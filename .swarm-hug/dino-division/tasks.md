@@ -26,7 +26,7 @@
 
 ## Gallery & Theming
 
-- [A] (#13) Implement the Dino Gallery page/section to display all unlocked dinosaurs with image, dinosaur name, and earned date, including empty-state and live refresh after new unlocks [5 pts] (blocked by #12)
+- [x] (#13) Implement the Dino Gallery page/section to display all unlocked dinosaurs with image, dinosaur name, and earned date, including empty-state and live refresh after new unlocks [5 pts] (blocked by #12) (A)
 - [ ] (#14) Apply full dinosaur/Jurassic theming across the app (earthy/jungle palette, themed typography/headers, subtle dino motifs) and integrate playful success/error messages into gameplay feedback [5 pts] (blocked by #5, #13)
 
 ## Testing & Release Readiness
@@ -50,5 +50,5 @@
 - [x] (#21) Wire `processReward()` into `page.tsx`'s `handleProblemComplete` so that when `shouldReward` fires, the reward orchestrator is called to pick a dinosaur, generate its image via Gemini, and append the unlocked metadata to the player save — instead of only showing a static banner (blocked by #9) (A)
 
 ## Follow-up tasks (from sprint review)
-- [B] (#22) Add a `.catch()` handler to the `persistAfterSolve` promise in `page.tsx` `handleProblemComplete` to prevent unhandled promise rejections — log or surface the error via `setSaveError` (blocked by #12)
-- [B] (#23) Refactor `saveGame` / persistence integration to cache the `FileSystemFileHandle` after the first save so that subsequent auto-saves after each problem solve reuse the handle instead of re-prompting `showSaveFilePicker` every time (blocked by #12)
+- [x] (#22) Add a `.catch()` handler to the `persistAfterSolve` promise in `page.tsx` `handleProblemComplete` to prevent unhandled promise rejections — log or surface the error via `setSaveError` (blocked by #12) (B)
+- [x] (#23) Refactor `saveGame` / persistence integration to cache the `FileSystemFileHandle` after the first save so that subsequent auto-saves after each problem solve reuse the handle instead of re-prompting `showSaveFilePicker` every time (blocked by #12) (B)
