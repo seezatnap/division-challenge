@@ -143,6 +143,7 @@ export default function PlayerSavePanel() {
           <LongDivisionWorkbench
             key={`${runtimeState.playerSave.playerName}-${runtimeState.initializedAt}-${runtimeState.playerSave.currentDifficulty}`}
             difficulty={runtimeState.playerSave.currentDifficulty}
+            lifetimeSolvedCount={runtimeState.playerSave.totalProblemsSolved}
           />
         </>
       ) : (
