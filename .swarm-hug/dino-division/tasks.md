@@ -27,7 +27,7 @@
 ## Gallery & Theming
 
 - [x] (#13) Implement the Dino Gallery page/section to display all unlocked dinosaurs with image, dinosaur name, and earned date, including empty-state and live refresh after new unlocks [5 pts] (blocked by #12) (B)
-- [ ] (#14) Apply full dinosaur/Jurassic theming across the app (earthy/jungle palette, themed typography/headers, subtle dino motifs) and integrate playful success/error messages into gameplay feedback [5 pts] (blocked by #5, #13)
+- [A] (#14) Apply full dinosaur/Jurassic theming across the app (earthy/jungle palette, themed typography/headers, subtle dino motifs) and integrate playful success/error messages into gameplay feedback [5 pts] (blocked by #5, #13)
 
 ## Testing & Release Readiness
 
