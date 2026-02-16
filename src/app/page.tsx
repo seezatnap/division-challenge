@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import GameStartScreen from "@/components/GameStartScreen";
 import type { GameStartResult } from "@/components/GameStartScreen";
 import DivisionWorkspace from "@/components/DivisionWorkspace";
+import DinoGallery from "@/components/DinoGallery";
 import type { GameState } from "@/lib/game-state";
 import { initFromSave, initNewGame } from "@/lib/game-state";
 import type { DifficultyTier, DivisionProblem, UnlockedDinosaur } from "@/types";
@@ -20,17 +21,25 @@ export default function Home() {
   const [rewardError, setRewardError] = useState<string | null>(null);
   const [levelUpTier, setLevelUpTier] = useState<DifficultyTier | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showGallery, setShowGallery] = useState(false);
 
   // Track whether we've already persisted once this session (to avoid
   // duplicating session history entries).
   const hasPersistedRef = useRef(false);
 
+  // Cache the FileSystemFileHandle after the first save so subsequent
+  // auto-saves reuse it instead of re-prompting showSaveFilePicker.
+  const fileHandleRef = useRef<FileSystemFileHandle | undefined>(undefined);
+
   function handleStart(result: GameStartResult) {
     let newState: GameState;
     if (result.mode === "loaded" && result.playerSave) {
       newState = initFromSave(result.playerSave);
+      // Reuse the handle from the loaded file for subsequent saves
+      fileHandleRef.current = result.fileHandle;
     } else if (result.mode === "new" && result.playerName) {
       newState = initNewGame(result.playerName);
+      fileHandleRef.current = undefined;
     } else {
       return;
     }
@@ -55,11 +64,19 @@ export default function Home() {
           generateProblem(updatedState.playerSave.currentDifficulty),
         );
 
-        // Persist progress asynchronously (non-blocking)
+        // Persist progress asynchronously (non-blocking).
+        // Pass the cached file handle so subsequent saves skip the OS picker.
         const isFirstSave = !hasPersistedRef.current;
-        persistAfterSolve(updatedState, shouldReward, isFirstSave).then(
-          (result) => {
+        persistAfterSolve(updatedState, shouldReward, isFirstSave, {
+          cachedFileHandle: fileHandleRef.current,
+        })
+          .then((result) => {
             hasPersistedRef.current = true;
+
+            // Cache the file handle for future saves
+            if (result.fileHandle) {
+              fileHandleRef.current = result.fileHandle;
+            }
 
             if (result.rewardResult?.status === "success") {
               setRewardDino(result.rewardResult.unlocked);
@@ -79,8 +96,13 @@ export default function Home() {
               if (!current) return current;
               return { ...current, playerSave: result.updatedState.playerSave };
             });
-          },
-        );
+          })
+          .catch((err: unknown) => {
+            const message =
+              err instanceof Error ? err.message : "Unknown persistence error";
+            console.error("persistAfterSolve failed:", err);
+            setSaveError(message);
+          });
 
         return updatedState;
       });
@@ -103,6 +125,14 @@ export default function Home() {
           {gameState.playerSave.totalProblemsSolved} | Session:{" "}
           {gameState.sessionProblemsSolved}
         </p>
+        <button
+          type="button"
+          onClick={() => setShowGallery((prev) => !prev)}
+          className="mt-2 rounded bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-700"
+          data-testid="gallery-toggle"
+        >
+          {showGallery ? "Back to Practice" : "Dino Gallery"} ({gameState.playerSave.unlockedDinosaurs.length})
+        </button>
       </header>
 
       {/* Level-up banner */}
@@ -182,13 +212,19 @@ export default function Home() {
         </div>
       )}
 
-      {/* Workspace */}
-      {currentProblem && (
-        <DivisionWorkspace
-          key={currentProblem.id}
-          problem={currentProblem}
-          onProblemComplete={handleProblemComplete}
+      {/* Gallery or Workspace */}
+      {showGallery ? (
+        <DinoGallery
+          unlockedDinosaurs={gameState.playerSave.unlockedDinosaurs}
         />
+      ) : (
+        currentProblem && (
+          <DivisionWorkspace
+            key={currentProblem.id}
+            problem={currentProblem}
+            onProblemComplete={handleProblemComplete}
+          />
+        )
       )}
     </div>
   );

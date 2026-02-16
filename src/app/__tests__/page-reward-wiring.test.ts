@@ -252,3 +252,63 @@ describe("Page reward wiring (handleProblemComplete flow)", () => {
     expect(successResult.rewardError).toBeNull();
   });
 });
+
+/**
+ * Tests verifying that the .catch() handler on the persistAfterSolve promise
+ * in page.tsx's handleProblemComplete properly surfaces unexpected errors via
+ * setSaveError. Since page.tsx is a React component, these tests exercise the
+ * catch-handler logic directly without a DOM environment.
+ */
+describe("persistAfterSolve .catch() handler (unhandled rejection prevention)", () => {
+  it("rejects with an Error when saveFn throws unexpectedly", async () => {
+    const state = initNewGame("Rex");
+    const { updatedState } = recordSolve(state);
+
+    // saveFn throws — this simulates an unexpected failure that would cause
+    // an unhandled promise rejection without a .catch() handler.
+    const error = await persistAfterSolve(updatedState, false, true, {
+      saveFn: vi.fn().mockRejectedValue(new Error("Disk full")),
+      rewardFn: vi.fn().mockResolvedValue({ status: "pool_exhausted" }),
+      now: "2026-02-16T12:00:00.000Z",
+      supportedFn: () => true,
+    }).catch((err: unknown) => err);
+
+    // Verify the catch handler receives an Error with the right message
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("Disk full");
+  });
+
+  it("rejects with an Error when rewardFn throws unexpectedly", async () => {
+    let state = initNewGame("Rex");
+    for (let i = 0; i < REWARD_INTERVAL - 1; i++) {
+      state = recordSolve(state).updatedState;
+    }
+    const { updatedState, shouldReward } = recordSolve(state);
+    expect(shouldReward).toBe(true);
+
+    // rewardFn throws (not a graceful error result — an actual exception)
+    const error = await persistAfterSolve(updatedState, shouldReward, false, {
+      saveFn: vi.fn().mockResolvedValue({ ok: true }),
+      rewardFn: vi.fn().mockRejectedValue(new Error("Network timeout")),
+      now: "2026-02-16T12:00:00.000Z",
+      supportedFn: () => true,
+    }).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("Network timeout");
+  });
+
+  it("extracts error message from Error instances (page.tsx catch logic)", () => {
+    // This mirrors the exact logic in page.tsx's .catch() handler:
+    //   const message = err instanceof Error ? err.message : "Unknown persistence error";
+    const extractMessage = (err: unknown): string =>
+      err instanceof Error ? err.message : "Unknown persistence error";
+
+    expect(extractMessage(new Error("Disk full"))).toBe("Disk full");
+    expect(extractMessage(new TypeError("Failed to fetch"))).toBe("Failed to fetch");
+    expect(extractMessage("string error")).toBe("Unknown persistence error");
+    expect(extractMessage(null)).toBe("Unknown persistence error");
+    expect(extractMessage(undefined)).toBe("Unknown persistence error");
+    expect(extractMessage(42)).toBe("Unknown persistence error");
+  });
+});
