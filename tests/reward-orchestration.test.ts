@@ -4,8 +4,15 @@ import test from "node:test";
 import { createNewPlayerSave } from "../lib/domain";
 import {
   orchestrateRewardUnlock,
+  processPendingRewardMilestones,
   requestGeminiRewardImage,
 } from "../lib/reward-orchestration";
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
 
 test("requestGeminiRewardImage posts dinosaur name and returns image path", async () => {
   let receivedUrl: RequestInfo | URL | undefined;
@@ -155,4 +162,87 @@ test("orchestrateRewardUnlock validates reward trigger index integrity", async (
       }),
     /does not match the solved-count milestone/,
   );
+});
+
+test("processPendingRewardMilestones retries failed milestones before newer milestones", async () => {
+  const save = createNewPlayerSave("Delta");
+  const requestedDinosaurNames: string[] = [];
+  let shouldFailFirstTrexAttempt = true;
+
+  const firstResult = await processPendingRewardMilestones({
+    playerSave: save,
+    highestRewardIndex: 0,
+    generateRewardImage: async (dinosaurName) => {
+      requestedDinosaurNames.push(dinosaurName);
+      if (dinosaurName === "Tyrannosaurus Rex" && shouldFailFirstTrexAttempt) {
+        shouldFailFirstTrexAttempt = false;
+        throw new Error("Temporary Gemini failure");
+      }
+
+      return {
+        imagePath: `/generated-dinosaurs/${dinosaurName.toLowerCase().replace(/\s+/g, "-")}.png`,
+      };
+    },
+    earnedAt: "2026-02-16T14:00:00.000Z",
+  });
+
+  assert.equal(firstResult.failedRewardIndex, 0);
+  assert.match(firstResult.errorMessage ?? "", /Temporary Gemini failure/);
+  assert.equal(firstResult.playerSave.unlockedDinosaurs.length, 0);
+
+  const secondResult = await processPendingRewardMilestones({
+    playerSave: firstResult.playerSave,
+    highestRewardIndex: 1,
+    generateRewardImage: async (dinosaurName) => {
+      requestedDinosaurNames.push(dinosaurName);
+      return {
+        imagePath: `/generated-dinosaurs/${dinosaurName.toLowerCase().replace(/\s+/g, "-")}.png`,
+      };
+    },
+    earnedAt: "2026-02-16T14:01:00.000Z",
+  });
+
+  assert.equal(secondResult.failedRewardIndex, null);
+  assert.equal(secondResult.errorMessage, null);
+  assert.deepEqual(
+    secondResult.playerSave.unlockedDinosaurs.map((dinosaur) => dinosaur.name),
+    ["Tyrannosaurus Rex", "Velociraptor"],
+  );
+  assert.deepEqual(requestedDinosaurNames, [
+    "Tyrannosaurus Rex",
+    "Tyrannosaurus Rex",
+    "Velociraptor",
+  ]);
+});
+
+test("processPendingRewardMilestones keeps milestone unlocks ordered when later responses are faster", async () => {
+  const save = createNewPlayerSave("Echo");
+  const responseResolutionOrder: string[] = [];
+
+  const result = await processPendingRewardMilestones({
+    playerSave: save,
+    highestRewardIndex: 1,
+    generateRewardImage: async (dinosaurName) => {
+      if (dinosaurName === "Tyrannosaurus Rex") {
+        await delay(30);
+      }
+
+      responseResolutionOrder.push(dinosaurName);
+      return {
+        imagePath: `/generated-dinosaurs/${dinosaurName.toLowerCase().replace(/\s+/g, "-")}.png`,
+      };
+    },
+    earnedAt: "2026-02-16T15:00:00.000Z",
+  });
+
+  assert.equal(result.failedRewardIndex, null);
+  assert.equal(result.errorMessage, null);
+  assert.deepEqual(
+    result.playerSave.unlockedDinosaurs.map((dinosaur) => dinosaur.name),
+    ["Tyrannosaurus Rex", "Velociraptor"],
+  );
+  assert.deepEqual(responseResolutionOrder, [
+    "Tyrannosaurus Rex",
+    "Velociraptor",
+  ]);
 });
