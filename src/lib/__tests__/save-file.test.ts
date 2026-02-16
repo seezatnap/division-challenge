@@ -169,9 +169,41 @@ describe("saveGame", () => {
     expect(writable.close).toHaveBeenCalled();
   });
 
-  it("returns ok:true on success", async () => {
+  it("returns ok:true with handle on success", async () => {
     const result = await saveGame(validSave());
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.handle).toBeDefined();
+      expect(result.handle.createWritable).toBeDefined();
+    }
+  });
+
+  it("skips showSaveFilePicker when a cached handle is provided", async () => {
+    const cachedHandle = makeMockFileHandle("", "rex-save.json");
+    const result = await saveGame(validSave(), cachedHandle as unknown as FileSystemFileHandle);
+    expect(result.ok).toBe(true);
+    // showSaveFilePicker should NOT have been called
+    expect(window.showSaveFilePicker).not.toHaveBeenCalled();
+    if (result.ok) {
+      expect(result.handle).toBe(cachedHandle);
+    }
+  });
+
+  it("writes to cached handle without prompting", async () => {
+    const writable = makeMockWritable();
+    const cachedHandle = {
+      createWritable: vi.fn().mockResolvedValue(writable),
+    };
+    const save = validSave("Rex");
+    await saveGame(save, cachedHandle as unknown as FileSystemFileHandle);
+    expect(cachedHandle.createWritable).toHaveBeenCalled();
+    expect(writable.write).toHaveBeenCalledWith(JSON.stringify(save, null, 2));
+    expect(writable.close).toHaveBeenCalled();
+  });
+
+  it("falls back to showSaveFilePicker when no cached handle is provided", async () => {
+    await saveGame(validSave());
+    expect(window.showSaveFilePicker).toHaveBeenCalledTimes(1);
   });
 
   it("returns user-cancelled error on AbortError", async () => {
@@ -253,6 +285,16 @@ describe("loadGame", () => {
     if (result.ok) {
       expect(result.data.playerName).toBe("Rex");
       expect(result.data.version).toBe(1);
+    }
+  });
+
+  it("returns the file handle on successful load", async () => {
+    const save = validSave("Rex");
+    const handle = setupWindow(JSON.stringify(save));
+    const result = await loadGame();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.handle).toBe(handle);
     }
   });
 

@@ -12,6 +12,8 @@ export interface GameStartResult {
   mode: "new" | "loaded";
   playerSave?: PlayerSave;
   playerName?: string;
+  /** Cached FileSystemFileHandle from loading a save, reusable for subsequent saves. */
+  fileHandle?: FileSystemFileHandle;
 }
 
 interface GameStartScreenProps {
@@ -58,7 +60,7 @@ export default function GameStartScreen({ onStart }: GameStartScreenProps) {
       return;
     }
 
-    onStart({ mode: "loaded", playerSave: result.data });
+    onStart({ mode: "loaded", playerSave: result.data, fileHandle: result.handle });
   }
 
   function handleBack() {
