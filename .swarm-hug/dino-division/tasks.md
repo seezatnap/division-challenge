@@ -26,7 +26,7 @@
 
 ## Gallery & Theming
 
-- [ ] (#13) Implement the Dino Gallery page/section to display all unlocked dinosaurs with image, dinosaur name, and earned date, including empty-state and live refresh after new unlocks [5 pts] (blocked by #12)
+- [B] (#13) Implement the Dino Gallery page/section to display all unlocked dinosaurs with image, dinosaur name, and earned date, including empty-state and live refresh after new unlocks [5 pts] (blocked by #12)
 - [ ] (#14) Apply full dinosaur/Jurassic theming across the app (earthy/jungle palette, themed typography/headers, subtle dino motifs) and integrate playful success/error messages into gameplay feedback [5 pts] (blocked by #5, #13)
 
 ## Testing & Release Readiness
@@ -44,6 +44,6 @@
 - [x] (#19) Add retry handling for failed reward generation milestones (instead of permanently dropping them after one failed attempt), with regression tests for failed and out-of-order reward responses. (B)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#20) Fix session-history solve counting so `sessionHistory[].problemsSolved` remains cumulative across difficulty-tier remounts (currently it can plateau at 5); add a regression test that simulates solves across 5/10/15 milestones.
-- [ ] (#21) Make `Save Progress` wait for pending/in-flight reward milestone processing (or disable saving while rewards are processing) so newly unlocked dinosaurs and updated totals are not omitted from the saved JSON; add a regression test for this race.
-- [ ] (#22) Retry failed reward milestones without requiring a future milestone trigger (including after reload when `totalProblemsSolved` already crossed a reward boundary), so a failed reward at 5 solved is not deferred indefinitely.
+- [B] (#20) Fix session-history solve counting so `sessionHistory[].problemsSolved` remains cumulative across difficulty-tier remounts (currently it can plateau at 5); add a regression test that simulates solves across 5/10/15 milestones.
+- [A] (#21) Make `Save Progress` wait for pending/in-flight reward milestone processing (or disable saving while rewards are processing) so newly unlocked dinosaurs and updated totals are not omitted from the saved JSON; add a regression test for this race.
+- [A] (#22) Retry failed reward milestones without requiring a future milestone trigger (including after reload when `totalProblemsSolved` already crossed a reward boundary), so a failed reward at 5 solved is not deferred indefinitely.
