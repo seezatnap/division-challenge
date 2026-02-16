@@ -45,3 +45,6 @@
 ## Follow-up tasks (from sprint review)
 - [x] (#19) Fix stale closure in `handleProblemComplete` by using the functional updater form of `setGameState` so that rapid sequential solves don't lose state (blocked by #6) (B)
 - [x] (#20) Remove the empty `if (didLevelUp)` block in `page.tsx` or replace it with actual level-up feedback UI such as a congratulatory banner (blocked by #6) (B)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#21) Wire `processReward()` into `page.tsx`'s `handleProblemComplete` so that when `shouldReward` fires, the reward orchestrator is called to pick a dinosaur, generate its image via Gemini, and append the unlocked metadata to the player save — instead of only showing a static banner (blocked by #9)
