@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateDinoImage } from "@/lib/gemini";
+import { saveDinoImage } from "@/lib/image-storage";
 
 /**
  * POST /api/generate-dino
  *
- * Accepts { dinoName: string } and returns the generated image as
- * { base64Data: string, mimeType: string }.
+ * Accepts { dinoName: string } and returns the generated image's
+ * public path along with original base64 data and MIME type.
+ *
+ * Response: { imagePath: string, base64Data: string, mimeType: string }
  */
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -40,7 +43,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const image = await generateDinoImage(dinoName);
+    const imagePath = await saveDinoImage(
+      dinoName,
+      image.base64Data,
+      image.mimeType,
+    );
     return NextResponse.json({
+      imagePath,
       base64Data: image.base64Data,
       mimeType: image.mimeType,
     });
