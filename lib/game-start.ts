@@ -140,6 +140,21 @@ function upsertRuntimeSessionProgress(
   ];
 }
 
+function getRuntimeSessionSolvedCount(
+  sessionHistory: readonly SessionHistoryEntry[],
+  sessionId: string,
+): number {
+  const runtimeSessionEntry = sessionHistory.find(
+    (entry) => entry.sessionId === sessionId,
+  );
+
+  if (!runtimeSessionEntry) {
+    return 0;
+  }
+
+  return normalizeSolvedCount(runtimeSessionEntry.problemsSolved);
+}
+
 export function requirePlayerName(playerName: string): string {
   const trimmedName = playerName.trim();
 
@@ -211,11 +226,23 @@ export function applyRuntimeProgressUpdate(
     runtimeState.playerSave.totalProblemsSolved,
     lifetimeSolvedCount,
   );
+  const solvedCountDelta = Math.max(
+    0,
+    totalProblemsSolved - runtimeState.playerSave.totalProblemsSolved,
+  );
+  const runtimeSessionSolvedCount = getRuntimeSessionSolvedCount(
+    runtimeState.playerSave.sessionHistory,
+    runtimeState.sessionId,
+  );
+  const cumulativeSolvedCount = Math.max(
+    solvedCount,
+    runtimeSessionSolvedCount + solvedCountDelta,
+  );
   const sessionHistory = upsertRuntimeSessionProgress(
     runtimeState.playerSave.sessionHistory,
     runtimeState.sessionId,
     runtimeState.initializedAt,
-    solvedCount,
+    cumulativeSolvedCount,
   );
   const hasNoChanges =
     runtimeState.playerSave.totalProblemsSolved === totalProblemsSolved &&
