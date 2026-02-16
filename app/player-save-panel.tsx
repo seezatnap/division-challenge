@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import LongDivisionWorkbench from "./long-division-workbench";
+import DinoGallery from "./dino-gallery";
 
 import {
   applyRuntimeProgressUpdate,
@@ -345,6 +346,10 @@ export default function PlayerSavePanel() {
             lifetimeSolvedCount={runtimeState.playerSave.totalProblemsSolved}
             onProgressChange={handleWorkbenchProgressChange}
             onRewardTrigger={handleRewardTrigger}
+          />
+
+          <DinoGallery
+            unlockedDinosaurs={runtimeState.playerSave.unlockedDinosaurs}
           />
         </>
       ) : (
