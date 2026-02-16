@@ -1,0 +1,158 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { createNewPlayerSave } from "../lib/domain";
+import {
+  orchestrateRewardUnlock,
+  requestGeminiRewardImage,
+} from "../lib/reward-orchestration";
+
+test("requestGeminiRewardImage posts dinosaur name and returns image path", async () => {
+  let receivedUrl: RequestInfo | URL | undefined;
+  let receivedInit: RequestInit | undefined;
+
+  const fetchFn: typeof fetch = async (input, init) => {
+    receivedUrl = input;
+    receivedInit = init;
+
+    return new Response(
+      JSON.stringify({
+        imagePath: "/generated-dinosaurs/tyrannosaurus-rex-abc123.png",
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  };
+
+  const response = await requestGeminiRewardImage({
+    dinosaurName: "  Tyrannosaurus Rex  ",
+    endpoint: "/api/test-gemini",
+    fetchFn,
+  });
+
+  assert.equal(receivedUrl, "/api/test-gemini");
+  assert.equal(receivedInit?.method, "POST");
+  assert.equal(
+    (receivedInit?.headers as Record<string, string> | undefined)?.[
+      "Content-Type"
+    ],
+    "application/json",
+  );
+  assert.deepEqual(JSON.parse(String(receivedInit?.body)), {
+    dinosaurName: "Tyrannosaurus Rex",
+  });
+  assert.equal(
+    response.imagePath,
+    "/generated-dinosaurs/tyrannosaurus-rex-abc123.png",
+  );
+});
+
+test("requestGeminiRewardImage surfaces gemini route errors", async () => {
+  const fetchFn: typeof fetch = async () =>
+    new Response(
+      JSON.stringify({
+        error: "Gemini unavailable",
+      }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+  await assert.rejects(
+    () =>
+      requestGeminiRewardImage({
+        dinosaurName: "Triceratops",
+        fetchFn,
+      }),
+    /Gemini unavailable/,
+  );
+});
+
+test("orchestrateRewardUnlock selects a dinosaur and appends unlocked metadata", async () => {
+  let requestedDinosaurName = "";
+  const save = createNewPlayerSave("Rex");
+  const result = await orchestrateRewardUnlock({
+    playerSave: save,
+    rewardTrigger: {
+      rewardIndex: 2,
+      lifetimeSolvedCount: 15,
+    },
+    earnedAt: "2026-02-16T10:15:00.000Z",
+    generateRewardImage: async (dinosaurName) => {
+      requestedDinosaurName = dinosaurName;
+      return {
+        imagePath: `/generated-dinosaurs/${dinosaurName.toLowerCase().replace(/\s+/g, "-")}.png`,
+      };
+    },
+  });
+
+  assert.equal(result.dinosaurName, "Triceratops");
+  assert.equal(requestedDinosaurName, "Triceratops");
+  assert.equal(result.skipped, false);
+  assert.equal(result.unlockedDinosaur?.name, "Triceratops");
+  assert.equal(
+    result.unlockedDinosaur?.imagePath,
+    "/generated-dinosaurs/triceratops.png",
+  );
+  assert.equal(result.unlockedDinosaur?.earnedAt, "2026-02-16T10:15:00.000Z");
+  assert.equal(result.playerSave.totalProblemsSolved, 15);
+  assert.equal(result.playerSave.unlockedDinosaurs.length, 1);
+});
+
+test("orchestrateRewardUnlock skips duplicate reward triggers that were already unlocked", async () => {
+  const save = createNewPlayerSave("Blue");
+  save.unlockedDinosaurs.push({
+    name: "Tyrannosaurus Rex",
+    imagePath: "/generated-dinosaurs/trex.png",
+    earnedAt: "2026-02-15T00:00:00.000Z",
+  });
+  save.unlockedDinosaurs.push({
+    name: "Velociraptor",
+    imagePath: "/generated-dinosaurs/velociraptor.png",
+    earnedAt: "2026-02-15T01:00:00.000Z",
+  });
+
+  let called = false;
+  const result = await orchestrateRewardUnlock({
+    playerSave: save,
+    rewardTrigger: {
+      rewardIndex: 1,
+      lifetimeSolvedCount: 10,
+    },
+    generateRewardImage: async () => {
+      called = true;
+      return { imagePath: "/generated-dinosaurs/unexpected.png" };
+    },
+  });
+
+  assert.equal(called, false);
+  assert.equal(result.skipped, true);
+  assert.equal(result.unlockedDinosaur, null);
+  assert.equal(result.playerSave, save);
+});
+
+test("orchestrateRewardUnlock validates reward trigger index integrity", async () => {
+  const save = createNewPlayerSave("Charlie");
+
+  await assert.rejects(
+    () =>
+      orchestrateRewardUnlock({
+        playerSave: save,
+        rewardTrigger: {
+          rewardIndex: 3,
+          lifetimeSolvedCount: 10,
+        },
+        generateRewardImage: async () => ({
+          imagePath: "/generated-dinosaurs/unused.png",
+        }),
+      }),
+    /does not match the solved-count milestone/,
+  );
+});
