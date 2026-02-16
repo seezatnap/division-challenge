@@ -2,7 +2,7 @@
 
 ## Platform & Data Foundations
 
-- [ ] (#1) Set up and validate the Next.js App Router + TypeScript + Tailwind baseline, configure `.env.local` usage for `GEMINI_API_KEY`, and define shared domain types for division problems, player save schema, unlocked dinosaurs, and session history [5 pts]
+- [x] (#1) Set up and validate the Next.js App Router + TypeScript + Tailwind baseline, configure `.env.local` usage for `GEMINI_API_KEY`, and define shared domain types for division problems, player save schema, unlocked dinosaurs, and session history [5 pts] (A)
 - [ ] (#2) Create a constants/data module with the full static list of 100 dinosaurs (including major Jurassic Park/Jurassic World/Chaos Theory dinosaurs), plus utility methods for selection and guard checks for exact count and uniqueness [5 pts] (blocked by #1)
 
 ## Division Gameplay
@@ -32,3 +32,6 @@
 ## Testing & Release Readiness
 
 - [ ] (#15) Add automated tests for problem generation, step validation, progression/reward thresholds, dinosaur list integrity, save-file schema handling, plus an integration smoke test for solve->reward->gallery flow with mocked Gemini; include a concise developer QA/runbook for env and browser support checks [5 pts] (blocked by #12, #13, #14)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#16) Update `isDivisionProblem` in `lib/domain.ts` to reject mathematically inconsistent problems (`dividend !== divisor * quotient + remainder`) and add a regression test in `tests/domain.test.ts`.
