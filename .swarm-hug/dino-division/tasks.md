@@ -48,3 +48,7 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#21) Wire `processReward()` into `page.tsx`'s `handleProblemComplete` so that when `shouldReward` fires, the reward orchestrator is called to pick a dinosaur, generate its image via Gemini, and append the unlocked metadata to the player save — instead of only showing a static banner (blocked by #9) (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#22) Add a `.catch()` handler to the `persistAfterSolve` promise in `page.tsx` `handleProblemComplete` to prevent unhandled promise rejections — log or surface the error via `setSaveError` (blocked by #12)
+- [ ] (#23) Refactor `saveGame` / persistence integration to cache the `FileSystemFileHandle` after the first save so that subsequent auto-saves after each problem solve reuse the handle instead of re-prompting `showSaveFilePicker` every time (blocked by #12)
