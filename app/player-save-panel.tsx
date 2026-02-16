@@ -24,6 +24,7 @@ import {
   saveProgressAfterRewardMilestones,
 } from "@/lib/save-progress";
 import {
+  getHighestRewardIndexForSolvedCount,
   processPendingRewardMilestones,
   type ProcessPendingRewardMilestonesResult,
 } from "@/lib/reward-orchestration";
@@ -48,6 +49,9 @@ export default function PlayerSavePanel() {
   const [isBusy, setIsBusy] = useState(false);
   const rewardMilestoneQueue = useMemo(() => createSerialTaskQueue(), []);
   const runtimeStateRef = useRef<GameRuntimeState | null>(runtimeState);
+  const processQueuedRewardMilestonesRef = useRef<
+    (runtimeStateKey: string) => Promise<void>
+  >(async (): Promise<void> => {});
   const rewardHighestSeenIndexRef = useRef<number>(-1);
 
   const isSupported = useMemo(() => isFileSystemAccessSupported(), []);
@@ -55,6 +59,33 @@ export default function PlayerSavePanel() {
   useEffect(() => {
     runtimeStateRef.current = runtimeState;
   }, [runtimeState]);
+
+  useEffect(() => {
+    if (!runtimeState) {
+      return;
+    }
+
+    const highestRewardIndex = syncHighestSeenRewardIndex(
+      runtimeState.playerSave.totalProblemsSolved,
+    );
+    if (runtimeState.playerSave.unlockedDinosaurs.length > highestRewardIndex) {
+      return;
+    }
+
+    const runtimeStateKey = buildRuntimeStateKey(runtimeState);
+    void rewardMilestoneQueue.enqueue(() =>
+      processQueuedRewardMilestonesRef.current(runtimeStateKey)
+    );
+  }, [runtimeState, rewardMilestoneQueue]);
+
+  function syncHighestSeenRewardIndex(totalProblemsSolved: number): number {
+    rewardHighestSeenIndexRef.current = Math.max(
+      rewardHighestSeenIndexRef.current,
+      getHighestRewardIndexForSolvedCount(totalProblemsSolved),
+    );
+
+    return rewardHighestSeenIndexRef.current;
+  }
 
   function resetRewardProcessingState(): void {
     rewardMilestoneQueue.clear();
@@ -87,7 +118,9 @@ export default function PlayerSavePanel() {
         return;
       }
 
-      const highestRewardIndex = rewardHighestSeenIndexRef.current;
+      const highestRewardIndex = syncHighestSeenRewardIndex(
+        queuedRuntimeState.playerSave.totalProblemsSolved,
+      );
       if (queuedRuntimeState.playerSave.unlockedDinosaurs.length > highestRewardIndex) {
         return;
       }
@@ -106,22 +139,14 @@ export default function PlayerSavePanel() {
       }
     }
   }
+  processQueuedRewardMilestonesRef.current = processQueuedRewardMilestones;
 
-  async function handleRewardTrigger(
+  function handleRewardTrigger(
     rewardTrigger: LongDivisionWorkbenchRewardTrigger,
-  ): Promise<void> {
-    const currentRuntimeState = runtimeStateRef.current;
-    if (!currentRuntimeState) {
-      return;
-    }
-
-    const runtimeStateKey = buildRuntimeStateKey(currentRuntimeState);
+  ): void {
     rewardHighestSeenIndexRef.current = Math.max(
       rewardHighestSeenIndexRef.current,
       rewardTrigger.rewardIndex,
-    );
-    await rewardMilestoneQueue.enqueue(() =>
-      processQueuedRewardMilestones(runtimeStateKey)
     );
   }
 
