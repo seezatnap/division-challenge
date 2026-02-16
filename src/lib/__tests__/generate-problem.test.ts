@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { generateProblem, generateProblems } from "./generate-problem";
-import { ALL_TIERS, DIFFICULTY_CONFIGS } from "./difficulty";
+import { generateProblem, generateProblems } from "../generate-problem";
+import { ALL_TIERS, DIFFICULTY_CONFIGS } from "../difficulty";
 import type { DifficultyTier } from "@/types";
 
 /** Count the number of decimal digits in a positive integer. */
