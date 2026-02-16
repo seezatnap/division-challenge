@@ -57,8 +57,8 @@ export default function Home() {
 
         // Persist progress asynchronously (non-blocking)
         const isFirstSave = !hasPersistedRef.current;
-        persistAfterSolve(updatedState, shouldReward, isFirstSave).then(
-          (result) => {
+        persistAfterSolve(updatedState, shouldReward, isFirstSave)
+          .then((result) => {
             hasPersistedRef.current = true;
 
             if (result.rewardResult?.status === "success") {
@@ -79,8 +79,13 @@ export default function Home() {
               if (!current) return current;
               return { ...current, playerSave: result.updatedState.playerSave };
             });
-          },
-        );
+          })
+          .catch((err: unknown) => {
+            const message =
+              err instanceof Error ? err.message : "Unknown persistence error";
+            console.error("persistAfterSolve failed:", err);
+            setSaveError(message);
+          });
 
         return updatedState;
       });
