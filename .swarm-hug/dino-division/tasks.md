@@ -9,7 +9,7 @@
 
 - [x] (#3) Implement long-division problem generation with difficulty tiers from `2-digit ÷ 1-digit` up to `4–5 digit ÷ 2–3 digit`, including remainder handling and difficulty metadata per generated problem [5 pts] (blocked by #1) (B)
 - [x] (#4) Build the step-state engine for long division (`divide -> multiply -> subtract -> bring down`) that validates each step input, returns correctness state, provides hint text for mistakes, and detects problem completion [5 pts] (blocked by #3) (A)
-- [ ] (#5) Implement the interactive “work on paper” UI for step-by-step solving, wiring user inputs to the step engine with immediate feedback and smooth transition to the next problem [5 pts] (blocked by #4)
+- [A] (#5) Implement the interactive “work on paper” UI for step-by-step solving, wiring user inputs to the step engine with immediate feedback and smooth transition to the next problem [5 pts] (blocked by #4)
 - [ ] (#6) Add progression logic to track solved counts for current session and lifetime totals, increase difficulty with player progress, and emit a reward trigger every 5 solved problems [5 pts] (blocked by #5)
 
 ## Dino Rewards Pipeline
@@ -40,4 +40,4 @@
 - [x] (#17) Move `src/lib/difficulty.test.ts` and `src/lib/generate-problem.test.ts` into `src/lib/__tests__/` to match the established test directory convention used by Sprint 1 and the other Sprint 2 deliverables (blocked by #3) (A)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#18) Move `src/lib/game-state.test.ts` into `src/lib/__tests__/` to match the established test directory convention and update its relative import from `./game-state` to `../game-state` (blocked by #11)
+- [A] (#18) Move `src/lib/game-state.test.ts` into `src/lib/__tests__/` to match the established test directory convention and update its relative import from `./game-state` to `../game-state` (blocked by #11)
