@@ -125,7 +125,8 @@ export function isDivisionProblem(value: unknown): value is DivisionProblem {
 
   return (
     divisor > 0 &&
-    remainder < divisor
+    remainder < divisor &&
+    dividend === (divisor * quotient) + remainder
   );
 }
 
