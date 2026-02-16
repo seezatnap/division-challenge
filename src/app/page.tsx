@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import GameStartScreen from "@/components/GameStartScreen";
 import type { GameStartResult } from "@/components/GameStartScreen";
 import DivisionWorkspace from "@/components/DivisionWorkspace";
+import DinoGallery from "@/components/DinoGallery";
 import type { GameState } from "@/lib/game-state";
 import { initFromSave, initNewGame } from "@/lib/game-state";
 import type { DifficultyTier, DivisionProblem, UnlockedDinosaur } from "@/types";
@@ -20,6 +21,7 @@ export default function Home() {
   const [rewardError, setRewardError] = useState<string | null>(null);
   const [levelUpTier, setLevelUpTier] = useState<DifficultyTier | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showGallery, setShowGallery] = useState(false);
 
   // Track whether we've already persisted once this session (to avoid
   // duplicating session history entries).
@@ -108,6 +110,14 @@ export default function Home() {
           {gameState.playerSave.totalProblemsSolved} | Session:{" "}
           {gameState.sessionProblemsSolved}
         </p>
+        <button
+          type="button"
+          onClick={() => setShowGallery((prev) => !prev)}
+          className="mt-2 rounded bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-700"
+          data-testid="gallery-toggle"
+        >
+          {showGallery ? "Back to Practice" : "Dino Gallery"} ({gameState.playerSave.unlockedDinosaurs.length})
+        </button>
       </header>
 
       {/* Level-up banner */}
@@ -187,13 +197,19 @@ export default function Home() {
         </div>
       )}
 
-      {/* Workspace */}
-      {currentProblem && (
-        <DivisionWorkspace
-          key={currentProblem.id}
-          problem={currentProblem}
-          onProblemComplete={handleProblemComplete}
+      {/* Gallery or Workspace */}
+      {showGallery ? (
+        <DinoGallery
+          unlockedDinosaurs={gameState.playerSave.unlockedDinosaurs}
         />
+      ) : (
+        currentProblem && (
+          <DivisionWorkspace
+            key={currentProblem.id}
+            problem={currentProblem}
+            onProblemComplete={handleProblemComplete}
+          />
+        )
       )}
     </div>
   );
