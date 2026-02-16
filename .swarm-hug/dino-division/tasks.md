@@ -16,7 +16,7 @@
 
 - [x] (#7) Implement a server-side Gemini image generation service/route using `@google/generative-ai` with model `gemini-2.0-flash-exp`, reading `GEMINI_API_KEY` from `.env.local`, and generating Jurassic Park cinematic-style prompts based on dinosaur name [5 pts] (blocked by #1) (A)
 - [x] (#8) Create server filesystem persistence for generated images by saving files into the public directory with stable unique naming and returning the public image path for UI rendering [5 pts] (blocked by #7) (B)
-- [ ] (#9) Build reward orchestration that consumes every-5-solved triggers, chooses a dinosaur from the 100-item pool, calls Gemini generation, stores image path, and appends unlocked metadata (`name`, `image path`, `date earned`) to player state [5 pts] (blocked by #2, #6, #8)
+- [A] (#9) Build reward orchestration that consumes every-5-solved triggers, chooses a dinosaur from the 100-item pool, calls Gemini generation, stores image path, and appends unlocked metadata (`name`, `image path`, `date earned`) to player state [5 pts] (blocked by #2, #6, #8)
 
 ## Save Files & Player Lifecycle
 
