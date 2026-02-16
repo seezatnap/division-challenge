@@ -22,7 +22,7 @@
 
 - [x] (#10) Implement File System Access API save/load support with explicit user permission prompts, `<player>-save.json` naming, JSON read/write, schema validation, and unsupported-browser fallback messaging [5 pts] (blocked by #1) (C)
 - [x] (#11) Build game-start flow to prompt for player name and present “Load existing save” vs “Start new game,” then initialize runtime state accordingly [5 pts] (blocked by #10) (A)
-- [ ] (#12) Integrate persistence with gameplay so progress, current difficulty, unlocked dinosaurs, and session history are saved/loaded consistently across sessions [5 pts] (blocked by #6, #9, #10, #11)
+- [A] (#12) Integrate persistence with gameplay so progress, current difficulty, unlocked dinosaurs, and session history are saved/loaded consistently across sessions [5 pts] (blocked by #6, #9, #10, #11)
 
 ## Gallery & Theming
 
@@ -40,5 +40,5 @@
 - [x] (#17) Harden `persistGeminiGeneratedImage` to strictly reject malformed base64 payloads (not just empty decodes) and add a regression test in `tests/gemini-image-storage.test.ts` for invalid-but-decodable input. (A)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#18) Make reward unlock application order-safe by queuing/serializing milestone processing in `app/player-save-panel.tsx` so later in-flight rewards cannot be applied before earlier ones and cause skipped unlocks.
-- [ ] (#19) Add retry handling for failed reward generation milestones (instead of permanently dropping them after one failed attempt), with regression tests for failed and out-of-order reward responses.
+- [B] (#18) Make reward unlock application order-safe by queuing/serializing milestone processing in `app/player-save-panel.tsx` so later in-flight rewards cannot be applied before earlier ones and cause skipped unlocks.
+- [B] (#19) Add retry handling for failed reward generation milestones (instead of permanently dropping them after one failed attempt), with regression tests for failed and out-of-order reward responses.
