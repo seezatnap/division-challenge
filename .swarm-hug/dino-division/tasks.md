@@ -8,20 +8,20 @@
 ## Division Gameplay
 
 - [x] (#3) Implement long-division problem generation with difficulty tiers from `2-digit ÷ 1-digit` up to `4–5 digit ÷ 2–3 digit`, including remainder handling and difficulty metadata per generated problem [5 pts] (blocked by #1) (B)
-- [A] (#4) Build the step-state engine for long division (`divide -> multiply -> subtract -> bring down`) that validates each step input, returns correctness state, provides hint text for mistakes, and detects problem completion [5 pts] (blocked by #3)
+- [x] (#4) Build the step-state engine for long division (`divide -> multiply -> subtract -> bring down`) that validates each step input, returns correctness state, provides hint text for mistakes, and detects problem completion [5 pts] (blocked by #3) (A)
 - [ ] (#5) Implement the interactive “work on paper” UI for step-by-step solving, wiring user inputs to the step engine with immediate feedback and smooth transition to the next problem [5 pts] (blocked by #4)
 - [ ] (#6) Add progression logic to track solved counts for current session and lifetime totals, increase difficulty with player progress, and emit a reward trigger every 5 solved problems [5 pts] (blocked by #5)
 
 ## Dino Rewards Pipeline
 
 - [x] (#7) Implement a server-side Gemini image generation service/route using `@google/generative-ai` with model `gemini-2.0-flash-exp`, reading `GEMINI_API_KEY` from `.env.local`, and generating Jurassic Park cinematic-style prompts based on dinosaur name [5 pts] (blocked by #1) (C)
-- [B] (#8) Create server filesystem persistence for generated images by saving files into the public directory with stable unique naming and returning the public image path for UI rendering [5 pts] (blocked by #7)
+- [x] (#8) Create server filesystem persistence for generated images by saving files into the public directory with stable unique naming and returning the public image path for UI rendering [5 pts] (blocked by #7) (B)
 - [ ] (#9) Build reward orchestration that consumes every-5-solved triggers, chooses a dinosaur from the 100-item pool, calls Gemini generation, stores image path, and appends unlocked metadata (`name`, `image path`, `date earned`) to player state [5 pts] (blocked by #2, #6, #8)
 
 ## Save Files & Player Lifecycle
 
 - [x] (#10) Implement File System Access API save/load support with explicit user permission prompts, `<player>-save.json` naming, JSON read/write, schema validation, and unsupported-browser fallback messaging [5 pts] (blocked by #1) (B)
-- [B] (#11) Build game-start flow to prompt for player name and present “Load existing save” vs “Start new game,” then initialize runtime state accordingly [5 pts] (blocked by #10)
+- [x] (#11) Build game-start flow to prompt for player name and present “Load existing save” vs “Start new game,” then initialize runtime state accordingly [5 pts] (blocked by #10) (B)
 - [ ] (#12) Integrate persistence with gameplay so progress, current difficulty, unlocked dinosaurs, and session history are saved/loaded consistently across sessions [5 pts] (blocked by #6, #9, #10, #11)
 
 ## Gallery & Theming
@@ -37,4 +37,4 @@
 - [x] (#16) Remove unused create-next-app boilerplate assets from `public/` (file.svg, globe.svg, next.svg, vercel.svg, window.svg) and replace default favicon.ico with a dino-themed one (blocked by #1) (A)
 
 ## Follow-up tasks (from sprint review)
-- [A] (#17) Move `src/lib/difficulty.test.ts` and `src/lib/generate-problem.test.ts` into `src/lib/__tests__/` to match the established test directory convention used by Sprint 1 and the other Sprint 2 deliverables (blocked by #3)
+- [x] (#17) Move `src/lib/difficulty.test.ts` and `src/lib/generate-problem.test.ts` into `src/lib/__tests__/` to match the established test directory convention used by Sprint 1 and the other Sprint 2 deliverables (blocked by #3) (A)
