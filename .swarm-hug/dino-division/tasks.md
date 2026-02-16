@@ -35,3 +35,6 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#16) Remove unused create-next-app boilerplate assets from `public/` (file.svg, globe.svg, next.svg, vercel.svg, window.svg) and replace default favicon.ico with a dino-themed one (blocked by #1) (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#17) Move `src/lib/difficulty.test.ts` and `src/lib/generate-problem.test.ts` into `src/lib/__tests__/` to match the established test directory convention used by Sprint 1 and the other Sprint 2 deliverables (blocked by #3)
