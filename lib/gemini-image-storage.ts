@@ -13,6 +13,8 @@ const MIME_EXTENSION_MAP: Record<string, string> = {
   "image/avif": "avif",
 };
 
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
+
 export interface PersistGeminiGeneratedImageOptions {
   dinosaurName: string;
   mimeType: string;
@@ -98,6 +100,37 @@ function buildStableHash(
     .slice(0, 16);
 }
 
+function decodeBase64Data(base64Data: string): Buffer {
+  if (!BASE64_PATTERN.test(base64Data)) {
+    throw new Error("Generated image data must be valid base64 content.");
+  }
+
+  if (base64Data.length % 4 === 1) {
+    throw new Error("Generated image data must be valid base64 content.");
+  }
+
+  if (base64Data.includes("=") && base64Data.length % 4 !== 0) {
+    throw new Error("Generated image data must be valid base64 content.");
+  }
+
+  const fileBuffer = Buffer.from(base64Data, "base64");
+
+  if (fileBuffer.length === 0) {
+    throw new Error("Generated image data could not be decoded from base64.");
+  }
+
+  const canonicalBase64 = fileBuffer.toString("base64");
+  const normalizedInput = base64Data.includes("=")
+    ? base64Data
+    : base64Data + "=".repeat((4 - (base64Data.length % 4)) % 4);
+
+  if (canonicalBase64 !== normalizedInput) {
+    throw new Error("Generated image data must be valid base64 content.");
+  }
+
+  return fileBuffer;
+}
+
 export function buildGeneratedDinosaurFileName(
   options: Pick<PersistGeminiGeneratedImageOptions, "dinosaurName" | "mimeType" | "data">,
 ): string {
@@ -114,18 +147,17 @@ export async function persistGeminiGeneratedImage(
   const subdirectory = normalizePublicSubdirectory(
     options.publicSubdirectory ?? GENERATED_DINOSAUR_PUBLIC_SUBDIRECTORY,
   );
-  const fileName = buildGeneratedDinosaurFileName(options);
   const base64Data = options.data.trim();
 
   if (!base64Data) {
     throw new Error("Generated image data must be non-empty base64 content.");
   }
 
-  const fileBuffer = Buffer.from(base64Data, "base64");
-
-  if (fileBuffer.length === 0) {
-    throw new Error("Generated image data could not be decoded from base64.");
-  }
+  const fileBuffer = decodeBase64Data(base64Data);
+  const fileName = buildGeneratedDinosaurFileName({
+    ...options,
+    data: base64Data,
+  });
 
   const publicDirectoryPath = path.join(
     options.projectRootDir ?? process.cwd(),

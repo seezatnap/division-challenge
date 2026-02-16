@@ -82,3 +82,15 @@ test("persistGeminiGeneratedImage rejects unsupported MIME types", async () => {
     /Unsupported image MIME type/,
   );
 });
+
+test("persistGeminiGeneratedImage rejects malformed base64 that still decodes", async () => {
+  await assert.rejects(
+    () =>
+      persistGeminiGeneratedImage({
+        dinosaurName: "Brachiosaurus",
+        mimeType: "image/png",
+        data: `${Buffer.from("mock-image-data").toString("base64")}!!`,
+      }),
+    /must be valid base64 content/,
+  );
+});
