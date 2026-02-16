@@ -31,7 +31,7 @@
 
 ## Testing & Release Readiness
 
-- [ ] (#15) Add automated tests for problem generation, step validation, progression/reward thresholds, dinosaur list integrity, save-file schema handling, plus an integration smoke test for solve->reward->gallery flow with mocked Gemini; include a concise developer QA/runbook for env and browser support checks [5 pts] (blocked by #12, #13, #14)
+- [A] (#15) Add automated tests for problem generation, step validation, progression/reward thresholds, dinosaur list integrity, save-file schema handling, plus an integration smoke test for solve->reward->gallery flow with mocked Gemini; include a concise developer QA/runbook for env and browser support checks [5 pts] (blocked by #12, #13, #14)
 
 ## Follow-up tasks (from sprint review)
 - [x] (#16) Remove unused create-next-app boilerplate assets from `public/` (file.svg, globe.svg, next.svg, vercel.svg, window.svg) and replace default favicon.ico with a dino-themed one (blocked by #1) (A)
