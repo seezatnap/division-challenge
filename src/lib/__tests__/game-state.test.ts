@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initFromSave, initNewGame } from "./game-state";
+import { initFromSave, initNewGame } from "../game-state";
 import { createNewPlayerSave } from "@/types";
 import type { PlayerSave } from "@/types";
 
