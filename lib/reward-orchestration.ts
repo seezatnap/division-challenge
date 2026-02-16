@@ -169,6 +169,19 @@ function assertHighestRewardIndex(highestRewardIndex: number): void {
   }
 }
 
+export function getHighestRewardIndexForSolvedCount(
+  totalProblemsSolved: number,
+): number {
+  if (
+    !Number.isInteger(totalProblemsSolved) ||
+    totalProblemsSolved < LONG_DIVISION_REWARD_INTERVAL
+  ) {
+    return -1;
+  }
+
+  return Math.floor(totalProblemsSolved / LONG_DIVISION_REWARD_INTERVAL) - 1;
+}
+
 function buildRewardTriggerForIndex(
   rewardIndex: number,
 ): LongDivisionWorkbenchRewardTrigger {
