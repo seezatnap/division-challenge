@@ -32,26 +32,24 @@ export default function Home() {
 
   const handleProblemComplete = useCallback(
     (_problem: DivisionProblem) => {
-      if (!gameState) return;
+      setGameState((prev) => {
+        if (!prev) return prev;
 
-      const { updatedState, didLevelUp, shouldReward } = recordSolve(gameState);
+        const { updatedState, shouldReward } = recordSolve(prev);
 
-      setGameState(updatedState);
+        if (shouldReward) {
+          setRewardPending(true);
+        }
 
-      if (shouldReward) {
-        setRewardPending(true);
-      }
+        // Generate next problem at (possibly new) difficulty
+        setCurrentProblem(
+          generateProblem(updatedState.playerSave.currentDifficulty),
+        );
 
-      // Generate next problem at (possibly new) difficulty
-      setCurrentProblem(
-        generateProblem(updatedState.playerSave.currentDifficulty),
-      );
-
-      if (didLevelUp) {
-        // Level-up is reflected in the header via updated tier display
-      }
+        return updatedState;
+      });
     },
-    [gameState],
+    [],
   );
 
   if (!gameState) {
