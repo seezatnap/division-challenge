@@ -11,6 +11,7 @@ import {
   buildLongDivisionStepPrompt,
   createLongDivisionWorkbenchState,
   getLongDivisionStepLabel,
+  LONG_DIVISION_REWARD_INTERVAL,
   submitLongDivisionWorkbenchStepInput,
 } from "@/lib/long-division-workbench";
 import { getCurrentLongDivisionStep } from "@/lib/long-division-step-engine";
@@ -23,6 +24,7 @@ const DIFFICULTY_LABELS: ReadonlyMap<DivisionDifficultyId, string> = new Map(
 
 interface LongDivisionWorkbenchProps {
   difficulty: DivisionDifficultyId;
+  lifetimeSolvedCount?: number;
 }
 
 function getFeedbackClassName(tone: string): string {
@@ -43,9 +45,13 @@ function getFeedbackClassName(tone: string): string {
 
 export default function LongDivisionWorkbench({
   difficulty,
+  lifetimeSolvedCount = 0,
 }: LongDivisionWorkbenchProps) {
   const [workbenchState, setWorkbenchState] = useState(() =>
-    createLongDivisionWorkbenchState({ difficulty }),
+    createLongDivisionWorkbenchState({
+      difficulty,
+      lifetimeSolvedCount,
+    }),
   );
   const [stepInput, setStepInput] = useState("");
 
@@ -74,6 +80,11 @@ export default function LongDivisionWorkbench({
   const difficultyLabel =
     DIFFICULTY_LABELS.get(workbenchState.problem.difficulty) ??
     workbenchState.problem.difficulty;
+  const solvedSinceReward =
+    workbenchState.lifetimeSolvedCount % LONG_DIVISION_REWARD_INTERVAL;
+  const solvesUntilNextReward = solvedSinceReward === 0
+    ? LONG_DIVISION_REWARD_INTERVAL
+    : LONG_DIVISION_REWARD_INTERVAL - solvedSinceReward;
   const isInputDisabled =
     currentStep === null || workbenchState.pendingAdvance;
 
@@ -105,9 +116,16 @@ export default function LongDivisionWorkbench({
           Work on Paper Practice
         </h3>
         <p className="text-sm text-emerald-100">
-          Solved this run: <span className="font-semibold">{workbenchState.solvedCount}</span>
+          Solved this run:{" "}
+          <span className="font-semibold">{workbenchState.solvedCount}</span>{" "}
+          | Lifetime solved:{" "}
+          <span className="font-semibold">{workbenchState.lifetimeSolvedCount}</span>
         </p>
       </div>
+      <p className="mt-2 text-xs uppercase tracking-[0.12em] text-emerald-200">
+        Next reward in {solvesUntilNextReward} solved problem
+        {solvesUntilNextReward === 1 ? "" : "s"}
+      </p>
 
       <div
         key={workbenchState.problem.id}
