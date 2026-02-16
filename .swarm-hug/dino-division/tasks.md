@@ -16,7 +16,7 @@
 
 - [x] (#7) Implement a server-side Gemini image generation service/route using `@google/generative-ai` with model `gemini-2.0-flash-exp`, reading `GEMINI_API_KEY` from `.env.local`, and generating Jurassic Park cinematic-style prompts based on dinosaur name [5 pts] (blocked by #1) (C)
 - [x] (#8) Create server filesystem persistence for generated images by saving files into the public directory with stable unique naming and returning the public image path for UI rendering [5 pts] (blocked by #7) (B)
-- [A] (#9) Build reward orchestration that consumes every-5-solved triggers, chooses a dinosaur from the 100-item pool, calls Gemini generation, stores image path, and appends unlocked metadata (`name`, `image path`, `date earned`) to player state [5 pts] (blocked by #2, #6, #8)
+- [x] (#9) Build reward orchestration that consumes every-5-solved triggers, chooses a dinosaur from the 100-item pool, calls Gemini generation, stores image path, and appends unlocked metadata (`name`, `image path`, `date earned`) to player state [5 pts] (blocked by #2, #6, #8) (A)
 
 ## Save Files & Player Lifecycle
 
@@ -43,5 +43,5 @@
 - [x] (#18) Move `src/lib/game-state.test.ts` into `src/lib/__tests__/` to match the established test directory convention and update its relative import from `./game-state` to `../game-state` (blocked by #11) (A)
 
 ## Follow-up tasks (from sprint review)
-- [B] (#19) Fix stale closure in `handleProblemComplete` by using the functional updater form of `setGameState` so that rapid sequential solves don't lose state (blocked by #6)
-- [B] (#20) Remove the empty `if (didLevelUp)` block in `page.tsx` or replace it with actual level-up feedback UI such as a congratulatory banner (blocked by #6)
+- [x] (#19) Fix stale closure in `handleProblemComplete` by using the functional updater form of `setGameState` so that rapid sequential solves don't lose state (blocked by #6) (B)
+- [x] (#20) Remove the empty `if (didLevelUp)` block in `page.tsx` or replace it with actual level-up feedback UI such as a congratulatory banner (blocked by #6) (B)
