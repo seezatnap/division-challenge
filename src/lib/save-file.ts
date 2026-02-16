@@ -20,11 +20,11 @@ export const UNSUPPORTED_BROWSER_MESSAGE =
 // ─── Result Types ───────────────────────────────────────────
 
 export type SaveResult =
-  | { ok: true }
+  | { ok: true; handle: FileSystemFileHandle }
   | { ok: false; error: string };
 
 export type LoadResult =
-  | { ok: true; data: PlayerSave }
+  | { ok: true; data: PlayerSave; handle: FileSystemFileHandle }
   | { ok: false; error: string };
 
 // ─── File Naming ────────────────────────────────────────────
@@ -45,33 +45,42 @@ export function saveFileName(playerName: string): string {
 // ─── Save ───────────────────────────────────────────────────
 
 /**
- * Prompt the user to choose where to save, then write the PlayerSave as JSON.
+ * Write the PlayerSave as JSON using the File System Access API.
  *
- * Uses `window.showSaveFilePicker` which triggers an explicit OS permission
- * dialog — the user must approve the save location before any data is written.
+ * When a cached `FileSystemFileHandle` is provided, the file is written
+ * directly without re-prompting the user. On the first save (or when no
+ * handle is supplied), `showSaveFilePicker` triggers an OS permission dialog.
+ *
+ * The returned `SaveResult` includes the handle so the caller can cache it
+ * for subsequent auto-saves.
  */
-export async function saveGame(playerSave: PlayerSave): Promise<SaveResult> {
+export async function saveGame(
+  playerSave: PlayerSave,
+  cachedHandle?: FileSystemFileHandle,
+): Promise<SaveResult> {
   if (!isFileSystemAccessSupported()) {
     return { ok: false, error: UNSUPPORTED_BROWSER_MESSAGE };
   }
 
   try {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: saveFileName(playerSave.playerName),
-      types: [
-        {
-          description: "Dino Division Save File",
-          accept: { "application/json": [".json"] },
-        },
-      ],
-    });
+    const handle =
+      cachedHandle ??
+      (await window.showSaveFilePicker({
+        suggestedName: saveFileName(playerSave.playerName),
+        types: [
+          {
+            description: "Dino Division Save File",
+            accept: { "application/json": [".json"] },
+          },
+        ],
+      }));
 
     const writable = await handle.createWritable();
     const json = JSON.stringify(playerSave, null, 2);
     await writable.write(json);
     await writable.close();
 
-    return { ok: true };
+    return { ok: true, handle };
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === "AbortError") {
       return { ok: false, error: "Save cancelled by user." };
@@ -125,7 +134,7 @@ export async function loadGame(): Promise<LoadResult> {
       };
     }
 
-    return { ok: true, data: result.data };
+    return { ok: true, data: result.data, handle };
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === "AbortError") {
       return { ok: false, error: "Load cancelled by user." };

@@ -33,6 +33,15 @@ function makeSaveWithHistory(sessions: SessionRecord[]): PlayerSave {
   };
 }
 
+function makeMockHandle(): FileSystemFileHandle {
+  return {
+    kind: "file",
+    name: "rex-save.json",
+    getFile: vi.fn(),
+    createWritable: vi.fn(),
+  } as unknown as FileSystemFileHandle;
+}
+
 // ─── buildSessionRecord ─────────────────────────────────────
 
 describe("buildSessionRecord", () => {
@@ -179,17 +188,19 @@ describe("persistAfterSolve", () => {
     rewardFn?: typeof mockRewardFn;
     supportedFn?: typeof mockSupportedFn;
     now?: string;
+    cachedFileHandle?: FileSystemFileHandle;
   } = {}) {
     return {
       saveFn: overrides.saveFn ?? mockSaveFn,
       rewardFn: overrides.rewardFn ?? mockRewardFn,
       now: overrides.now ?? NOW,
       supportedFn: overrides.supportedFn ?? mockSupportedFn,
+      cachedFileHandle: overrides.cachedFileHandle,
     };
   }
 
   it("saves progress without reward when shouldReward is false", async () => {
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     const state = makeState({ sessionProblemsSolved: 1, sessionProblemsAttempted: 1 });
@@ -221,7 +232,7 @@ describe("persistAfterSolve", () => {
       },
     };
     mockRewardFn.mockResolvedValue(rewardResult);
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     const state = makeState({ sessionProblemsSolved: 5, sessionProblemsAttempted: 5 });
@@ -237,7 +248,7 @@ describe("persistAfterSolve", () => {
   it("continues with save even when reward fails", async () => {
     const rewardError: RewardResult = { status: "error", message: "API down" };
     mockRewardFn.mockResolvedValue(rewardError);
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     const state = makeState({ sessionProblemsSolved: 5, sessionProblemsAttempted: 5 });
@@ -252,7 +263,7 @@ describe("persistAfterSolve", () => {
   it("continues with save when reward pool is exhausted", async () => {
     const rewardExhausted: RewardResult = { status: "pool_exhausted" };
     mockRewardFn.mockResolvedValue(rewardExhausted);
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     const state = makeState();
@@ -263,7 +274,7 @@ describe("persistAfterSolve", () => {
   });
 
   it("appends a session record on first save of session", async () => {
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     const state = makeState({ sessionProblemsSolved: 1, sessionProblemsAttempted: 1 });
@@ -276,7 +287,7 @@ describe("persistAfterSolve", () => {
   });
 
   it("replaces the last session record on subsequent saves", async () => {
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     // Simulate a state that already has one session in history (from first save)
@@ -334,7 +345,7 @@ describe("persistAfterSolve", () => {
   });
 
   it("preserves player save fields through the full flow", async () => {
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     const state = makeState({
@@ -366,7 +377,7 @@ describe("persistAfterSolve", () => {
   });
 
   it("writes the correct save data (with session history) to saveFn", async () => {
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     const state = makeState({ sessionProblemsSolved: 1, sessionProblemsAttempted: 1 });
@@ -379,7 +390,7 @@ describe("persistAfterSolve", () => {
   });
 
   it("integrates with recordSolve correctly", async () => {
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     // Simulate a full solve → persist cycle
@@ -425,7 +436,7 @@ describe("persistAfterSolve", () => {
       },
     };
     mockRewardFn.mockResolvedValue(rewardResult);
-    mockSaveFn.mockResolvedValue({ ok: true });
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
     mockSupportedFn.mockReturnValue(true);
 
     // Simulate 5 solves
@@ -451,5 +462,60 @@ describe("persistAfterSolve", () => {
     expect(result.updatedState.playerSave.sessionHistory).toHaveLength(1);
     expect(result.updatedState.playerSave.sessionHistory[0].problemsSolved).toBe(5);
     expect(result.saved).toBe(true);
+  });
+
+  // ─── Cached FileSystemFileHandle tests ───────────────────
+
+  it("passes cachedFileHandle to saveFn", async () => {
+    const handle = makeMockHandle();
+    mockSaveFn.mockResolvedValue({ ok: true, handle });
+    mockSupportedFn.mockReturnValue(true);
+
+    const state = makeState({ sessionProblemsSolved: 1, sessionProblemsAttempted: 1 });
+    await persistAfterSolve(state, false, true, deps({ cachedFileHandle: handle }));
+
+    // saveFn should receive the cached handle as its second argument
+    expect(mockSaveFn.mock.calls[0][1]).toBe(handle);
+  });
+
+  it("returns fileHandle from successful save", async () => {
+    const handle = makeMockHandle();
+    mockSaveFn.mockResolvedValue({ ok: true, handle });
+    mockSupportedFn.mockReturnValue(true);
+
+    const state = makeState({ sessionProblemsSolved: 1, sessionProblemsAttempted: 1 });
+    const result = await persistAfterSolve(state, false, true, deps());
+
+    expect(result.fileHandle).toBe(handle);
+  });
+
+  it("does not return fileHandle when save fails", async () => {
+    mockSaveFn.mockResolvedValue({ ok: false, error: "Disk full" });
+    mockSupportedFn.mockReturnValue(true);
+
+    const state = makeState({ sessionProblemsSolved: 1, sessionProblemsAttempted: 1 });
+    const result = await persistAfterSolve(state, false, true, deps());
+
+    expect(result.fileHandle).toBeUndefined();
+  });
+
+  it("does not return fileHandle when API is unsupported", async () => {
+    mockSupportedFn.mockReturnValue(false);
+
+    const state = makeState({ sessionProblemsSolved: 1, sessionProblemsAttempted: 1 });
+    const result = await persistAfterSolve(state, false, true, deps());
+
+    expect(result.fileHandle).toBeUndefined();
+  });
+
+  it("passes undefined to saveFn when no cached handle is provided", async () => {
+    mockSaveFn.mockResolvedValue({ ok: true, handle: makeMockHandle() });
+    mockSupportedFn.mockReturnValue(true);
+
+    const state = makeState({ sessionProblemsSolved: 1, sessionProblemsAttempted: 1 });
+    await persistAfterSolve(state, false, true, deps());
+
+    // saveFn's second argument should be undefined (no cached handle)
+    expect(mockSaveFn.mock.calls[0][1]).toBeUndefined();
   });
 });

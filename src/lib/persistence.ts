@@ -23,6 +23,8 @@ export interface PersistenceResult {
   saved: boolean;
   /** Error message if save failed (non-fatal — game continues). */
   saveError?: string;
+  /** The cached FileSystemFileHandle for reuse on subsequent saves. */
+  fileHandle?: FileSystemFileHandle;
 }
 
 // ─── Session snapshot ───────────────────────────────────────
@@ -100,6 +102,7 @@ export async function persistAfterSolve(
     rewardFn?: typeof processReward;
     now?: string;
     supportedFn?: typeof isFileSystemAccessSupported;
+    cachedFileHandle?: FileSystemFileHandle;
   } = {},
 ): Promise<PersistenceResult> {
   const {
@@ -107,6 +110,7 @@ export async function persistAfterSolve(
     rewardFn = processReward,
     now,
     supportedFn = isFileSystemAccessSupported,
+    cachedFileHandle,
   } = deps;
 
   let currentSave = state.playerSave;
@@ -131,15 +135,17 @@ export async function persistAfterSolve(
   // 4. Write save file (non-fatal on failure)
   let saved = false;
   let saveError: string | undefined;
+  let fileHandle: FileSystemFileHandle | undefined;
 
   if (supportedFn()) {
-    const result = await saveFn(currentSave);
+    const result = await saveFn(currentSave, cachedFileHandle);
     if (result.ok) {
       saved = true;
+      fileHandle = result.handle;
     } else {
       saveError = result.error;
     }
   }
 
-  return { updatedState, rewardResult, saved, saveError };
+  return { updatedState, rewardResult, saved, saveError, fileHandle };
 }

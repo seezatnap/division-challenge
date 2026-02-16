@@ -25,12 +25,19 @@ export default function Home() {
   // duplicating session history entries).
   const hasPersistedRef = useRef(false);
 
+  // Cache the FileSystemFileHandle after the first save so subsequent
+  // auto-saves reuse it instead of re-prompting showSaveFilePicker.
+  const fileHandleRef = useRef<FileSystemFileHandle | undefined>(undefined);
+
   function handleStart(result: GameStartResult) {
     let newState: GameState;
     if (result.mode === "loaded" && result.playerSave) {
       newState = initFromSave(result.playerSave);
+      // Reuse the handle from the loaded file for subsequent saves
+      fileHandleRef.current = result.fileHandle;
     } else if (result.mode === "new" && result.playerName) {
       newState = initNewGame(result.playerName);
+      fileHandleRef.current = undefined;
     } else {
       return;
     }
@@ -55,11 +62,19 @@ export default function Home() {
           generateProblem(updatedState.playerSave.currentDifficulty),
         );
 
-        // Persist progress asynchronously (non-blocking)
+        // Persist progress asynchronously (non-blocking).
+        // Pass the cached file handle so subsequent saves skip the OS picker.
         const isFirstSave = !hasPersistedRef.current;
-        persistAfterSolve(updatedState, shouldReward, isFirstSave)
+        persistAfterSolve(updatedState, shouldReward, isFirstSave, {
+          cachedFileHandle: fileHandleRef.current,
+        })
           .then((result) => {
             hasPersistedRef.current = true;
+
+            // Cache the file handle for future saves
+            if (result.fileHandle) {
+              fileHandleRef.current = result.fileHandle;
+            }
 
             if (result.rewardResult?.status === "success") {
               setRewardDino(result.rewardResult.unlocked);
