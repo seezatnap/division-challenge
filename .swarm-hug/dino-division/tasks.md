@@ -38,3 +38,6 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#17) Move `src/lib/difficulty.test.ts` and `src/lib/generate-problem.test.ts` into `src/lib/__tests__/` to match the established test directory convention used by Sprint 1 and the other Sprint 2 deliverables (blocked by #3) (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#18) Move `src/lib/game-state.test.ts` into `src/lib/__tests__/` to match the established test directory convention and update its relative import from `./game-state` to `../game-state` (blocked by #11)
