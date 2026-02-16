@@ -52,25 +52,26 @@ export default function DinoGallery({ unlockedDinosaurs }: DinoGalleryProps) {
   );
 
   return (
-    <section className="mt-6 rounded-xl border border-emerald-700 bg-emerald-950/40 p-5">
+    <section className="jurassic-card mt-6 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold tracking-tight">Dino Gallery</h3>
-        <p className="text-sm text-emerald-100">
+        <h3 className="jurassic-heading text-lg font-semibold">Dino Gallery</h3>
+        <p className="jurassic-copy text-sm">
           Unlocked:{" "}
           <span className="font-semibold">{sortedUnlockedDinosaurs.length}</span>
         </p>
       </div>
 
       {sortedUnlockedDinosaurs.length === 0 ? (
-        <p className="mt-4 rounded-lg border border-emerald-700 bg-emerald-900/30 p-4 text-sm text-emerald-100">
+        <p className="dino-status dino-status-idle mt-4 text-sm">
           No dinosaurs unlocked yet. Solve 5 problems to earn your first dino.
+          Your paddock will fill up fast.
         </p>
       ) : (
         <ul className="mt-4 grid gap-4 sm:grid-cols-2">
           {sortedUnlockedDinosaurs.map((dinosaur) => (
             <li
               key={`${dinosaur.name}-${dinosaur.earnedAt}-${dinosaur.imagePath}`}
-              className="overflow-hidden rounded-lg border border-emerald-700 bg-emerald-900/30"
+              className="jurassic-card overflow-hidden"
             >
               <Image
                 src={dinosaur.imagePath}
@@ -78,13 +79,13 @@ export default function DinoGallery({ unlockedDinosaurs }: DinoGalleryProps) {
                 width={640}
                 height={360}
                 unoptimized
-                className="h-36 w-full object-cover"
+                className="h-36 w-full border-b border-amber-900/40 object-cover"
               />
               <div className="space-y-1 p-3">
-                <p className="text-base font-semibold text-emerald-50">
+                <p className="jurassic-heading text-base font-semibold">
                   {dinosaur.name}
                 </p>
-                <p className="text-sm text-emerald-200">
+                <p className="jurassic-copy text-sm">
                   Earned {formatUnlockedDinosaurEarnedDate(dinosaur.earnedAt)}
                 </p>
               </div>
