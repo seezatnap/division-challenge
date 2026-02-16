@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createNewPlayerSave } from "../lib/domain";
 import {
+  getHighestRewardIndexForSolvedCount,
   orchestrateRewardUnlock,
   processPendingRewardMilestones,
   requestGeminiRewardImage,
@@ -161,6 +162,68 @@ test("orchestrateRewardUnlock validates reward trigger index integrity", async (
         }),
       }),
     /does not match the solved-count milestone/,
+  );
+});
+
+test("getHighestRewardIndexForSolvedCount maps solved totals to reward boundaries", () => {
+  const testCases: Array<{ solved: number; expectedRewardIndex: number }> = [
+    { solved: -1, expectedRewardIndex: -1 },
+    { solved: 0, expectedRewardIndex: -1 },
+    { solved: 1, expectedRewardIndex: -1 },
+    { solved: 4, expectedRewardIndex: -1 },
+    { solved: 5, expectedRewardIndex: 0 },
+    { solved: 6, expectedRewardIndex: 0 },
+    { solved: 10, expectedRewardIndex: 1 },
+    { solved: 14, expectedRewardIndex: 1 },
+    { solved: 15, expectedRewardIndex: 2 },
+    { solved: 5.5, expectedRewardIndex: -1 },
+  ];
+
+  for (const testCase of testCases) {
+    assert.equal(
+      getHighestRewardIndexForSolvedCount(testCase.solved),
+      testCase.expectedRewardIndex,
+    );
+  }
+});
+
+test("processPendingRewardMilestones retries a failed boundary without a newer trigger", async () => {
+  const save = createNewPlayerSave("Foxtrot");
+  let shouldFailFirstAttempt = true;
+
+  const firstResult = await processPendingRewardMilestones({
+    playerSave: save,
+    highestRewardIndex: getHighestRewardIndexForSolvedCount(5),
+    generateRewardImage: async (dinosaurName) => {
+      if (shouldFailFirstAttempt) {
+        shouldFailFirstAttempt = false;
+        throw new Error("Temporary Gemini failure");
+      }
+
+      return {
+        imagePath: `/generated-dinosaurs/${dinosaurName.toLowerCase().replace(/\s+/g, "-")}.png`,
+      };
+    },
+    earnedAt: "2026-02-16T13:00:00.000Z",
+  });
+
+  assert.equal(firstResult.failedRewardIndex, 0);
+  assert.equal(firstResult.playerSave.unlockedDinosaurs.length, 0);
+
+  const secondResult = await processPendingRewardMilestones({
+    playerSave: firstResult.playerSave,
+    highestRewardIndex: getHighestRewardIndexForSolvedCount(6),
+    generateRewardImage: async (dinosaurName) => ({
+      imagePath: `/generated-dinosaurs/${dinosaurName.toLowerCase().replace(/\s+/g, "-")}.png`,
+    }),
+    earnedAt: "2026-02-16T13:01:00.000Z",
+  });
+
+  assert.equal(secondResult.failedRewardIndex, null);
+  assert.equal(secondResult.errorMessage, null);
+  assert.deepEqual(
+    secondResult.playerSave.unlockedDinosaurs.map((dinosaur) => dinosaur.name),
+    ["Tyrannosaurus Rex"],
   );
 });
 
