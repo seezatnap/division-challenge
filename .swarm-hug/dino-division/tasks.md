@@ -2,7 +2,7 @@
 
 ## Platform & Data Foundations
 
-- [ ] (#1) Set up and validate the Next.js App Router + TypeScript + Tailwind baseline, configure `.env.local` usage for `GEMINI_API_KEY`, and define shared domain types for division problems, player save schema, unlocked dinosaurs, and session history [5 pts]
+- [A] (#1) Set up and validate the Next.js App Router + TypeScript + Tailwind baseline, configure `.env.local` usage for `GEMINI_API_KEY`, and define shared domain types for division problems, player save schema, unlocked dinosaurs, and session history [5 pts]
 - [ ] (#2) Create a constants/data module with the full static list of 100 dinosaurs (including major Jurassic Park/Jurassic World/Chaos Theory dinosaurs), plus utility methods for selection and guard checks for exact count and uniqueness [5 pts] (blocked by #1)
 
 ## Division Gameplay
