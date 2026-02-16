@@ -21,6 +21,7 @@ import {
   orchestrateRewardUnlock,
   type OrchestratedRewardUnlock,
 } from "@/lib/reward-orchestration";
+import { createSerialTaskQueue } from "@/lib/serial-task-queue";
 import type { LongDivisionWorkbenchRewardTrigger } from "@/lib/long-division-workbench";
 
 function getErrorMessage(error: unknown): string {
@@ -38,7 +39,7 @@ function buildRuntimeStateKey(runtimeState: GameRuntimeState): string {
 function doesRuntimeStateMatchKey(
   runtimeState: GameRuntimeState | null,
   runtimeStateKey: string,
-): boolean {
+): runtimeState is GameRuntimeState {
   return runtimeState !== null && buildRuntimeStateKey(runtimeState) === runtimeStateKey;
 }
 
@@ -50,6 +51,7 @@ export default function PlayerSavePanel() {
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [rewardStatusMessage, setRewardStatusMessage] = useState<string>("");
   const [isBusy, setIsBusy] = useState(false);
+  const rewardMilestoneQueue = useMemo(() => createSerialTaskQueue(), []);
   const runtimeStateRef = useRef<GameRuntimeState | null>(runtimeState);
   const rewardProcessingKeysRef = useRef<Set<string>>(new Set());
   const rewardCompletedKeysRef = useRef<Set<string>>(new Set());
@@ -61,6 +63,7 @@ export default function PlayerSavePanel() {
   }, [runtimeState]);
 
   function resetRewardProcessingState(): void {
+    rewardMilestoneQueue.clear();
     rewardProcessingKeysRef.current.clear();
     rewardCompletedKeysRef.current.clear();
     setRewardStatusMessage("");
@@ -80,31 +83,21 @@ export default function PlayerSavePanel() {
     });
   }
 
-  async function handleRewardTrigger(
+  async function processQueuedRewardTrigger(
     rewardTrigger: LongDivisionWorkbenchRewardTrigger,
+    runtimeStateKey: string,
+    rewardKey: string,
   ): Promise<void> {
-    const currentRuntimeState = runtimeStateRef.current;
-    if (!currentRuntimeState) {
-      return;
-    }
-    const runtimeStateKey = buildRuntimeStateKey(currentRuntimeState);
-    const rewardKey =
-      `${runtimeStateKey}:${rewardTrigger.rewardIndex}:${rewardTrigger.lifetimeSolvedCount}`;
-    if (
-      rewardProcessingKeysRef.current.has(rewardKey) ||
-      rewardCompletedKeysRef.current.has(rewardKey)
-    ) {
-      return;
-    }
-
-    rewardProcessingKeysRef.current.add(rewardKey);
-    if (doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)) {
-      setRewardStatusMessage("Generating your dinosaur reward...");
-    }
-
     try {
+      const queuedRuntimeState = runtimeStateRef.current;
+      if (!doesRuntimeStateMatchKey(queuedRuntimeState, runtimeStateKey)) {
+        return;
+      }
+
+      setRewardStatusMessage("Generating your dinosaur reward...");
+
       const orchestrationResult = await orchestrateRewardUnlock({
-        playerSave: currentRuntimeState.playerSave,
+        playerSave: queuedRuntimeState.playerSave,
         rewardTrigger,
       });
 
@@ -131,6 +124,30 @@ export default function PlayerSavePanel() {
     } finally {
       rewardProcessingKeysRef.current.delete(rewardKey);
     }
+  }
+
+  async function handleRewardTrigger(
+    rewardTrigger: LongDivisionWorkbenchRewardTrigger,
+  ): Promise<void> {
+    const currentRuntimeState = runtimeStateRef.current;
+    if (!currentRuntimeState) {
+      return;
+    }
+
+    const runtimeStateKey = buildRuntimeStateKey(currentRuntimeState);
+    const rewardKey =
+      `${runtimeStateKey}:${rewardTrigger.rewardIndex}:${rewardTrigger.lifetimeSolvedCount}`;
+    if (
+      rewardProcessingKeysRef.current.has(rewardKey) ||
+      rewardCompletedKeysRef.current.has(rewardKey)
+    ) {
+      return;
+    }
+
+    rewardProcessingKeysRef.current.add(rewardKey);
+    await rewardMilestoneQueue.enqueue(() =>
+      processQueuedRewardTrigger(rewardTrigger, runtimeStateKey, rewardKey)
+    );
   }
 
   function applyUnlockedDinosaurToRuntimeState(
