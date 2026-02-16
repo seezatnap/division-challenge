@@ -4,6 +4,10 @@ import {
   generateGeminiDinosaurImage,
   type GeminiGeneratedImage,
 } from "@/lib/gemini-image-service";
+import {
+  persistGeminiGeneratedImage,
+  type PersistedGeminiGeneratedImage,
+} from "@/lib/gemini-image-storage";
 
 export const runtime = "nodejs";
 
@@ -14,6 +18,10 @@ interface GeminiImageRequestBody {
 type GenerateImageFn = (options: {
   dinosaurName: string;
 }) => Promise<GeminiGeneratedImage>;
+
+type PersistImageFn = (
+  image: GeminiGeneratedImage,
+) => Promise<PersistedGeminiGeneratedImage>;
 
 function parseDinosaurName(body: GeminiImageRequestBody): string | null {
   if (typeof body.dinosaurName !== "string") {
@@ -30,6 +38,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 export function createGeminiImagePostHandler(
   generateImage: GenerateImageFn = generateGeminiDinosaurImage,
+  persistImage: PersistImageFn = persistGeminiGeneratedImage,
 ) {
   return async function POST(request: Request): Promise<Response> {
     let body: unknown;
@@ -61,15 +70,13 @@ export function createGeminiImagePostHandler(
 
     try {
       const generatedImage = await generateImage({ dinosaurName });
+      const persistedImage = await persistImage(generatedImage);
 
       return NextResponse.json({
         dinosaurName: generatedImage.dinosaurName,
         model: generatedImage.model,
         prompt: generatedImage.prompt,
-        image: {
-          mimeType: generatedImage.mimeType,
-          data: generatedImage.data,
-        },
+        imagePath: persistedImage.imagePath,
       });
     } catch (error) {
       const errorMessage = error instanceof Error
