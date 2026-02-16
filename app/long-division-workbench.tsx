@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
   DIVISION_DIFFICULTIES,
@@ -12,6 +12,7 @@ import {
   createLongDivisionWorkbenchState,
   getLongDivisionStepLabel,
   LONG_DIVISION_REWARD_INTERVAL,
+  type LongDivisionWorkbenchRewardTrigger,
   submitLongDivisionWorkbenchStepInput,
 } from "@/lib/long-division-workbench";
 import { getCurrentLongDivisionStep } from "@/lib/long-division-step-engine";
@@ -25,6 +26,12 @@ const DIFFICULTY_LABELS: ReadonlyMap<DivisionDifficultyId, string> = new Map(
 interface LongDivisionWorkbenchProps {
   difficulty: DivisionDifficultyId;
   lifetimeSolvedCount?: number;
+  onProgressChange?: (progress: {
+    difficulty: DivisionDifficultyId;
+    solvedCount: number;
+    lifetimeSolvedCount: number;
+  }) => void;
+  onRewardTrigger?: (rewardTrigger: LongDivisionWorkbenchRewardTrigger) => void;
 }
 
 function getFeedbackClassName(tone: string): string {
@@ -46,6 +53,8 @@ function getFeedbackClassName(tone: string): string {
 export default function LongDivisionWorkbench({
   difficulty,
   lifetimeSolvedCount = 0,
+  onProgressChange,
+  onRewardTrigger,
 }: LongDivisionWorkbenchProps) {
   const [workbenchState, setWorkbenchState] = useState(() =>
     createLongDivisionWorkbenchState({
@@ -54,6 +63,7 @@ export default function LongDivisionWorkbench({
     }),
   );
   const [stepInput, setStepInput] = useState("");
+  const emittedRewardTriggerKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!workbenchState.pendingAdvance) {
@@ -69,6 +79,39 @@ export default function LongDivisionWorkbench({
 
     return () => window.clearTimeout(timeoutId);
   }, [workbenchState.pendingAdvance]);
+
+  useEffect(() => {
+    if (!onProgressChange) {
+      return;
+    }
+
+    onProgressChange({
+      difficulty: workbenchState.difficulty,
+      solvedCount: workbenchState.solvedCount,
+      lifetimeSolvedCount: workbenchState.lifetimeSolvedCount,
+    });
+  }, [
+    onProgressChange,
+    workbenchState.difficulty,
+    workbenchState.lifetimeSolvedCount,
+    workbenchState.solvedCount,
+  ]);
+
+  useEffect(() => {
+    if (!onRewardTrigger || !workbenchState.pendingRewardTrigger) {
+      return;
+    }
+
+    const trigger = workbenchState.pendingRewardTrigger;
+    const triggerKey = `${trigger.rewardIndex}:${trigger.lifetimeSolvedCount}`;
+
+    if (emittedRewardTriggerKeysRef.current.has(triggerKey)) {
+      return;
+    }
+
+    emittedRewardTriggerKeysRef.current.add(triggerKey);
+    onRewardTrigger(trigger);
+  }, [onRewardTrigger, workbenchState.pendingRewardTrigger]);
 
   const currentStep = getCurrentLongDivisionStep(workbenchState.stepState);
   const totalStepCount = workbenchState.stepState.sequence.length;
