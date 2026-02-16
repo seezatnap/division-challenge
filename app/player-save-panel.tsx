@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import LongDivisionWorkbench from "./long-division-workbench";
 
 import {
+  applyRuntimeProgressUpdate,
   doesLoadedSaveMatchRequestedPlayerName,
   initializeLoadedGameRuntimeState,
   initializeNewGameRuntimeState,
@@ -14,6 +15,7 @@ import {
   FILE_SYSTEM_ACCESS_UNSUPPORTED_MESSAGE,
   isFileSystemAccessSupported,
   loadPlayerSaveFile,
+  savePlayerSaveFile,
 } from "@/lib/save-file";
 import {
   orchestrateRewardUnlock,
@@ -74,22 +76,7 @@ export default function PlayerSavePanel() {
         return previousState;
       }
 
-      if (
-        previousState.playerSave.totalProblemsSolved ===
-          progress.lifetimeSolvedCount &&
-        previousState.playerSave.currentDifficulty === progress.difficulty
-      ) {
-        return previousState;
-      }
-
-      return {
-        ...previousState,
-        playerSave: {
-          ...previousState.playerSave,
-          totalProblemsSolved: progress.lifetimeSolvedCount,
-          currentDifficulty: progress.difficulty,
-        },
-      };
+      return applyRuntimeProgressUpdate(previousState, progress);
     });
   }
 
@@ -240,6 +227,30 @@ export default function PlayerSavePanel() {
     }
   }
 
+  async function handleSaveProgressClick(): Promise<void> {
+    const currentRuntimeState = runtimeStateRef.current;
+    if (!currentRuntimeState) {
+      return;
+    }
+
+    const runtimeStateKey = buildRuntimeStateKey(currentRuntimeState);
+    setIsBusy(true);
+    setStatusMessage("");
+
+    try {
+      const saveResult = await savePlayerSaveFile(currentRuntimeState.playerSave);
+      if (doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)) {
+        setStatusMessage(`Saved progress to ${saveResult.fileName}.`);
+      }
+    } catch (error) {
+      if (doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)) {
+        setStatusMessage(getErrorMessage(error));
+      }
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   function handleResetFlowClick(): void {
     setRuntimeState(null);
     setStatusMessage("");
@@ -293,13 +304,29 @@ export default function PlayerSavePanel() {
               </span>{" "}
               {runtimeState.initializedAt}
             </p>
-            <button
-              type="button"
-              onClick={handleResetFlowClick}
-              className="mt-4 rounded-md border border-emerald-500 px-3 py-2 font-semibold text-emerald-50 transition hover:bg-emerald-800/60"
-            >
-              Start With Different Player
-            </button>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleSaveProgressClick}
+                disabled={!isSupported || isBusy}
+                className="rounded-md bg-lime-500 px-3 py-2 font-semibold text-emerald-950 transition hover:bg-lime-400 disabled:cursor-not-allowed disabled:bg-emerald-800 disabled:text-emerald-200"
+              >
+                {isBusy ? "Working..." : "Save Progress"}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetFlowClick}
+                disabled={isBusy}
+                className="rounded-md border border-emerald-500 px-3 py-2 font-semibold text-emerald-50 transition hover:bg-emerald-800/60 disabled:cursor-not-allowed disabled:border-emerald-800 disabled:text-emerald-200"
+              >
+                Start With Different Player
+              </button>
+            </div>
+            <p className="mt-3 text-xs text-emerald-200">
+              {isSupported
+                ? "Save your progress to keep difficulty, unlocked dinosaurs, and session history across sessions."
+                : FILE_SYSTEM_ACCESS_UNSUPPORTED_MESSAGE}
+            </p>
           </div>
 
           <LongDivisionWorkbench
