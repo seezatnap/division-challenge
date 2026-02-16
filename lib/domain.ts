@@ -2,7 +2,7 @@ export const DIVISION_DIFFICULTY_IDS = [
   "two-digit-by-one-digit",
   "three-digit-by-one-digit",
   "four-digit-by-two-digit",
-  "five-digit-by-three-digit",
+  "four-to-five-digit-by-two-to-three-digit",
 ] as const;
 
 export type DivisionDifficultyId = (typeof DIVISION_DIFFICULTY_IDS)[number];
@@ -34,10 +34,10 @@ export const DIVISION_DIFFICULTIES: readonly DivisionDifficultyDefinition[] = [
     divisorDigits: [2, 2],
   },
   {
-    id: "five-digit-by-three-digit",
-    label: "5-digit ÷ 3-digit",
-    dividendDigits: [5, 5],
-    divisorDigits: [3, 3],
+    id: "four-to-five-digit-by-two-to-three-digit",
+    label: "4-5 digit ÷ 2-3 digit",
+    dividendDigits: [4, 5],
+    divisorDigits: [2, 3],
   },
 ];
 
