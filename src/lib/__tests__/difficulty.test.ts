@@ -3,7 +3,7 @@ import {
   DIFFICULTY_CONFIGS,
   getDifficultyConfig,
   ALL_TIERS,
-} from "./difficulty";
+} from "../difficulty";
 import type { DifficultyTier } from "@/types";
 
 describe("DIFFICULTY_CONFIGS", () => {
