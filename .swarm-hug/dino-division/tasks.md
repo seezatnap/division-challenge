@@ -35,3 +35,6 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#16) Update `isDivisionProblem` in `lib/domain.ts` to reject mathematically inconsistent problems (`dividend !== divisor * quotient + remainder`) and add a regression test in `tests/domain.test.ts`. (B)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#17) Harden `persistGeminiGeneratedImage` to strictly reject malformed base64 payloads (not just empty decodes) and add a regression test in `tests/gemini-image-storage.test.ts` for invalid-but-decodable input.
