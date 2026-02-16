@@ -22,7 +22,7 @@
 
 - [x] (#10) Implement File System Access API save/load support with explicit user permission prompts, `<player>-save.json` naming, JSON read/write, schema validation, and unsupported-browser fallback messaging [5 pts] (blocked by #1) (B)
 - [x] (#11) Build game-start flow to prompt for player name and present “Load existing save” vs “Start new game,” then initialize runtime state accordingly [5 pts] (blocked by #10) (B)
-- [ ] (#12) Integrate persistence with gameplay so progress, current difficulty, unlocked dinosaurs, and session history are saved/loaded consistently across sessions [5 pts] (blocked by #6, #9, #10, #11)
+- [x] (#12) Integrate persistence with gameplay so progress, current difficulty, unlocked dinosaurs, and session history are saved/loaded consistently across sessions [5 pts] (blocked by #6, #9, #10, #11) (A)
 
 ## Gallery & Theming
 
@@ -47,4 +47,8 @@
 - [x] (#20) Remove the empty `if (didLevelUp)` block in `page.tsx` or replace it with actual level-up feedback UI such as a congratulatory banner (blocked by #6) (B)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#21) Wire `processReward()` into `page.tsx`'s `handleProblemComplete` so that when `shouldReward` fires, the reward orchestrator is called to pick a dinosaur, generate its image via Gemini, and append the unlocked metadata to the player save — instead of only showing a static banner (blocked by #9)
+- [x] (#21) Wire `processReward()` into `page.tsx`'s `handleProblemComplete` so that when `shouldReward` fires, the reward orchestrator is called to pick a dinosaur, generate its image via Gemini, and append the unlocked metadata to the player save — instead of only showing a static banner (blocked by #9) (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#22) Add a `.catch()` handler to the `persistAfterSolve` promise in `page.tsx` `handleProblemComplete` to prevent unhandled promise rejections — log or surface the error via `setSaveError` (blocked by #12)
+- [ ] (#23) Refactor `saveGame` / persistence integration to cache the `FileSystemFileHandle` after the first save so that subsequent auto-saves after each problem solve reuse the handle instead of re-prompting `showSaveFilePicker` every time (blocked by #12)
