@@ -16,7 +16,7 @@
 
 - [x] (#7) Implement a server-side Gemini image generation service/route using `@google/generative-ai` with model `gemini-2.0-flash-exp`, reading `GEMINI_API_KEY` from `.env.local`, and generating Jurassic Park cinematic-style prompts based on dinosaur name [5 pts] (blocked by #1) (A)
 - [x] (#8) Create server filesystem persistence for generated images by saving files into the public directory with stable unique naming and returning the public image path for UI rendering [5 pts] (blocked by #7) (B)
-- [ ] (#9) Build reward orchestration that consumes every-5-solved triggers, chooses a dinosaur from the 100-item pool, calls Gemini generation, stores image path, and appends unlocked metadata (`name`, `image path`, `date earned`) to player state [5 pts] (blocked by #2, #6, #8)
+- [x] (#9) Build reward orchestration that consumes every-5-solved triggers, chooses a dinosaur from the 100-item pool, calls Gemini generation, stores image path, and appends unlocked metadata (`name`, `image path`, `date earned`) to player state [5 pts] (blocked by #2, #6, #8) (A)
 
 ## Save Files & Player Lifecycle
 
@@ -38,3 +38,7 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#17) Harden `persistGeminiGeneratedImage` to strictly reject malformed base64 payloads (not just empty decodes) and add a regression test in `tests/gemini-image-storage.test.ts` for invalid-but-decodable input. (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#18) Make reward unlock application order-safe by queuing/serializing milestone processing in `app/player-save-panel.tsx` so later in-flight rewards cannot be applied before earlier ones and cause skipped unlocks.
+- [ ] (#19) Add retry handling for failed reward generation milestones (instead of permanently dropping them after one failed attempt), with regression tests for failed and out-of-order reward responses.
