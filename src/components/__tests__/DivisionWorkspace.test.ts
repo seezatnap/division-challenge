@@ -10,6 +10,7 @@ import {
 } from "@/lib/step-engine";
 import { initNewGame } from "@/lib/game-state";
 import type { GameState } from "@/lib/game-state";
+import { recordSolve, PROBLEMS_PER_TIER } from "@/lib/progression";
 
 /**
  * These tests verify the logic that DivisionWorkspace orchestrates:
@@ -346,4 +347,51 @@ describe("DivisionWorkspace handles all difficulty tiers", () => {
       expect(feedbackLog.length).toBe(engine.steps.length);
     });
   }
+});
+
+// ─── Level-up feedback (page-level) ────────────────────────
+
+describe("Level-up feedback integration", () => {
+  it("didLevelUp is false for solves before tier boundary", () => {
+    let state = initNewGame("Rex");
+    for (let i = 0; i < PROBLEMS_PER_TIER - 1; i++) {
+      const result = recordSolve(state);
+      expect(result.didLevelUp).toBe(false);
+      state = result.updatedState;
+    }
+  });
+
+  it("didLevelUp is true on the solve that crosses a tier boundary", () => {
+    let state = initNewGame("Rex");
+    for (let i = 0; i < PROBLEMS_PER_TIER - 1; i++) {
+      state = recordSolve(state).updatedState;
+    }
+    const result = recordSolve(state);
+    expect(result.didLevelUp).toBe(true);
+    expect(result.updatedState.playerSave.currentDifficulty).toBe(2);
+  });
+
+  it("didLevelUp carries the new tier for UI display", () => {
+    let state = initNewGame("Rex");
+    // Solve through to tier 3 boundary (2 * PROBLEMS_PER_TIER solves)
+    for (let i = 0; i < PROBLEMS_PER_TIER * 2 - 1; i++) {
+      state = recordSolve(state).updatedState;
+    }
+    const result = recordSolve(state);
+    expect(result.didLevelUp).toBe(true);
+    expect(result.updatedState.playerSave.currentDifficulty).toBe(3);
+  });
+
+  it("didLevelUp is false once at max tier", () => {
+    let state = initNewGame("Rex");
+    // Reach tier 5
+    for (let i = 0; i < PROBLEMS_PER_TIER * 4; i++) {
+      state = recordSolve(state).updatedState;
+    }
+    expect(state.playerSave.currentDifficulty).toBe(5);
+
+    // Additional solve should not level up
+    const result = recordSolve(state);
+    expect(result.didLevelUp).toBe(false);
+  });
 });

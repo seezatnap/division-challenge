@@ -244,4 +244,63 @@ describe("recordSolve", () => {
     expect(result.didLevelUp).toBe(true);
     expect(result.shouldReward).toBe(true);
   });
+
+  // ── Stale closure scenario ────────────────────────────────
+
+  it("loses state when two solves use the same stale state (stale closure bug)", () => {
+    // This demonstrates the bug that functional updater form fixes:
+    // if two rapid solves both read the same stale gameState, the second
+    // overwrites the first and only 1 solve is counted instead of 2.
+    const staleState = initNewGame("Rex");
+
+    // Both calls use the same stale state (simulating stale closure)
+    const result1 = recordSolve(staleState);
+    const result2 = recordSolve(staleState); // same stale state!
+
+    // Both results think they're solve #1 — the second overwrites the first
+    expect(result1.updatedState.playerSave.totalProblemsSolved).toBe(1);
+    expect(result2.updatedState.playerSave.totalProblemsSolved).toBe(1); // lost!
+    expect(result1.updatedState.sessionProblemsSolved).toBe(1);
+    expect(result2.updatedState.sessionProblemsSolved).toBe(1); // lost!
+  });
+
+  it("preserves all solves when chained sequentially (functional updater pattern)", () => {
+    // This demonstrates the fix: functional updater passes the latest state
+    // to each call, so rapid sequential solves are all counted.
+    const initial = initNewGame("Rex");
+
+    const result1 = recordSolve(initial);
+    const result2 = recordSolve(result1.updatedState); // uses updated state
+
+    expect(result1.updatedState.playerSave.totalProblemsSolved).toBe(1);
+    expect(result2.updatedState.playerSave.totalProblemsSolved).toBe(2);
+    expect(result1.updatedState.sessionProblemsSolved).toBe(1);
+    expect(result2.updatedState.sessionProblemsSolved).toBe(2);
+  });
+
+  it("correctly triggers reward at boundary when chained, not when stale", () => {
+    // Start with 3 solved, then rapidly solve 2 more.
+    // Chained: solves 4 and 5, reward fires on #5.
+    // Stale: both see solve #4, reward never fires.
+    const base = initNewGame("Rex");
+    const atThree = {
+      ...base,
+      sessionProblemsSolved: 3,
+      sessionProblemsAttempted: 3,
+      playerSave: { ...base.playerSave, totalProblemsSolved: 3 },
+    };
+
+    // Stale: both calls use atThree
+    const stale1 = recordSolve(atThree);
+    const stale2 = recordSolve(atThree);
+    expect(stale1.shouldReward).toBe(false); // solve #4
+    expect(stale2.shouldReward).toBe(false); // also solve #4, never reaches #5
+
+    // Chained: second call uses first result
+    const chained1 = recordSolve(atThree);
+    const chained2 = recordSolve(chained1.updatedState);
+    expect(chained1.shouldReward).toBe(false); // solve #4
+    expect(chained2.shouldReward).toBe(true);  // solve #5 — reward fires!
+    expect(chained2.updatedState.playerSave.totalProblemsSolved).toBe(5);
+  });
 });
