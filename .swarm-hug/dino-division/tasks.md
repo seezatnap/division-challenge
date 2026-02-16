@@ -41,3 +41,7 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#18) Move `src/lib/game-state.test.ts` into `src/lib/__tests__/` to match the established test directory convention and update its relative import from `./game-state` to `../game-state` (blocked by #11) (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#19) Fix stale closure in `handleProblemComplete` by using the functional updater form of `setGameState` so that rapid sequential solves don't lose state (blocked by #6)
+- [ ] (#20) Remove the empty `if (didLevelUp)` block in `page.tsx` or replace it with actual level-up feedback UI such as a congratulatory banner (blocked by #6)
