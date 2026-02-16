@@ -42,3 +42,8 @@
 ## Follow-up tasks (from sprint review)
 - [x] (#18) Make reward unlock application order-safe by queuing/serializing milestone processing in `app/player-save-panel.tsx` so later in-flight rewards cannot be applied before earlier ones and cause skipped unlocks. (B)
 - [x] (#19) Add retry handling for failed reward generation milestones (instead of permanently dropping them after one failed attempt), with regression tests for failed and out-of-order reward responses. (B)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#20) Fix session-history solve counting so `sessionHistory[].problemsSolved` remains cumulative across difficulty-tier remounts (currently it can plateau at 5); add a regression test that simulates solves across 5/10/15 milestones.
+- [ ] (#21) Make `Save Progress` wait for pending/in-flight reward milestone processing (or disable saving while rewards are processing) so newly unlocked dinosaurs and updated totals are not omitted from the saved JSON; add a regression test for this race.
+- [ ] (#22) Retry failed reward milestones without requiring a future milestone trigger (including after reload when `totalProblemsSolved` already crossed a reward boundary), so a failed reward at 5 solved is not deferred indefinitely.
