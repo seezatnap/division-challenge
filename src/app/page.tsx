@@ -6,7 +6,7 @@ import type { GameStartResult } from "@/components/GameStartScreen";
 import DivisionWorkspace from "@/components/DivisionWorkspace";
 import type { GameState } from "@/lib/game-state";
 import { initFromSave, initNewGame } from "@/lib/game-state";
-import type { DivisionProblem } from "@/types";
+import type { DifficultyTier, DivisionProblem } from "@/types";
 import { generateProblem } from "@/lib/generate-problem";
 import { recordSolve } from "@/lib/progression";
 
@@ -16,6 +16,7 @@ export default function Home() {
     null,
   );
   const [rewardPending, setRewardPending] = useState(false);
+  const [levelUpTier, setLevelUpTier] = useState<DifficultyTier | null>(null);
 
   function handleStart(result: GameStartResult) {
     let newState: GameState;
@@ -35,10 +36,14 @@ export default function Home() {
       setGameState((prev) => {
         if (!prev) return prev;
 
-        const { updatedState, shouldReward } = recordSolve(prev);
+        const { updatedState, didLevelUp, shouldReward } = recordSolve(prev);
 
         if (shouldReward) {
           setRewardPending(true);
+        }
+
+        if (didLevelUp) {
+          setLevelUpTier(updatedState.playerSave.currentDifficulty);
         }
 
         // Generate next problem at (possibly new) difficulty
@@ -68,6 +73,22 @@ export default function Home() {
           {gameState.sessionProblemsSolved}
         </p>
       </header>
+
+      {/* Level-up banner */}
+      {levelUpTier !== null && (
+        <div
+          role="status"
+          className="mb-4 rounded-lg bg-green-100 px-4 py-2 text-green-800 dark:bg-green-900 dark:text-green-200"
+        >
+          Roarsome! You leveled up to Tier {levelUpTier}!
+          <button
+            className="ml-3 underline"
+            onClick={() => setLevelUpTier(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Reward trigger banner */}
       {rewardPending && (
