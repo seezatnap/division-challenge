@@ -85,6 +85,35 @@ const STEP_LABELS: Record<LongDivisionStepId, string> = {
   "bring-down": "Bring Down",
 };
 
+const STEP_SUCCESS_MESSAGES = [
+  "Roarsome step!",
+  "Dino-mite move!",
+  "Jurassic genius!",
+  "That lands like a T. rex stomp!",
+] as const;
+
+const STEP_ERROR_MESSAGES = [
+  "Uh oh, the raptor nudged that answer.",
+  "A sneaky compy stole a digit there.",
+  "Close, but that fossil does not fit.",
+  "Paddock alert: tighten that math move.",
+] as const;
+
+function selectFeedbackMessageVariant(
+  messages: readonly string[],
+  indexSeed: number,
+): string {
+  if (messages.length === 0) {
+    return "";
+  }
+
+  const normalizedIndex = Number.isInteger(indexSeed) && indexSeed >= 0
+    ? indexSeed % messages.length
+    : 0;
+
+  return messages[normalizedIndex] ?? messages[0];
+}
+
 function normalizeSolvedCount(solvedCount: number | undefined): number {
   if (typeof solvedCount !== "number") {
     return 0;
@@ -186,17 +215,36 @@ function buildInitialFeedback(
 
 function buildStepSuccessFeedback(
   nextStep: LongDivisionCurrentStep | null,
+  successCount: number,
 ): LongDivisionWorkbenchFeedback {
+  const intro = selectFeedbackMessageVariant(
+    STEP_SUCCESS_MESSAGES,
+    successCount,
+  );
+
   if (nextStep === null) {
     return {
       tone: "success",
-      message: "Great step. Keep going.",
+      message: `${intro} Keep following the quotient trail.`,
     };
   }
 
   return {
     tone: "success",
-    message: `Nice work. ${buildLongDivisionStepPrompt(nextStep)}`,
+    message: `${intro} ${buildLongDivisionStepPrompt(nextStep)}`,
+  };
+}
+
+function buildStepErrorFeedback(
+  step: LongDivisionStepId,
+  hint: string | null,
+  attemptCount: number,
+): LongDivisionWorkbenchFeedback {
+  const intro = selectFeedbackMessageVariant(STEP_ERROR_MESSAGES, attemptCount);
+
+  return {
+    tone: "error",
+    message: `${intro} ${hint ?? `Try ${getLongDivisionStepLabel(step)} again.`}`,
   };
 }
 
@@ -314,7 +362,9 @@ export function submitLongDivisionWorkbenchStepInput(
         pendingRewardTrigger: null,
         feedback: {
           tone: state.pendingAdvance ? "complete" : "error",
-          message: validation.hint ?? "This problem is already complete.",
+          message: state.pendingAdvance
+            ? "This problem is already complete. A fresh challenge is loading."
+            : `${selectFeedbackMessageVariant(STEP_ERROR_MESSAGES, state.attempts.length)} ${validation.hint ?? "This problem is already complete."}`,
         },
       },
       validation,
@@ -339,10 +389,11 @@ export function submitLongDivisionWorkbenchStepInput(
         attempts: nextAttempts,
         pendingAdvance: false,
         pendingRewardTrigger: null,
-        feedback: {
-          tone: "error",
-          message: validation.hint ?? `Try ${getLongDivisionStepLabel(validation.step)} again.`,
-        },
+        feedback: buildStepErrorFeedback(
+          validation.step,
+          validation.hint,
+          nextAttempts.length - 1,
+        ),
       },
       validation,
       rewardTrigger: null,
@@ -387,6 +438,7 @@ export function submitLongDivisionWorkbenchStepInput(
       pendingRewardTrigger: null,
       feedback: buildStepSuccessFeedback(
         getCurrentLongDivisionStep(validation.state),
+        nextAttempts.length - 1,
       ),
     },
     validation,

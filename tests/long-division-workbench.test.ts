@@ -84,6 +84,17 @@ test("incorrect input keeps the same step and returns immediate hint feedback", 
   assert.equal(result.state.attempts[0]?.step, "divide");
   assert.equal(result.state.attempts[0]?.inputValue, 3);
   assert.equal(result.state.attempts[0]?.expectedValue, 1);
+  assert.match(result.state.feedback.message, /raptor/i);
+});
+
+test("correct step feedback includes playful encouragement and the next prompt", () => {
+  const initialState = createLongDivisionWorkbenchStateFromProblem(createProblem());
+  const result = submitLongDivisionWorkbenchStepInput(initialState, 1);
+
+  assert.equal(result.validation.isCorrect, true);
+  assert.equal(result.state.feedback.tone, "success");
+  assert.match(result.state.feedback.message, /^Roarsome step!/i);
+  assert.match(result.state.feedback.message, /Multiply 5 by/i);
 });
 
 test("solving every step marks the problem complete and queues next transition", () => {
