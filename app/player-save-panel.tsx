@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import LongDivisionWorkbench from "./long-division-workbench";
 
 import {
   doesLoadedSaveMatchRequestedPlayerName,
@@ -90,51 +91,60 @@ export default function PlayerSavePanel() {
     <section className="mt-8 rounded-xl border border-emerald-700 bg-emerald-950/40 p-6">
       <h2 className="text-xl font-semibold tracking-tight">Game Start</h2>
       {runtimeState ? (
-        <div className="mt-4 rounded-lg border border-emerald-700 bg-emerald-900/40 p-4 text-sm text-emerald-100">
-          <p>
-            <span className="font-semibold text-emerald-50">Mode:</span>{" "}
-            {runtimeModeLabel}
-          </p>
-          <p>
-            <span className="font-semibold text-emerald-50">Player:</span>{" "}
-            {runtimeState.playerSave.playerName}
-          </p>
-          <p>
-            <span className="font-semibold text-emerald-50">
-              Total Problems Solved:
-            </span>{" "}
-            {runtimeState.playerSave.totalProblemsSolved}
-          </p>
-          <p>
-            <span className="font-semibold text-emerald-50">
-              Current Difficulty:
-            </span>{" "}
-            {runtimeState.playerSave.currentDifficulty}
-          </p>
-          <p>
-            <span className="font-semibold text-emerald-50">
-              Unlocked Dinosaurs:
-            </span>{" "}
-            {runtimeState.playerSave.unlockedDinosaurs.length}
-          </p>
-          <p>
-            <span className="font-semibold text-emerald-50">
-              Session History Entries:
-            </span>{" "}
-            {runtimeState.playerSave.sessionHistory.length}
-          </p>
-          <p>
-            <span className="font-semibold text-emerald-50">Initialized At:</span>{" "}
-            {runtimeState.initializedAt}
-          </p>
-          <button
-            type="button"
-            onClick={handleResetFlowClick}
-            className="mt-4 rounded-md border border-emerald-500 px-3 py-2 font-semibold text-emerald-50 transition hover:bg-emerald-800/60"
-          >
-            Start With Different Player
-          </button>
-        </div>
+        <>
+          <div className="mt-4 rounded-lg border border-emerald-700 bg-emerald-900/40 p-4 text-sm text-emerald-100">
+            <p>
+              <span className="font-semibold text-emerald-50">Mode:</span>{" "}
+              {runtimeModeLabel}
+            </p>
+            <p>
+              <span className="font-semibold text-emerald-50">Player:</span>{" "}
+              {runtimeState.playerSave.playerName}
+            </p>
+            <p>
+              <span className="font-semibold text-emerald-50">
+                Total Problems Solved:
+              </span>{" "}
+              {runtimeState.playerSave.totalProblemsSolved}
+            </p>
+            <p>
+              <span className="font-semibold text-emerald-50">
+                Current Difficulty:
+              </span>{" "}
+              {runtimeState.playerSave.currentDifficulty}
+            </p>
+            <p>
+              <span className="font-semibold text-emerald-50">
+                Unlocked Dinosaurs:
+              </span>{" "}
+              {runtimeState.playerSave.unlockedDinosaurs.length}
+            </p>
+            <p>
+              <span className="font-semibold text-emerald-50">
+                Session History Entries:
+              </span>{" "}
+              {runtimeState.playerSave.sessionHistory.length}
+            </p>
+            <p>
+              <span className="font-semibold text-emerald-50">
+                Initialized At:
+              </span>{" "}
+              {runtimeState.initializedAt}
+            </p>
+            <button
+              type="button"
+              onClick={handleResetFlowClick}
+              className="mt-4 rounded-md border border-emerald-500 px-3 py-2 font-semibold text-emerald-50 transition hover:bg-emerald-800/60"
+            >
+              Start With Different Player
+            </button>
+          </div>
+
+          <LongDivisionWorkbench
+            key={`${runtimeState.playerSave.playerName}-${runtimeState.initializedAt}-${runtimeState.playerSave.currentDifficulty}`}
+            difficulty={runtimeState.playerSave.currentDifficulty}
+          />
+        </>
       ) : (
         <>
           <p className="mt-2 text-sm text-emerald-100">
