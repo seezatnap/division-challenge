@@ -8,12 +8,14 @@ import type { GameState } from "@/lib/game-state";
 import { initFromSave, initNewGame } from "@/lib/game-state";
 import type { DivisionProblem } from "@/types";
 import { generateProblem } from "@/lib/generate-problem";
+import { recordSolve } from "@/lib/progression";
 
 export default function Home() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [currentProblem, setCurrentProblem] = useState<DivisionProblem | null>(
     null,
   );
+  const [rewardPending, setRewardPending] = useState(false);
 
   function handleStart(result: GameStartResult) {
     let newState: GameState;
@@ -32,23 +34,22 @@ export default function Home() {
     (_problem: DivisionProblem) => {
       if (!gameState) return;
 
-      // Update session counters
-      const updatedState: GameState = {
-        ...gameState,
-        sessionProblemsSolved: gameState.sessionProblemsSolved + 1,
-        sessionProblemsAttempted: gameState.sessionProblemsAttempted + 1,
-        playerSave: {
-          ...gameState.playerSave,
-          totalProblemsSolved: gameState.playerSave.totalProblemsSolved + 1,
-        },
-      };
+      const { updatedState, didLevelUp, shouldReward } = recordSolve(gameState);
 
       setGameState(updatedState);
 
-      // Generate next problem at current difficulty
+      if (shouldReward) {
+        setRewardPending(true);
+      }
+
+      // Generate next problem at (possibly new) difficulty
       setCurrentProblem(
         generateProblem(updatedState.playerSave.currentDifficulty),
       );
+
+      if (didLevelUp) {
+        // Level-up is reflected in the header via updated tier display
+      }
     },
     [gameState],
   );
@@ -65,9 +66,26 @@ export default function Home() {
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           Player: {gameState.playerSave.playerName} | Tier{" "}
           {gameState.playerSave.currentDifficulty} | Solved:{" "}
-          {gameState.playerSave.totalProblemsSolved}
+          {gameState.playerSave.totalProblemsSolved} | Session:{" "}
+          {gameState.sessionProblemsSolved}
         </p>
       </header>
+
+      {/* Reward trigger banner */}
+      {rewardPending && (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg bg-amber-100 px-4 py-2 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+        >
+          You earned a dinosaur reward! 🦕
+          <button
+            className="ml-3 underline"
+            onClick={() => setRewardPending(false)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Workspace */}
       {currentProblem && (
