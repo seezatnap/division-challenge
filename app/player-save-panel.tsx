@@ -19,6 +19,11 @@ import {
   savePlayerSaveFile,
 } from "@/lib/save-file";
 import {
+  buildRuntimeStateKey,
+  doesRuntimeStateMatchKey,
+  saveProgressAfterRewardMilestones,
+} from "@/lib/save-progress";
+import {
   processPendingRewardMilestones,
   type ProcessPendingRewardMilestonesResult,
 } from "@/lib/reward-orchestration";
@@ -31,17 +36,6 @@ function getErrorMessage(error: unknown): string {
   }
 
   return "An unexpected error occurred while accessing save files.";
-}
-
-function buildRuntimeStateKey(runtimeState: GameRuntimeState): string {
-  return `${runtimeState.playerSave.playerName}:${runtimeState.initializedAt}`;
-}
-
-function doesRuntimeStateMatchKey(
-  runtimeState: GameRuntimeState | null,
-  runtimeStateKey: string,
-): runtimeState is GameRuntimeState {
-  return runtimeState !== null && buildRuntimeStateKey(runtimeState) === runtimeStateKey;
 }
 
 export default function PlayerSavePanel() {
@@ -105,7 +99,7 @@ export default function PlayerSavePanel() {
         highestRewardIndex,
       });
 
-      applyRewardMilestonesToRuntimeState(rewardResult, runtimeStateKey);
+      await applyRewardMilestonesToRuntimeState(rewardResult, runtimeStateKey);
     } catch (error) {
       if (doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)) {
         setRewardStatusMessage(getErrorMessage(error));
@@ -131,47 +125,53 @@ export default function PlayerSavePanel() {
     );
   }
 
-  function applyRewardMilestonesToRuntimeState(
+  async function applyRewardMilestonesToRuntimeState(
     rewardResult: ProcessPendingRewardMilestonesResult,
     runtimeStateKey: string,
-  ): void {
-    setRuntimeState((previousState) => {
-      if (!previousState) {
-        return previousState;
-      }
+  ): Promise<void> {
+    await new Promise<void>((resolve) => {
+      setRuntimeState((previousState) => {
+        if (!previousState) {
+          resolve();
+          return previousState;
+        }
 
-      if (buildRuntimeStateKey(previousState) !== runtimeStateKey) {
-        return previousState;
-      }
+        if (buildRuntimeStateKey(previousState) !== runtimeStateKey) {
+          resolve();
+          return previousState;
+        }
 
-      const totalProblemsSolved = Math.max(
-        previousState.playerSave.totalProblemsSolved,
-        rewardResult.playerSave.totalProblemsSolved,
-      );
-      const hasNewUnlocks =
-        rewardResult.playerSave.unlockedDinosaurs.length >
-        previousState.playerSave.unlockedDinosaurs.length;
-      const unlockedDinosaurs = hasNewUnlocks
-        ? [...rewardResult.playerSave.unlockedDinosaurs]
-        : previousState.playerSave.unlockedDinosaurs;
-      const hasNoChanges =
-        totalProblemsSolved === previousState.playerSave.totalProblemsSolved &&
-        unlockedDinosaurs === previousState.playerSave.unlockedDinosaurs;
+        const totalProblemsSolved = Math.max(
+          previousState.playerSave.totalProblemsSolved,
+          rewardResult.playerSave.totalProblemsSolved,
+        );
+        const hasNewUnlocks =
+          rewardResult.playerSave.unlockedDinosaurs.length >
+          previousState.playerSave.unlockedDinosaurs.length;
+        const unlockedDinosaurs = hasNewUnlocks
+          ? [...rewardResult.playerSave.unlockedDinosaurs]
+          : previousState.playerSave.unlockedDinosaurs;
+        const hasNoChanges =
+          totalProblemsSolved === previousState.playerSave.totalProblemsSolved &&
+          unlockedDinosaurs === previousState.playerSave.unlockedDinosaurs;
 
-      if (hasNoChanges) {
-        return previousState;
-      }
+        if (hasNoChanges) {
+          resolve();
+          return previousState;
+        }
 
-      const nextState: GameRuntimeState = {
-        ...previousState,
-        playerSave: {
-          ...previousState.playerSave,
-          totalProblemsSolved,
-          unlockedDinosaurs,
-        },
-      };
-      runtimeStateRef.current = nextState;
-      return nextState;
+        const nextState: GameRuntimeState = {
+          ...previousState,
+          playerSave: {
+            ...previousState.playerSave,
+            totalProblemsSolved,
+            unlockedDinosaurs,
+          },
+        };
+        runtimeStateRef.current = nextState;
+        resolve();
+        return nextState;
+      });
     });
 
     if (doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)) {
@@ -248,8 +248,16 @@ export default function PlayerSavePanel() {
     setStatusMessage("");
 
     try {
-      const saveResult = await savePlayerSaveFile(currentRuntimeState.playerSave);
-      if (doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)) {
+      const saveResult = await saveProgressAfterRewardMilestones({
+        expectedRuntimeStateKey: runtimeStateKey,
+        getRuntimeState: () => runtimeStateRef.current,
+        rewardMilestoneQueue,
+        persistPlayerSave: savePlayerSaveFile,
+      });
+      if (
+        saveResult &&
+        doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)
+      ) {
         setStatusMessage(`Saved progress to ${saveResult.fileName}.`);
       }
     } catch (error) {
