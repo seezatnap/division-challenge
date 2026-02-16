@@ -38,3 +38,7 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#17) Harden `persistGeminiGeneratedImage` to strictly reject malformed base64 payloads (not just empty decodes) and add a regression test in `tests/gemini-image-storage.test.ts` for invalid-but-decodable input. (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#18) Make reward unlock application order-safe by queuing/serializing milestone processing in `app/player-save-panel.tsx` so later in-flight rewards cannot be applied before earlier ones and cause skipped unlocks.
+- [ ] (#19) Add retry handling for failed reward generation milestones (instead of permanently dropping them after one failed attempt), with regression tests for failed and out-of-order reward responses.
