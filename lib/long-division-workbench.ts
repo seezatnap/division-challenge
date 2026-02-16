@@ -1,4 +1,8 @@
-import type { DivisionDifficultyId, DivisionProblem } from "./domain";
+import {
+  DIVISION_DIFFICULTIES,
+  type DivisionDifficultyId,
+  type DivisionProblem,
+} from "./domain";
 import { generateDivisionProblem } from "./division-problem-generator";
 import {
   createLongDivisionStepState,
@@ -30,21 +34,34 @@ export interface LongDivisionWorkbenchAttempt {
   hint: string | null;
 }
 
+export interface LongDivisionWorkbenchRewardTrigger {
+  rewardIndex: number;
+  lifetimeSolvedCount: number;
+}
+
 export interface LongDivisionWorkbenchState {
   difficulty: DivisionDifficultyId;
   solvedCount: number;
+  lifetimeSolvedCount: number;
   problem: DivisionProblem;
   stepState: LongDivisionStepState;
   attempts: readonly LongDivisionWorkbenchAttempt[];
   pendingAdvance: boolean;
+  pendingRewardTrigger: LongDivisionWorkbenchRewardTrigger | null;
   feedback: LongDivisionWorkbenchFeedback;
 }
 
 export interface CreateLongDivisionWorkbenchStateOptions {
   difficulty: DivisionDifficultyId;
   solvedCount?: number;
+  lifetimeSolvedCount?: number;
   random?: () => number;
   createdAt?: Date | string;
+}
+
+export interface CreateLongDivisionWorkbenchStateFromProblemOptions {
+  solvedCount?: number;
+  lifetimeSolvedCount?: number;
 }
 
 export interface AdvanceLongDivisionWorkbenchProblemOptions {
@@ -55,7 +72,11 @@ export interface AdvanceLongDivisionWorkbenchProblemOptions {
 export interface LongDivisionWorkbenchSubmissionResult {
   state: LongDivisionWorkbenchState;
   validation: LongDivisionStepValidationResult;
+  rewardTrigger: LongDivisionWorkbenchRewardTrigger | null;
 }
+
+export const LONG_DIVISION_REWARD_INTERVAL = 5;
+export const LONG_DIVISION_DIFFICULTY_ADVANCE_INTERVAL = 5;
 
 const STEP_LABELS: Record<LongDivisionStepId, string> = {
   divide: "Divide",
@@ -74,6 +95,75 @@ function normalizeSolvedCount(solvedCount: number | undefined): number {
   }
 
   return solvedCount;
+}
+
+function getDifficultyTierIndex(difficulty: DivisionDifficultyId): number {
+  const tierIndex = DIVISION_DIFFICULTIES.findIndex(
+    (candidate) => candidate.id === difficulty,
+  );
+
+  if (tierIndex < 0) {
+    throw new Error(`Unknown division difficulty "${difficulty}".`);
+  }
+
+  return tierIndex;
+}
+
+function getDifficultyByTierIndex(tierIndex: number): DivisionDifficultyId {
+  if (!Number.isInteger(tierIndex)) {
+    throw new Error("Difficulty tier index must be an integer.");
+  }
+
+  if (tierIndex < 0 || tierIndex >= DIVISION_DIFFICULTIES.length) {
+    throw new Error(
+      `Difficulty tier index must be between 0 and ${DIVISION_DIFFICULTIES.length - 1}.`,
+    );
+  }
+
+  return DIVISION_DIFFICULTIES[tierIndex].id;
+}
+
+function buildRewardTrigger(
+  lifetimeSolvedCount: number,
+): LongDivisionWorkbenchRewardTrigger | null {
+  if (
+    lifetimeSolvedCount === 0 ||
+    lifetimeSolvedCount % LONG_DIVISION_REWARD_INTERVAL !== 0
+  ) {
+    return null;
+  }
+
+  return {
+    rewardIndex: (lifetimeSolvedCount / LONG_DIVISION_REWARD_INTERVAL) - 1,
+    lifetimeSolvedCount,
+  };
+}
+
+export function getProgressionDifficulty(
+  lifetimeSolvedCount: number,
+): DivisionDifficultyId {
+  const normalizedLifetimeSolvedCount = normalizeSolvedCount(lifetimeSolvedCount);
+  const progressionTierIndex = Math.min(
+    Math.floor(
+      normalizedLifetimeSolvedCount / LONG_DIVISION_DIFFICULTY_ADVANCE_INTERVAL,
+    ),
+    DIVISION_DIFFICULTIES.length - 1,
+  );
+
+  return getDifficultyByTierIndex(progressionTierIndex);
+}
+
+export function resolveLongDivisionWorkbenchDifficulty(
+  initialDifficulty: DivisionDifficultyId,
+  lifetimeSolvedCount: number,
+): DivisionDifficultyId {
+  const initialTierIndex = getDifficultyTierIndex(initialDifficulty);
+  const progressionTierIndex = getDifficultyTierIndex(
+    getProgressionDifficulty(lifetimeSolvedCount),
+  );
+  const resolvedTierIndex = Math.max(initialTierIndex, progressionTierIndex);
+
+  return getDifficultyByTierIndex(resolvedTierIndex);
 }
 
 function buildInitialFeedback(
@@ -110,15 +200,27 @@ function buildStepSuccessFeedback(
   };
 }
 
-function buildCompletionFeedback(problem: DivisionProblem): LongDivisionWorkbenchFeedback {
+function buildCompletionFeedback(
+  problem: DivisionProblem,
+  options: {
+    difficultyIncreased: boolean;
+    rewardTriggered: boolean;
+  },
+): LongDivisionWorkbenchFeedback {
   const remainderText = problem.remainder > 0
     ? ` remainder ${problem.remainder}`
+    : "";
+  const levelUpMessage = options.difficultyIncreased
+    ? " You leveled up to a tougher division tier."
+    : "";
+  const rewardMessage = options.rewardTriggered
+    ? " Dino reward milestone reached."
     : "";
 
   return {
     tone: "complete",
     message:
-      `Roarsome! ${problem.dividend} ÷ ${problem.divisor} = ${problem.quotient}${remainderText}. Next problem loading...`,
+      `Roarsome! ${problem.dividend} ÷ ${problem.divisor} = ${problem.quotient}${remainderText}. Next problem loading...${levelUpMessage}${rewardMessage}`,
   };
 }
 
@@ -148,17 +250,28 @@ export function buildLongDivisionStepPrompt(step: LongDivisionCurrentStep): stri
 
 export function createLongDivisionWorkbenchStateFromProblem(
   problem: DivisionProblem,
-  solvedCount: number = 0,
+  options: CreateLongDivisionWorkbenchStateFromProblemOptions = {},
 ): LongDivisionWorkbenchState {
   const stepState = createLongDivisionStepState(problem);
+  const solvedCount = normalizeSolvedCount(options.solvedCount);
+  const lifetimeSolvedCount = Math.max(
+    solvedCount,
+    normalizeSolvedCount(options.lifetimeSolvedCount ?? solvedCount),
+  );
+  const difficulty = resolveLongDivisionWorkbenchDifficulty(
+    problem.difficulty,
+    lifetimeSolvedCount,
+  );
 
   return {
-    difficulty: problem.difficulty,
-    solvedCount: normalizeSolvedCount(solvedCount),
+    difficulty,
+    solvedCount,
+    lifetimeSolvedCount,
     problem,
     stepState,
     attempts: [],
     pendingAdvance: false,
+    pendingRewardTrigger: null,
     feedback: buildInitialFeedback(stepState),
   };
 }
@@ -166,13 +279,25 @@ export function createLongDivisionWorkbenchStateFromProblem(
 export function createLongDivisionWorkbenchState(
   options: CreateLongDivisionWorkbenchStateOptions,
 ): LongDivisionWorkbenchState {
+  const solvedCount = normalizeSolvedCount(options.solvedCount);
+  const lifetimeSolvedCount = Math.max(
+    solvedCount,
+    normalizeSolvedCount(options.lifetimeSolvedCount ?? solvedCount),
+  );
+  const difficulty = resolveLongDivisionWorkbenchDifficulty(
+    options.difficulty,
+    lifetimeSolvedCount,
+  );
   const problem = generateDivisionProblem({
-    difficulty: options.difficulty,
+    difficulty,
     random: options.random,
     createdAt: options.createdAt,
   });
 
-  return createLongDivisionWorkbenchStateFromProblem(problem, options.solvedCount);
+  return createLongDivisionWorkbenchStateFromProblem(problem, {
+    solvedCount,
+    lifetimeSolvedCount,
+  });
 }
 
 export function submitLongDivisionWorkbenchStepInput(
@@ -186,12 +311,14 @@ export function submitLongDivisionWorkbenchStepInput(
     return {
       state: {
         ...state,
+        pendingRewardTrigger: null,
         feedback: {
           tone: state.pendingAdvance ? "complete" : "error",
           message: validation.hint ?? "This problem is already complete.",
         },
       },
       validation,
+      rewardTrigger: null,
     };
   }
 
@@ -211,26 +338,43 @@ export function submitLongDivisionWorkbenchStepInput(
         ...state,
         attempts: nextAttempts,
         pendingAdvance: false,
+        pendingRewardTrigger: null,
         feedback: {
           tone: "error",
           message: validation.hint ?? `Try ${getLongDivisionStepLabel(validation.step)} again.`,
         },
       },
       validation,
+      rewardTrigger: null,
     };
   }
 
   if (validation.isComplete) {
+    const solvedCount = state.solvedCount + 1;
+    const lifetimeSolvedCount = state.lifetimeSolvedCount + 1;
+    const difficulty = resolveLongDivisionWorkbenchDifficulty(
+      state.difficulty,
+      lifetimeSolvedCount,
+    );
+    const rewardTrigger = buildRewardTrigger(lifetimeSolvedCount);
+
     return {
       state: {
         ...state,
-        solvedCount: state.solvedCount + 1,
+        difficulty,
+        solvedCount,
+        lifetimeSolvedCount,
         stepState: validation.state,
         attempts: nextAttempts,
         pendingAdvance: true,
-        feedback: buildCompletionFeedback(state.problem),
+        pendingRewardTrigger: rewardTrigger,
+        feedback: buildCompletionFeedback(state.problem, {
+          difficultyIncreased: difficulty !== state.difficulty,
+          rewardTriggered: rewardTrigger !== null,
+        }),
       },
       validation,
+      rewardTrigger,
     };
   }
 
@@ -240,11 +384,13 @@ export function submitLongDivisionWorkbenchStepInput(
       stepState: validation.state,
       attempts: nextAttempts,
       pendingAdvance: false,
+      pendingRewardTrigger: null,
       feedback: buildStepSuccessFeedback(
         getCurrentLongDivisionStep(validation.state),
       ),
     },
     validation,
+    rewardTrigger: null,
   };
 }
 
@@ -258,5 +404,8 @@ export function advanceLongDivisionWorkbenchProblem(
     createdAt: options.createdAt,
   });
 
-  return createLongDivisionWorkbenchStateFromProblem(nextProblem, state.solvedCount);
+  return createLongDivisionWorkbenchStateFromProblem(nextProblem, {
+    solvedCount: state.solvedCount,
+    lifetimeSolvedCount: state.lifetimeSolvedCount,
+  });
 }
