@@ -35,6 +35,20 @@ export interface OrchestratedRewardUnlock {
   skipped: boolean;
 }
 
+export interface ProcessPendingRewardMilestonesOptions {
+  playerSave: PlayerSaveFile;
+  highestRewardIndex: number;
+  generateRewardImage?: RewardImageGenerationFn;
+  earnedAt?: string;
+}
+
+export interface ProcessPendingRewardMilestonesResult {
+  playerSave: PlayerSaveFile;
+  unlockedDinosaurs: readonly UnlockedDinosaur[];
+  failedRewardIndex: number | null;
+  errorMessage: string | null;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -147,6 +161,23 @@ export async function requestGeminiRewardImage(
   };
 }
 
+function assertHighestRewardIndex(highestRewardIndex: number): void {
+  if (!Number.isInteger(highestRewardIndex) || highestRewardIndex < -1) {
+    throw new Error(
+      "Highest reward index must be an integer greater than or equal to -1.",
+    );
+  }
+}
+
+function buildRewardTriggerForIndex(
+  rewardIndex: number,
+): LongDivisionWorkbenchRewardTrigger {
+  return {
+    rewardIndex,
+    lifetimeSolvedCount: (rewardIndex + 1) * LONG_DIVISION_REWARD_INTERVAL,
+  };
+}
+
 export async function orchestrateRewardUnlock(
   options: OrchestrateRewardUnlockOptions,
 ): Promise<OrchestratedRewardUnlock> {
@@ -204,5 +235,60 @@ export async function orchestrateRewardUnlock(
     unlockedDinosaur,
     playerSave,
     skipped: false,
+  };
+}
+
+export async function processPendingRewardMilestones(
+  options: ProcessPendingRewardMilestonesOptions,
+): Promise<ProcessPendingRewardMilestonesResult> {
+  assertHighestRewardIndex(options.highestRewardIndex);
+
+  let playerSave = options.playerSave;
+  const unlockedDinosaurs: UnlockedDinosaur[] = [];
+  const nextRewardIndex = playerSave.unlockedDinosaurs.length;
+
+  if (nextRewardIndex > options.highestRewardIndex) {
+    return {
+      playerSave,
+      unlockedDinosaurs,
+      failedRewardIndex: null,
+      errorMessage: null,
+    };
+  }
+
+  for (
+    let rewardIndex = nextRewardIndex;
+    rewardIndex <= options.highestRewardIndex;
+    rewardIndex += 1
+  ) {
+    const rewardTrigger = buildRewardTriggerForIndex(rewardIndex);
+
+    try {
+      const result = await orchestrateRewardUnlock({
+        playerSave,
+        rewardTrigger,
+        generateRewardImage: options.generateRewardImage,
+        earnedAt: options.earnedAt,
+      });
+      playerSave = result.playerSave;
+
+      if (result.unlockedDinosaur) {
+        unlockedDinosaurs.push(result.unlockedDinosaur);
+      }
+    } catch (error) {
+      return {
+        playerSave,
+        unlockedDinosaurs,
+        failedRewardIndex: rewardIndex,
+        errorMessage: getErrorMessage(error),
+      };
+    }
+  }
+
+  return {
+    playerSave,
+    unlockedDinosaurs,
+    failedRewardIndex: null,
+    errorMessage: null,
   };
 }
