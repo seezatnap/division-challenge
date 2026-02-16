@@ -7,6 +7,7 @@ import {
   UNSUPPORTED_BROWSER_MESSAGE,
   loadGame,
 } from "@/lib/save-file";
+import { MOTIFS } from "@/lib/theme";
 
 export interface GameStartResult {
   mode: "new" | "loaded";
@@ -70,19 +71,19 @@ export default function GameStartScreen({ onStart }: GameStartScreenProps) {
 
   if (screen === "name-entry") {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-8 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-          <h1 className="mb-2 text-center text-3xl font-bold">
-            Dino Division
+      <div className="relative z-10 flex min-h-screen items-center justify-center">
+        <div className="w-full max-w-md rounded-lg border border-earth/20 bg-ivory p-8 shadow-lg dark:border-earth/30 dark:bg-sand">
+          <h1 className="mb-2 text-center text-4xl font-extrabold tracking-tight text-jungle dark:text-leaf">
+            {MOTIFS.trex} Dino Division {MOTIFS.dino}
           </h1>
-          <p className="mb-6 text-center text-zinc-600 dark:text-zinc-400">
-            Enter your name to get started
+          <p className="mb-6 text-center text-fossil">
+            {MOTIFS.leaf} Enter your name to get started
           </p>
 
           <form onSubmit={handleNameSubmit}>
             <label
               htmlFor="player-name"
-              className="mb-2 block text-sm font-medium"
+              className="mb-2 block text-sm font-medium text-earth dark:text-fossil"
             >
               Player Name
             </label>
@@ -94,14 +95,14 @@ export default function GameStartScreen({ onStart }: GameStartScreenProps) {
               placeholder="e.g. Dr. Malcolm"
               maxLength={50}
               autoFocus
-              className="mb-4 w-full rounded border border-zinc-300 px-3 py-2 text-base focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 dark:border-zinc-600 dark:bg-zinc-800"
+              className="mb-4 w-full rounded border border-earth/30 bg-background px-3 py-2 text-base focus:border-jungle focus:outline-none focus:ring-1 focus:ring-jungle dark:border-earth/40 dark:bg-background"
             />
             <button
               type="submit"
               disabled={!nameValid}
-              className="w-full rounded bg-green-700 px-4 py-2 text-base font-semibold text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded bg-jungle px-4 py-2 text-base font-semibold text-white transition-colors hover:bg-jungle-light disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Continue
+              {MOTIFS.footprint} Continue
             </button>
           </form>
         </div>
@@ -111,35 +112,35 @@ export default function GameStartScreen({ onStart }: GameStartScreenProps) {
 
   // choice screen
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-8 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-        <h1 className="mb-2 text-center text-3xl font-bold">
-          Dino Division
+    <div className="relative z-10 flex min-h-screen items-center justify-center">
+      <div className="w-full max-w-md rounded-lg border border-earth/20 bg-ivory p-8 shadow-lg dark:border-earth/30 dark:bg-sand">
+        <h1 className="mb-2 text-center text-4xl font-extrabold tracking-tight text-jungle dark:text-leaf">
+          {MOTIFS.trex} Dino Division {MOTIFS.dino}
         </h1>
-        <p className="mb-6 text-center text-zinc-600 dark:text-zinc-400">
-          Welcome, <strong>{trimmedName}</strong>!
+        <p className="mb-6 text-center text-fossil">
+          Welcome, <strong className="text-jungle dark:text-leaf">{trimmedName}</strong>!
         </p>
 
         <div className="flex flex-col gap-3">
           <button
             type="button"
             onClick={handleStartNew}
-            className="w-full rounded bg-green-700 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-green-800"
+            className="w-full rounded bg-jungle px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-jungle-light"
           >
-            Start New Game
+            {MOTIFS.egg} Start New Game
           </button>
           <button
             type="button"
             onClick={handleLoadSave}
             disabled={loading}
-            className="w-full rounded border border-green-700 px-4 py-3 text-base font-semibold text-green-700 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-green-400 dark:hover:bg-zinc-800"
+            className="w-full rounded border border-jungle px-4 py-3 text-base font-semibold text-jungle transition-colors hover:bg-leaf/10 disabled:cursor-not-allowed disabled:opacity-50 dark:text-leaf dark:hover:bg-fern/20"
           >
-            {loading ? "Loading…" : "Load Existing Save"}
+            {loading ? "Loading…" : `${MOTIFS.bone} Load Existing Save`}
           </button>
           <button
             type="button"
             onClick={handleBack}
-            className="mt-1 text-sm text-zinc-500 underline hover:text-zinc-700 dark:hover:text-zinc-300"
+            className="mt-1 text-sm text-fossil underline hover:text-earth"
           >
             Back
           </button>
