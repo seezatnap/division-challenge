@@ -6,7 +6,7 @@ import type { GameStartResult } from "@/components/GameStartScreen";
 import DivisionWorkspace from "@/components/DivisionWorkspace";
 import type { GameState } from "@/lib/game-state";
 import { initFromSave, initNewGame } from "@/lib/game-state";
-import type { DifficultyTier, DivisionProblem } from "@/types";
+import type { DifficultyTier, DivisionProblem, UnlockedDinosaur } from "@/types";
 import { generateProblem } from "@/lib/generate-problem";
 import { recordSolve } from "@/lib/progression";
 import { persistAfterSolve } from "@/lib/persistence";
@@ -16,7 +16,8 @@ export default function Home() {
   const [currentProblem, setCurrentProblem] = useState<DivisionProblem | null>(
     null,
   );
-  const [rewardPending, setRewardPending] = useState(false);
+  const [rewardDino, setRewardDino] = useState<UnlockedDinosaur | null>(null);
+  const [rewardError, setRewardError] = useState<string | null>(null);
   const [levelUpTier, setLevelUpTier] = useState<DifficultyTier | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -61,7 +62,10 @@ export default function Home() {
             hasPersistedRef.current = true;
 
             if (result.rewardResult?.status === "success") {
-              setRewardPending(true);
+              setRewardDino(result.rewardResult.unlocked);
+              setRewardError(null);
+            } else if (result.rewardResult?.status === "error") {
+              setRewardError(result.rewardResult.message);
             }
 
             if (result.saveError) {
@@ -117,16 +121,45 @@ export default function Home() {
         </div>
       )}
 
-      {/* Reward trigger banner */}
-      {rewardPending && (
+      {/* Reward unlock banner */}
+      {rewardDino && (
         <div
           role="alert"
-          className="mb-4 rounded-lg bg-amber-100 px-4 py-2 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+          className="mb-4 flex items-center gap-4 rounded-lg bg-amber-100 px-4 py-3 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
         >
-          You earned a dinosaur reward! 🦕
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={rewardDino.imagePath}
+            alt={rewardDino.name}
+            className="h-16 w-16 rounded-md object-cover"
+          />
+          <div>
+            <p className="font-semibold">
+              You unlocked {rewardDino.name}!
+            </p>
+            <p className="text-sm">
+              Added to your Dino Gallery.
+            </p>
+          </div>
+          <button
+            className="ml-auto underline"
+            onClick={() => setRewardDino(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Reward error banner */}
+      {rewardError && (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg bg-orange-100 px-4 py-2 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+        >
+          Reward generation failed: {rewardError}
           <button
             className="ml-3 underline"
-            onClick={() => setRewardPending(false)}
+            onClick={() => setRewardError(null)}
           >
             Dismiss
           </button>
