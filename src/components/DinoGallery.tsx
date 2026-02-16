@@ -2,6 +2,7 @@
 
 import type { UnlockedDinosaur } from "@/types";
 import { DINOSAUR_COUNT } from "@/data/dinosaurs";
+import { MOTIFS } from "@/lib/theme";
 
 // ─── Props ─────────────────────────────────────────────────
 
@@ -39,8 +40,10 @@ export default function DinoGallery({ unlockedDinosaurs }: DinoGalleryProps) {
     >
       {/* Gallery Header */}
       <div className="mb-4 flex items-baseline justify-between">
-        <h2 className="text-2xl font-bold">Dino Gallery</h2>
-        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+        <h2 className="text-2xl font-bold text-jungle dark:text-leaf">
+          {MOTIFS.bone} Dino Gallery
+        </h2>
+        <span className="text-sm text-fossil">
           {count} / {total} unlocked
         </span>
       </div>
@@ -48,13 +51,13 @@ export default function DinoGallery({ unlockedDinosaurs }: DinoGalleryProps) {
       {/* Empty State */}
       {count === 0 ? (
         <div
-          className="rounded-lg border-2 border-dashed border-zinc-300 px-6 py-12 text-center dark:border-zinc-600"
+          className="rounded-lg border-2 border-dashed border-earth/30 bg-sand/50 px-6 py-12 text-center dark:border-earth/40 dark:bg-sand/30"
           data-testid="gallery-empty"
         >
-          <p className="text-lg font-semibold text-zinc-500 dark:text-zinc-400">
-            No dinosaurs unlocked yet
+          <p className="text-lg font-semibold text-fossil">
+            {MOTIFS.egg} No dinosaurs unlocked yet
           </p>
-          <p className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">
+          <p className="mt-2 text-sm text-fossil/70">
             Solve 5 division problems to earn your first dinosaur!
           </p>
         </div>
@@ -67,7 +70,7 @@ export default function DinoGallery({ unlockedDinosaurs }: DinoGalleryProps) {
           {unlockedDinosaurs.map((dino, index) => (
             <div
               key={`${dino.name}-${index}`}
-              className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900"
+              className="overflow-hidden rounded-lg border border-earth/20 bg-ivory shadow-sm transition-shadow hover:shadow-md dark:border-earth/30 dark:bg-sand"
               data-testid="gallery-card"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -78,11 +81,11 @@ export default function DinoGallery({ unlockedDinosaurs }: DinoGalleryProps) {
                 loading="lazy"
               />
               <div className="p-3">
-                <p className="font-semibold text-zinc-800 dark:text-zinc-200">
+                <p className="font-semibold text-jungle dark:text-leaf">
                   {dino.name}
                 </p>
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Earned {formatEarnedDate(dino.dateEarned)}
+                <p className="mt-1 text-xs text-fossil">
+                  {MOTIFS.footprint} Earned {formatEarnedDate(dino.dateEarned)}
                 </p>
               </div>
             </div>

@@ -11,6 +11,7 @@ import type { DifficultyTier, DivisionProblem, UnlockedDinosaur } from "@/types"
 import { generateProblem } from "@/lib/generate-problem";
 import { recordSolve } from "@/lib/progression";
 import { persistAfterSolve } from "@/lib/persistence";
+import { MOTIFS, LEVEL_UP_MESSAGES, randomMessage } from "@/lib/theme";
 
 export default function Home() {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -115,12 +116,14 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-start pt-8">
+    <div className="relative z-10 flex min-h-screen flex-col items-center justify-start pt-8">
       {/* Header */}
       <header className="mb-6 text-center">
-        <h1 className="text-3xl font-bold">Dino Division</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Player: {gameState.playerSave.playerName} | Tier{" "}
+        <h1 className="text-4xl font-extrabold tracking-tight text-jungle dark:text-leaf">
+          {MOTIFS.trex} Dino Division {MOTIFS.dino}
+        </h1>
+        <p className="mt-1 text-sm text-fossil dark:text-earth">
+          {MOTIFS.footprint} Player: {gameState.playerSave.playerName} | Tier{" "}
           {gameState.playerSave.currentDifficulty} | Solved:{" "}
           {gameState.playerSave.totalProblemsSolved} | Session:{" "}
           {gameState.sessionProblemsSolved}
@@ -128,10 +131,10 @@ export default function Home() {
         <button
           type="button"
           onClick={() => setShowGallery((prev) => !prev)}
-          className="mt-2 rounded bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-700"
+          className="mt-2 rounded-lg bg-amber-accent px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:opacity-90"
           data-testid="gallery-toggle"
         >
-          {showGallery ? "Back to Practice" : "Dino Gallery"} ({gameState.playerSave.unlockedDinosaurs.length})
+          {showGallery ? "Back to Practice" : `${MOTIFS.bone} Dino Gallery`} ({gameState.playerSave.unlockedDinosaurs.length})
         </button>
       </header>
 
@@ -139,9 +142,9 @@ export default function Home() {
       {levelUpTier !== null && (
         <div
           role="status"
-          className="mb-4 rounded-lg bg-green-100 px-4 py-2 text-green-800 dark:bg-green-900 dark:text-green-200"
+          className="mb-4 rounded-lg border border-leaf/30 bg-leaf/10 px-4 py-2 text-jungle dark:bg-fern/30 dark:text-leaf"
         >
-          Roarsome! You leveled up to Tier {levelUpTier}!
+          {MOTIFS.volcano} {randomMessage(LEVEL_UP_MESSAGES)} {levelUpTier}!
           <button
             className="ml-3 underline"
             onClick={() => setLevelUpTier(null)}
@@ -155,7 +158,7 @@ export default function Home() {
       {rewardDino && (
         <div
           role="alert"
-          className="mb-4 flex items-center gap-4 rounded-lg bg-amber-100 px-4 py-3 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+          className="mb-4 flex items-center gap-4 rounded-lg border border-amber-accent/30 bg-amber-accent/10 px-4 py-3 text-earth dark:bg-amber-accent/20 dark:text-sand"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -165,7 +168,7 @@ export default function Home() {
           />
           <div>
             <p className="font-semibold">
-              You unlocked {rewardDino.name}!
+              {MOTIFS.trophy} You unlocked {rewardDino.name}!
             </p>
             <p className="text-sm">
               Added to your Dino Gallery.
@@ -184,9 +187,9 @@ export default function Home() {
       {rewardError && (
         <div
           role="alert"
-          className="mb-4 rounded-lg bg-orange-100 px-4 py-2 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+          className="mb-4 rounded-lg border border-amber-accent/30 bg-amber-accent/10 px-4 py-2 text-earth dark:bg-amber-accent/20 dark:text-sand"
         >
-          Reward generation failed: {rewardError}
+          {MOTIFS.volcano} Reward generation failed: {rewardError}
           <button
             className="ml-3 underline"
             onClick={() => setRewardError(null)}

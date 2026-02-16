@@ -1,21 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ─── Jurassic earthy / jungle palette ─── */
+  --background: #faf6ed;          /* Warm ivory */
+  --foreground: #2a2215;          /* Dark earth */
+  --color-jungle: #2d6a4f;        /* Deep jungle green — primary */
+  --color-jungle-light: #40916c;  /* Lighter jungle — hover */
+  --color-fern: #1b4332;          /* Dark fern */
+  --color-amber: #b5651d;         /* Warm amber */
+  --color-sand: #f5e6ca;          /* Sandy tan */
+  --color-ivory: #faf6ed;         /* Ivory surface */
+  --color-earth: #6b4e32;         /* Earthy brown */
+  --color-fossil: #7a7062;        /* Fossil grey */
+  --color-leaf: #52b788;          /* Leaf green */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-jungle: var(--color-jungle);
+  --color-jungle-light: var(--color-jungle-light);
+  --color-fern: var(--color-fern);
+  --color-amber-accent: var(--color-amber);
+  --color-sand: var(--color-sand);
+  --color-ivory: var(--color-ivory);
+  --color-earth: var(--color-earth);
+  --color-fossil: var(--color-fossil);
+  --color-leaf: var(--color-leaf);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1a1409;          /* Volcanic dark */
+    --foreground: #ede8d8;          /* Warm cream text */
+    --color-sand: #2a2215;          /* Sand → dark surface */
+    --color-ivory: #2a2215;         /* Ivory → lava rock */
   }
 }
 
@@ -23,4 +44,17 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Subtle repeating fern-leaf texture on the body background */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cpath d='M30 5 C25 15 15 20 5 25 C15 25 25 30 30 40 C35 30 45 25 55 25 C45 20 35 15 30 5Z' fill='%232d6a4f'/%3E%3C/svg%3E");
+  background-size: 60px 60px;
+  z-index: 0;
 }
