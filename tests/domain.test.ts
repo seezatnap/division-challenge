@@ -42,6 +42,20 @@ test("division problem guard validates core shape and remainder rule", () => {
   );
 });
 
+test("division problem guard rejects mathematically inconsistent values", () => {
+  const inconsistentProblem: DivisionProblem = {
+    id: "prob-2",
+    dividend: 129,
+    divisor: 4,
+    quotient: 32,
+    remainder: 0,
+    difficulty: "three-digit-by-one-digit",
+    createdAt: now,
+  };
+
+  assert.equal(isDivisionProblem(inconsistentProblem), false);
+});
+
 test("player save guard validates nested unlocked dino and session records", () => {
   const validSave: PlayerSaveFile = {
     playerName: "Rex",
