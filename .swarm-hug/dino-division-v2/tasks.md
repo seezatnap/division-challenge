@@ -3,9 +3,9 @@
 ## Foundation & Architecture
 
 - [x] (#1) Initialize the Next.js App Router + TypeScript + Tailwind baseline and set up feature folders for division engine, workspace UI, rewards, gallery, and persistence to support v2 architecture [5 pts] (A)
-- [ ] (#2) Define shared TypeScript models/state contracts for problems, long-division steps, active input targets, player progress (session + lifetime), unlocked rewards, and save-file schema [5 pts] (blocked by #1)
-- [ ] (#3) Create a constants/data module with the full static list of 100 dinosaurs (including the JP/JW/Chaos Theory priority set) and selection utilities for deterministic unlock order [5 pts] (blocked by #1)
-- [ ] (#4) Implement environment/config wiring for `GEMINI_API_KEY` and a reusable Jurassic Park cinematic prompt builder for `gemini-2.0-flash-exp` requests [5 pts] (blocked by #1)
+- [A] (#2) Define shared TypeScript models/state contracts for problems, long-division steps, active input targets, player progress (session + lifetime), unlocked rewards, and save-file schema [5 pts] (blocked by #1)
+- [A] (#3) Create a constants/data module with the full static list of 100 dinosaurs (including the JP/JW/Chaos Theory priority set) and selection utilities for deterministic unlock order [5 pts] (blocked by #1)
+- [B] (#4) Implement environment/config wiring for `GEMINI_API_KEY` and a reusable Jurassic Park cinematic prompt builder for `gemini-2.0-flash-exp` requests [5 pts] (blocked by #1)
 
 ## Division Logic & Game State
 
@@ -45,7 +45,7 @@
 
 ## Theming & Motion
 
-- [ ] (#26) Apply Jurassic-themed visual design system (earth/jungle palette, themed typography, motif overlays) across game, gallery, and save/load UI with responsive mobile/desktop layouts [5 pts] (blocked by #1)
+- [B] (#26) Apply Jurassic-themed visual design system (earth/jungle palette, themed typography, motif overlays) across game, gallery, and save/load UI with responsive mobile/desktop layouts [5 pts] (blocked by #1)
 - [ ] (#27) Polish motion system (glow cadence, row transitions, lock-in pulses, hatch/reveal states) so the workspace feels dynamic/live rather than form-based [5 pts] (blocked by #13, #14, #20, #26)
 
 ## Testing & Release Readiness
