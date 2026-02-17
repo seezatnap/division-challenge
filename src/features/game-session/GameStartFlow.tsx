@@ -36,13 +36,29 @@ function openFileViaInput(): Promise<File | null> {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json";
+    let settled = false;
 
     input.onchange = () => {
-      resolve(input.files?.[0] ?? null);
+      if (!settled) {
+        settled = true;
+        resolve(input.files?.[0] ?? null);
+      }
     };
 
-    // If the user cancels, we never get an event — resolve after a timeout.
-    // In practice the component stays interactive so this is just cleanup.
+    // If the user cancels the file picker, no change event fires.
+    // Listen for window re-focus (which fires when the dialog closes)
+    // and resolve with null after a short delay to let onchange fire first.
+    const onFocus = () => {
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          resolve(null);
+        }
+      }, 300);
+      window.removeEventListener("focus", onFocus);
+    };
+    window.addEventListener("focus", onFocus);
+
     input.click();
   });
 }
