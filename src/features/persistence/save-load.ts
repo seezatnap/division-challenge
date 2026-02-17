@@ -296,19 +296,115 @@ export async function loadFromFile(file: File): Promise<LoadResult> {
 /**
  * Trigger a browser download of the save file as a JSON blob.
  * Used when the File System Access API is not available.
+ *
+ * Uses the identical `buildSaveFile` pipeline as `saveToDisk`, so the
+ * resulting JSON has the same schema and validation guarantees.
  */
-export function saveViaDownload(session: GameSession): void {
-  const saveFile = buildSaveFile(session);
-  const suggestedName = saveFileNameFromPlayer(session.playerName);
-  const json = JSON.stringify(saveFile, null, 2);
+export function saveViaDownload(session: GameSession): SaveResult {
+  try {
+    const saveFile = buildSaveFile(session);
+    const suggestedName = saveFileNameFromPlayer(session.playerName);
+    const json = JSON.stringify(saveFile, null, 2);
 
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
 
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = suggestedName;
-  link.click();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = suggestedName;
+    link.click();
 
-  URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error while saving.",
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Unified save / load — auto-detect FSA vs fallback
+// ---------------------------------------------------------------------------
+
+/**
+ * Save the current game session, using the File System Access API when
+ * available and falling back to a browser download otherwise.
+ *
+ * Both paths use `buildSaveFile` → identical schema and validation.
+ */
+export async function saveGame(session: GameSession): Promise<SaveResult> {
+  if (isFileSystemAccessSupported()) {
+    return saveToDisk(session);
+  }
+  return saveViaDownload(session);
+}
+
+/**
+ * Load a save file, using the File System Access API when available
+ * and falling back to a hidden `<input type="file">` otherwise.
+ *
+ * Both paths use `parseSaveFileText` → identical schema and validation.
+ */
+export async function loadGame(): Promise<LoadResult> {
+  if (isFileSystemAccessSupported()) {
+    return loadFromDisk();
+  }
+  return loadViaFileInput();
+}
+
+/**
+ * Open a file picker via a hidden `<input type="file">` element and
+ * parse the selected file as a save file.
+ *
+ * This is the fallback load flow for browsers without the File System
+ * Access API. Uses `parseSaveFileText` for identical validation.
+ */
+export async function loadViaFileInput(): Promise<LoadResult> {
+  const file = await openFileViaInput();
+  if (!file) {
+    return { success: false, cancelled: true };
+  }
+  return loadFromFile(file);
+}
+
+// ---------------------------------------------------------------------------
+// Hidden file input helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Open a file via a hidden `<input type="file">` element.
+ * Returns the selected File, or null if the user cancelled.
+ */
+function openFileViaInput(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    let settled = false;
+
+    input.onchange = () => {
+      if (!settled) {
+        settled = true;
+        resolve(input.files?.[0] ?? null);
+      }
+    };
+
+    // If the user cancels the file picker, no change event fires.
+    // Listen for window re-focus (which fires when the dialog closes)
+    // and resolve with null after a short delay to let onchange fire first.
+    const onFocus = () => {
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          resolve(null);
+        }
+      }, 300);
+      window.removeEventListener("focus", onFocus);
+    };
+    window.addEventListener("focus", onFocus);
+
+    input.click();
+  });
 }

@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { GameSession } from "@/types";
 import { GameStartFlow } from "@/features/game-session";
+import { SaveLoadControls } from "@/features/persistence";
 
 export default function Home() {
   const [session, setSession] = useState<GameSession | null>(null);
@@ -39,6 +40,14 @@ export default function Home() {
               Solve problems, earn dinosaurs!
             </p>
           </div>
+        </div>
+
+        {/* Save / Load controls — works with or without File System Access API */}
+        <div className="mt-6 sm:mt-8">
+          <SaveLoadControls
+            session={session}
+            onSessionRestored={handleSessionReady}
+          />
         </div>
       </div>
     );
