@@ -353,6 +353,7 @@ export default function Home() {
   const [isNextProblemReady, setIsNextProblemReady] = useState(false);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
+  const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     gameSessionRef.current = gameSession;
@@ -362,6 +363,20 @@ export default function Home() {
     completedProblemIdRef.current = null;
     setIsNextProblemReady(false);
   }, [gameSession.activeProblem.id]);
+
+  useEffect(() => {
+    if (!isSessionStarted || !isNextProblemReady) {
+      return;
+    }
+
+    const focusFrameHandle = window.requestAnimationFrame(() => {
+      nextProblemButtonRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(focusFrameHandle);
+    };
+  }, [isNextProblemReady, isSessionStarted]);
 
   const handleStartSession = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -776,6 +791,7 @@ export default function Home() {
                   className="jp-button"
                   data-ui-action="next-problem"
                   onClick={advanceToNextProblem}
+                  ref={nextProblemButtonRef}
                   type="button"
                 >
                   NEXT

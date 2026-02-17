@@ -363,6 +363,16 @@ body {
   outline: none;
 }
 
+.inline-entry[data-entry-inline="true"][contenteditable="true"]:focus-visible {
+  outline: 2px solid rgba(188, 34, 34, 0.92);
+  outline-offset: 2px;
+}
+
+.inline-entry[data-entry-inline="true"][contenteditable="true"]:focus-visible::after {
+  border-color: rgba(220, 38, 38, 0.72);
+  opacity: 1;
+}
+
 .quotient-digit-cell {
   background: rgba(255, 255, 255, 0.45);
 }
@@ -1444,6 +1454,14 @@ body {
 .jp-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 0.5rem 1.15rem rgba(45, 36, 25, 0.2);
+}
+
+.jp-button:focus-visible {
+  outline: 2px solid rgba(188, 34, 34, 0.92);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 1px rgba(220, 38, 38, 0.72),
+    0 0 0.95rem rgba(220, 38, 38, 0.24);
 }
 
 .jp-button:disabled {

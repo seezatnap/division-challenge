@@ -151,6 +151,15 @@ function toStepValueText(step: LongDivisionStep): string {
   return trimmedValue.length > 0 ? trimmedValue : "0";
 }
 
+function resolveBringDownDisplayValue(stepValueText: string): string {
+  const trailingDigit = stepValueText.trim().at(-1);
+  if (trailingDigit && /^[0-9]$/.test(trailingDigit)) {
+    return trailingDigit;
+  }
+
+  return "0";
+}
+
 function shouldHighlightDivisorForStepKind(stepKind: LongDivisionStep["kind"]): boolean {
   return stepKind === "quotient-digit" || stepKind === "multiply-result";
 }
@@ -322,8 +331,13 @@ export function buildBusStopRenderModel({
       targetId: step.inputTargetId,
       kind: step.kind,
       columnIndex: workRowColumnIndex,
-      expectedDigitCount: Math.max(step.expectedValue.length, 1),
-      value: isFilled ? step.expectedValue : "",
+      expectedDigitCount:
+        step.kind === "bring-down" ? 1 : Math.max(step.expectedValue.length, 1),
+      value: isFilled
+        ? step.kind === "bring-down"
+          ? resolveBringDownDisplayValue(step.expectedValue)
+          : step.expectedValue
+        : "",
       isFilled,
       isActive: glowState.activeStepId === step.id,
       displayPrefix: step.kind === "multiply-result" ? "-" : "",

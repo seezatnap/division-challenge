@@ -870,8 +870,11 @@ export function BusStopLongDivisionRenderer({
                     isFilled: row.isFilled,
                     draftEntryValues,
                   });
+                  const expectedRowValue = row.kind === "bring-down"
+                    ? row.value
+                    : stepById.get(row.stepId)?.expectedValue ?? row.value;
                   const expectedDigits = resolveExpectedStepDigits(
-                    stepById.get(row.stepId)?.expectedValue ?? row.value,
+                    expectedRowValue,
                   );
                   const resolvedDigitCount = Math.max(
                     row.expectedDigitCount,

@@ -81,7 +81,7 @@ test("buildBusStopRenderModel reveals quotient cells and work rows by visible st
   );
   assert.deepEqual(
     partialModel.workRows.map((row) => `${row.kind}:${row.value}`),
-    ["multiply-result:36", "subtraction-result:7", "bring-down:72"],
+    ["multiply-result:36", "subtraction-result:7", "bring-down:2"],
   );
   assert.deepEqual(
     partialModel.workRows.map((row) => row.columnIndex),
@@ -89,7 +89,7 @@ test("buildBusStopRenderModel reveals quotient cells and work rows by visible st
   );
   assert.deepEqual(
     partialModel.workRows.map((row) => row.expectedDigitCount),
-    [2, 1, 2],
+    [2, 1, 1],
   );
   assert.equal(partialModel.activeStepId, sampleSteps[4].id);
   assert.equal(partialModel.activeTargetId, "target-4");

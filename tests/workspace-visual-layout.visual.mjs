@@ -436,11 +436,8 @@ test("visual layout mandate: solved solution digits align to dividend digit colu
         subtraction1Digit0: selectCenter(
           '[data-visual-snapshot="workspace-solved"] [data-entry-step-id="workspace-preview-problem:step:2:subtraction-result"][data-entry-digit-index="0"]',
         ),
-        bringDownDigit0: selectCenter(
+        bringDownDigit: selectCenter(
           '[data-visual-snapshot="workspace-solved"] [data-entry-step-id="workspace-preview-problem:step:3:bring-down"][data-entry-digit-index="0"]',
-        ),
-        bringDownDigit1: selectCenter(
-          '[data-visual-snapshot="workspace-solved"] [data-entry-step-id="workspace-preview-problem:step:3:bring-down"][data-entry-digit-index="1"]',
         ),
         multiply2Digit0: selectCenter(
           '[data-visual-snapshot="workspace-solved"] [data-entry-step-id="workspace-preview-problem:step:5:multiply-result"][data-entry-digit-index="0"]',
@@ -486,14 +483,9 @@ test("visual layout mandate: solved solution digits align to dividend digit colu
         message: "First subtraction result should align with dividend column 1.",
       },
       {
-        measuredKey: "bringDownDigit0",
-        dividendKey: "dividendDigit1",
-        message: "Bring-down digit 0 should align with dividend column 1.",
-      },
-      {
-        measuredKey: "bringDownDigit1",
+        measuredKey: "bringDownDigit",
         dividendKey: "dividendDigit2",
-        message: "Bring-down digit 1 should align with dividend column 2.",
+        message: "Bring-down digit should align with dividend column 2.",
       },
       {
         measuredKey: "multiply2Digit0",
@@ -545,6 +537,15 @@ test("visual workflow: solving a full problem advances to the next question and 
     }
 
     await page.waitForSelector('[data-ui-action="next-problem"]', { timeout: 10_000 });
+    const focusedAction = await page.evaluate(() => {
+      const activeElement = document.activeElement;
+      return activeElement?.getAttribute("data-ui-action") ?? null;
+    });
+    assert.equal(
+      focusedAction,
+      "next-problem",
+      `Expected keyboard focus to move to NEXT after solve, received: ${String(focusedAction)}`,
+    );
     await page.click('[data-ui-action="next-problem"]');
 
     const solvedAfter = await page.locator(".surface-header .status-chip").first().innerText();
