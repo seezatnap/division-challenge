@@ -19,3 +19,5 @@ export {
   type DivisionStep,
   type DivisionSolution,
 } from "@/types";
+
+export { generateProblem, type GenerateProblemOptions } from "./problem-generator";
