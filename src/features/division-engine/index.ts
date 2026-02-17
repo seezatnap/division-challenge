@@ -20,4 +20,19 @@ export {
   type DivisionSolution,
 } from "@/types";
 
-export { generateProblem, type GenerateProblemOptions } from "./problem-generator";
+export {
+  generateProblem,
+  generateProblemForPlayer,
+  type GenerateProblemOptions,
+  type GenerateForPlayerOptions,
+} from "./problem-generator";
+
+export {
+  getDifficultyForSolvedCount,
+  getCurrentDifficulty,
+  problemsUntilNextTier,
+  getNextDifficultyLevel,
+  getAllDifficultyLevels,
+  DIFFICULTY_THRESHOLDS,
+  type DifficultyThreshold,
+} from "./difficulty-progression";
