@@ -23,6 +23,12 @@ export {
   loadFromDisk,
   loadFromFile,
   saveViaDownload,
+  saveGame,
+  loadGame,
+  loadViaFileInput,
   type SaveResult,
   type LoadResult,
 } from "./save-load";
+
+export { SaveLoadControls } from "./SaveLoadControls";
+export type { SaveLoadControlsProps } from "./SaveLoadControls";
