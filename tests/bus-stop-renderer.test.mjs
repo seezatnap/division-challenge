@@ -28,7 +28,7 @@ async function loadTypeScriptModule(relativePath) {
   return import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
 }
 
-function createStep(kind, sequenceIndex, expectedValue) {
+function createStep(kind, sequenceIndex, expectedValue, overrides = {}) {
   return {
     id: `step-${sequenceIndex}-${kind}`,
     problemId: "workspace-problem",
@@ -36,7 +36,12 @@ function createStep(kind, sequenceIndex, expectedValue) {
     sequenceIndex,
     expectedValue,
     inputTargetId: `target-${sequenceIndex}`,
+    ...overrides,
   };
+}
+
+function countActiveEntries(model) {
+  return [...model.quotientCells, ...model.workRows].filter((entry) => entry.isActive).length;
 }
 
 const sampleSteps = [
@@ -73,7 +78,10 @@ test("buildBusStopRenderModel reveals quotient cells and work rows by visible st
     partialModel.workRows.map((row) => `${row.kind}:${row.value}`),
     ["multiply-result:36", "subtraction-result:7", "bring-down:72"],
   );
+  assert.equal(partialModel.activeStepId, sampleSteps[4].id);
   assert.equal(partialModel.activeTargetId, "target-4");
+  assert.equal(countActiveEntries(partialModel), 1);
+  assert.equal(partialModel.quotientCells[1].isActive, true);
 });
 
 test("buildBusStopRenderModel keeps the active work-row target visible as an inline pending cell", async () => {
@@ -91,6 +99,8 @@ test("buildBusStopRenderModel keeps the active work-row target visible as an inl
     model.workRows.map((row) => `${row.kind}:${row.value}:${row.isFilled ? "filled" : "pending"}`),
     ["multiply-result:36:filled", "subtraction-result::pending"],
   );
+  assert.equal(countActiveEntries(model), 1);
+  assert.equal(model.workRows[1].isActive, true);
 });
 
 test("buildBusStopRenderModel clamps revealed step count and marks multiply rows with minus prefix", async () => {
@@ -111,7 +121,9 @@ test("buildBusStopRenderModel clamps revealed step count and marks multiply rows
     fullModel.workRows.map((row) => row.displayPrefix),
     ["-", "", "", "-", ""],
   );
+  assert.equal(fullModel.activeStepId, null);
   assert.equal(fullModel.activeTargetId, null);
+  assert.equal(countActiveEntries(fullModel), 0);
 
   const hiddenModel = buildBusStopRenderModel({
     divisor: 12,
@@ -125,7 +137,40 @@ test("buildBusStopRenderModel clamps revealed step count and marks multiply rows
     ["", ""],
   );
   assert.equal(hiddenModel.workRows.length, 0);
+  assert.equal(hiddenModel.activeStepId, "step-0-quotient-digit");
   assert.equal(hiddenModel.activeTargetId, "target-0");
+  assert.equal(countActiveEntries(hiddenModel), 1);
+});
+
+test("buildBusStopRenderModel enforces a single active glow cell even when target ids collide", async () => {
+  const { buildBusStopRenderModel } = await busStopRenderModelModule;
+  const collisionSteps = [
+    createStep("quotient-digit", 0, "3", {
+      id: "collision-step-0",
+      inputTargetId: "shared-target",
+    }),
+    createStep("multiply-result", 1, "36", {
+      id: "collision-step-1",
+      inputTargetId: "shared-target",
+    }),
+    createStep("subtraction-result", 2, "0", {
+      id: "collision-step-2",
+      inputTargetId: "shared-target",
+    }),
+  ];
+
+  const model = buildBusStopRenderModel({
+    divisor: 12,
+    dividend: 36,
+    steps: collisionSteps,
+    revealedStepCount: 1,
+  });
+
+  assert.equal(model.activeStepId, "collision-step-1");
+  assert.equal(model.activeTargetId, "shared-target");
+  assert.equal(countActiveEntries(model), 1);
+  assert.equal(model.quotientCells[0].isActive, false);
+  assert.equal(model.workRows[0].isActive, true);
 });
 
 test("bus-stop renderer component uses inline workspace entries and avoids standalone form controls", async () => {
@@ -139,6 +184,8 @@ test("bus-stop renderer component uses inline workspace entries and avoids stand
     'className="work-rows"',
     "WorkspaceInlineEntry",
     'data-entry-inline="true"',
+    'data-entry-glow={isActive ? "amber" : "none"}',
+    "glow-amber",
     "contentEditable={isEditable}",
     "suppressContentEditableWarning={isEditable}",
   ]) {

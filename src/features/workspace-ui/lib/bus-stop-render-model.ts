@@ -7,6 +7,7 @@ export interface BusStopQuotientCell {
   targetId: string | null;
   value: string;
   isFilled: boolean;
+  isActive: boolean;
 }
 
 export interface BusStopWorkRow {
@@ -15,6 +16,7 @@ export interface BusStopWorkRow {
   kind: BusStopWorkRowKind;
   value: string;
   isFilled: boolean;
+  isActive: boolean;
   displayPrefix: "-" | "";
 }
 
@@ -28,9 +30,15 @@ export interface BuildBusStopRenderModelInput {
 export interface BusStopRenderModel {
   divisorText: string;
   dividendText: string;
+  activeStepId: string | null;
   activeTargetId: string | null;
   quotientCells: readonly BusStopQuotientCell[];
   workRows: readonly BusStopWorkRow[];
+}
+
+export interface SingleActiveCellGlowState {
+  activeStepId: LongDivisionStep["id"] | null;
+  activeTargetId: string | null;
 }
 
 function clampRevealedStepCount(totalStepCount: number, revealedStepCount?: number): number {
@@ -50,6 +58,19 @@ function isWorkRowStep(step: LongDivisionStep): step is LongDivisionStep & { kin
   return step.kind !== "quotient-digit";
 }
 
+export function resolveSingleActiveCellGlowState(
+  steps: readonly LongDivisionStep[],
+  revealedStepCount?: number,
+): SingleActiveCellGlowState {
+  const boundedRevealedStepCount = clampRevealedStepCount(steps.length, revealedStepCount);
+  const activeStep = steps[boundedRevealedStepCount];
+
+  return {
+    activeStepId: activeStep?.id ?? null,
+    activeTargetId: activeStep?.inputTargetId ?? null,
+  };
+}
+
 export function buildBusStopRenderModel({
   divisor,
   dividend,
@@ -57,6 +78,7 @@ export function buildBusStopRenderModel({
   revealedStepCount,
 }: BuildBusStopRenderModelInput): BusStopRenderModel {
   const boundedRevealedStepCount = clampRevealedStepCount(steps.length, revealedStepCount);
+  const glowState = resolveSingleActiveCellGlowState(steps, boundedRevealedStepCount);
 
   const quotientCells: BusStopQuotientCell[] = [];
   const workRows: BusStopWorkRow[] = [];
@@ -72,6 +94,7 @@ export function buildBusStopRenderModel({
         targetId: step.inputTargetId,
         value: isFilled ? step.expectedValue : "",
         isFilled,
+        isActive: glowState.activeStepId === step.id,
       });
 
       continue;
@@ -87,6 +110,7 @@ export function buildBusStopRenderModel({
       kind: step.kind,
       value: isFilled ? step.expectedValue : "",
       isFilled,
+      isActive: glowState.activeStepId === step.id,
       displayPrefix: step.kind === "multiply-result" ? "-" : "",
     });
   }
@@ -94,7 +118,8 @@ export function buildBusStopRenderModel({
   return {
     divisorText: String(divisor),
     dividendText: String(dividend),
-    activeTargetId: steps[boundedRevealedStepCount]?.inputTargetId ?? null,
+    activeStepId: glowState.activeStepId,
+    activeTargetId: glowState.activeTargetId,
     quotientCells,
     workRows,
   };

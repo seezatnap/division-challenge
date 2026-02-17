@@ -30,7 +30,7 @@ function buildInlineEntryClassName({
       : "inline-entry-work-row work-row-value",
     isFilled ? "inline-entry-locked" : "inline-entry-pending",
     lane === "quotient" && !isFilled ? "quotient-digit-empty" : "",
-    isActive ? "inline-entry-active" : "",
+    isActive ? "inline-entry-active glow-amber" : "",
   ];
 
   return classes.filter(Boolean).join(" ");
@@ -49,6 +49,7 @@ function WorkspaceInlineEntry({ lane, targetId, value, isFilled, isActive }: Wor
       className={buildInlineEntryClassName({ lane, isFilled, isActive })}
       contentEditable={isEditable}
       data-entry-active={isActive ? "true" : "false"}
+      data-entry-glow={isActive ? "amber" : "none"}
       data-entry-inline="true"
       data-entry-lane={lane}
       data-entry-state={isFilled ? "locked" : "pending"}
@@ -75,7 +76,6 @@ export function BusStopLongDivisionRenderer({
     steps,
     revealedStepCount,
   });
-  const activeTargetId = renderModel.activeTargetId;
 
   return (
     <article
@@ -92,7 +92,7 @@ export function BusStopLongDivisionRenderer({
           <div className="quotient-track">
             {renderModel.quotientCells.map((cell) => (
               <WorkspaceInlineEntry
-                isActive={Boolean(cell.targetId) && cell.targetId === activeTargetId}
+                isActive={cell.isActive}
                 isFilled={cell.isFilled}
                 key={cell.stepId}
                 lane="quotient"
@@ -123,7 +123,7 @@ export function BusStopLongDivisionRenderer({
                       {row.displayPrefix || "\u00a0"}
                     </span>
                     <WorkspaceInlineEntry
-                      isActive={Boolean(row.targetId) && row.targetId === activeTargetId}
+                      isActive={row.isActive}
                       isFilled={row.isFilled}
                       lane="work-row"
                       targetId={row.targetId}
