@@ -51,8 +51,10 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".inline-entry",
     ".inline-entry-quotient.inline-entry-pending:focus-visible",
     ".inline-entry-work-row.inline-entry-pending",
+    ".inline-entry-lock-in",
     ".glow-amber",
     "@keyframes amber-pulse",
+    "@keyframes inline-entry-lock-in",
     "@media (min-width: 48rem)",
     "@media (min-width: 64rem)",
   ]) {
