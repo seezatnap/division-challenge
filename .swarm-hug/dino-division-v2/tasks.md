@@ -20,8 +20,8 @@
 - [x] (#10) Build the bus-stop long-division renderer with divisor left of bracket, dividend inside, quotient above, and dynamic work rows below (paper-like notation, not forms) [5 pts] (blocked by #2, #7) (A)
 - [x] (#11) Implement inline entry elements embedded in the workspace (styled to blend into notation) and remove any standalone form field/dropdown interaction model [5 pts] (blocked by #10) (B)
 - [x] (#12) Implement a single-active-cell glow manager (amber/gold pulse) that ensures exactly one target is highlighted at any time according to solver order [5 pts] (blocked by #7, #11) (A)
-- [A] (#13) Wire real-time typing so values appear as typed, lock in with micro-animation on correct entry, and auto-advance glow to the next target [5 pts] (blocked by #8, #12)
-- [A] (#14) Implement the bring-down animation that visibly slides the next dividend digit into the working number and synchronizes state transitions [5 pts] (blocked by #10, #12)
+- [x] (#13) Wire real-time typing so values appear as typed, lock in with micro-animation on correct entry, and auto-advance glow to the next target [5 pts] (blocked by #8, #12) (A)
+- [x] (#14) Implement the bring-down animation that visibly slides the next dividend digit into the working number and synchronizes state transitions [5 pts] (blocked by #10, #12) (A)
 - [ ] (#15) Implement dino-themed feedback messaging for success/failure states (e.g., encouragement + playful retry hints) tied to validation outcomes [5 pts] (blocked by #13)
 
 ## Reward Pipeline (Gemini + Prefetch)
@@ -65,4 +65,4 @@
 - [x] (#36) Prevent concurrent duplicate Gemini generations for the same dinosaur by adding per-dinosaur in-flight deduping in `resolveGeminiRewardImageWithFilesystemCache`, and add a parallel-request regression test that asserts the generator runs only once. (B)
 
 ## Follow-up tasks (from sprint review)
-- [B] (#37) Update `resolveRewardMilestones` to discard any pre-existing rewards beyond `highestEarnedRewardNumber` (based on `totalProblemsSolved`) and add regression tests for states where solved count is lower than the unlocked reward prefix.
+- [x] (#37) Update `resolveRewardMilestones` to discard any pre-existing rewards beyond `highestEarnedRewardNumber` (based on `totalProblemsSolved`) and add regression tests for states where solved count is lower than the unlocked reward prefix. (B)
