@@ -1,13 +1,18 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import type { GameSession, GameStartPhase, SaveFile } from "@/types";
+import type { GameSession, GameStartPhase } from "@/types";
 import {
   createNewSession,
   restoreSessionFromSave,
   validatePlayerName,
   saveFileNameFromPlayer,
 } from "./session-init";
+import {
+  isFileSystemAccessSupported,
+  loadFromDisk,
+  loadFromFile,
+} from "@/features/persistence/save-load";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -21,22 +26,6 @@ export interface GameStartFlowProps {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Parse and minimally validate a save file from raw text.
- * Returns the parsed SaveFile or null if invalid.
- */
-function parseSaveFile(text: string): SaveFile | null {
-  try {
-    const parsed = JSON.parse(text) as SaveFile;
-    if (!parsed.playerName || typeof parsed.totalProblemsSolved !== "number") {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Open a file via a hidden `<input type="file">` element (fallback for
@@ -94,58 +83,36 @@ export function GameStartFlow({ onSessionReady }: GameStartFlowProps) {
   const handleLoadSave = useCallback(async () => {
     setLoadError(null);
 
-    let text: string | null = null;
+    if (isFileSystemAccessSupported()) {
+      // Use File System Access API — prompts for permission via native picker
+      const result = await loadFromDisk();
 
-    if ("showOpenFilePicker" in window) {
-      try {
-        const [fileHandle] = await (
-          window as Window & {
-            showOpenFilePicker: (
-              opts: unknown,
-            ) => Promise<FileSystemFileHandle[]>;
-          }
-        ).showOpenFilePicker({
-          types: [
-            {
-              description: "Dino Division Save File",
-              accept: { "application/json": [".json"] },
-            },
-          ],
-          multiple: false,
-        });
-        const file = await fileHandle.getFile();
-        text = await file.text();
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          return; // User cancelled
-        }
-        setLoadError("Could not load save file. Please try again.");
+      if (result.cancelled) return;
+      if (!result.success || !result.saveFile) {
+        setLoadError(result.error ?? "Could not load save file. Please try again.");
         return;
       }
+
+      const session = restoreSessionFromSave(result.saveFile);
+      setPlayerName(result.saveFile.playerName);
+      setPhase("ready");
+      onSessionReady(session);
     } else {
       // Fallback: hidden file input
       const file = await openFileViaInput();
       if (!file) return;
-      try {
-        text = await file.text();
-      } catch {
-        setLoadError("Could not read save file. Please try again.");
+
+      const result = await loadFromFile(file);
+      if (!result.success || !result.saveFile) {
+        setLoadError(result.error ?? "This file doesn't look like a valid save file.");
         return;
       }
+
+      const session = restoreSessionFromSave(result.saveFile);
+      setPlayerName(result.saveFile.playerName);
+      setPhase("ready");
+      onSessionReady(session);
     }
-
-    if (!text) return;
-
-    const parsed = parseSaveFile(text);
-    if (!parsed) {
-      setLoadError("This file doesn't look like a valid save file.");
-      return;
-    }
-
-    const session = restoreSessionFromSave(parsed);
-    setPlayerName(parsed.playerName);
-    setPhase("ready");
-    onSessionReady(session);
   }, [onSessionReady]);
 
   // ── Back to name entry ─────────────────────────────────────────────
