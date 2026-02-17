@@ -16,6 +16,10 @@ import type {
   LongDivisionStepValidationRequest,
   LongDivisionStepValidationResult,
 } from "@/features/division-engine/lib/step-validation";
+import type {
+  RewardMilestoneResolutionRequest,
+  RewardMilestoneResolutionResult,
+} from "@/features/rewards/lib/milestones";
 
 const DEFAULT_REMAINDER_MODE: DivisionProblemRemainderMode = "allow";
 
@@ -40,6 +44,7 @@ function assertProgressState(progress: PlayerProgressState): void {
     progress.lifetime.totalProblemsAttempted,
     "progress.lifetime.totalProblemsAttempted",
   );
+  assertNonNegativeInteger(progress.lifetime.rewardsUnlocked, "progress.lifetime.rewardsUnlocked");
 
   if (progress.session.attemptedProblems < progress.session.solvedProblems) {
     throw new Error("progress.session.attemptedProblems cannot be less than solvedProblems.");
@@ -157,6 +162,9 @@ export interface DivisionGameLoopDependencies {
   validateLongDivisionStepAnswer(
     request: LongDivisionStepValidationRequest,
   ): LongDivisionStepValidationResult;
+  resolveRewardMilestones(
+    request: RewardMilestoneResolutionRequest,
+  ): RewardMilestoneResolutionResult;
 }
 
 export interface DivisionGameLoopOrchestratorOptions {
@@ -186,6 +194,7 @@ export interface DivisionLiveStepInputResult {
   state: DivisionGameLoopState;
   validation: LongDivisionStepValidationResult;
   completedProblem: DivisionProblemCompletionSummary | null;
+  newlyUnlockedRewards: UnlockedReward[];
   chainedToNextProblem: boolean;
   nextProblem: DivisionProblem | null;
 }
@@ -207,6 +216,10 @@ function isDivisionGameLoopState(state: DivisionGameState | DivisionGameLoopStat
 
 function normalizeDivisionGameLoopState(state: DivisionGameState | DivisionGameLoopState): DivisionGameLoopState {
   const stateCopy = resolveStateCopy(state);
+  stateCopy.progress.lifetime.rewardsUnlocked = Math.max(
+    stateCopy.progress.lifetime.rewardsUnlocked,
+    stateCopy.unlockedRewards.length,
+  );
   assertProgressState(stateCopy.progress);
 
   if (!stateCopy.activeProblem) {
@@ -357,6 +370,7 @@ export function createDivisionGameLoopOrchestrator(
           state: normalizedState,
           validation,
           completedProblem: null,
+          newlyUnlockedRewards: [],
           chainedToNextProblem: false,
           nextProblem: null,
         };
@@ -384,6 +398,7 @@ export function createDivisionGameLoopOrchestrator(
           },
           validation,
           completedProblem: null,
+          newlyUnlockedRewards: [],
           chainedToNextProblem: false,
           nextProblem: null,
         };
@@ -404,6 +419,15 @@ export function createDivisionGameLoopOrchestrator(
         },
       };
 
+      const rewardMilestoneResolution = dependencies.resolveRewardMilestones({
+        totalProblemsSolved: completedProgress.lifetime.totalProblemsSolved,
+        unlockedRewards: normalizedState.unlockedRewards,
+      });
+      const unlockedRewards = cloneUnlockedRewards(rewardMilestoneResolution.unlockedRewards);
+      const newlyUnlockedRewards = cloneUnlockedRewards(
+        rewardMilestoneResolution.newlyUnlockedRewards,
+      );
+
       const completionSummary: DivisionProblemCompletionSummary = {
         problemId: completedProblemId,
         solvedProblemsThisSession: completedProgress.session.solvedProblems,
@@ -415,7 +439,14 @@ export function createDivisionGameLoopOrchestrator(
         activeStepIndex: null,
         revealedStepCount: normalizedState.steps.length,
         activeInputTarget: null,
-        progress: completedProgress,
+        progress: {
+          ...completedProgress,
+          lifetime: {
+            ...completedProgress.lifetime,
+            rewardsUnlocked: unlockedRewards.length,
+          },
+        },
+        unlockedRewards,
       };
 
       const chainedResult = startNextProblemFromState(completedState, options);
@@ -424,6 +455,7 @@ export function createDivisionGameLoopOrchestrator(
         state: chainedResult.state,
         validation,
         completedProblem: completionSummary,
+        newlyUnlockedRewards,
         chainedToNextProblem: true,
         nextProblem: chainedResult.startedProblem,
       };

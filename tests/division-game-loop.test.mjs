@@ -9,11 +9,15 @@ import ts from "typescript";
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "..");
 
-async function loadTypeScriptModule(relativePath) {
+function toDataUrl(source) {
+  return `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
+}
+
+async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
   const absolutePath = path.join(repoRoot, relativePath);
   const source = await readFile(absolutePath, "utf8");
 
-  const compiled = ts.transpileModule(source, {
+  let compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,
       target: ts.ScriptTarget.ES2022,
@@ -21,7 +25,16 @@ async function loadTypeScriptModule(relativePath) {
     fileName: absolutePath,
   }).outputText;
 
-  return import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  for (const [specifier, replacement] of Object.entries(replacements)) {
+    compiled = compiled.replaceAll(`from "${specifier}"`, `from "${replacement}"`);
+    compiled = compiled.replaceAll(`from '${specifier}'`, `from "${replacement}"`);
+  }
+
+  return toDataUrl(compiled);
+}
+
+async function loadTypeScriptModule(relativePath) {
+  return import(await transpileTypeScriptToDataUrl(relativePath));
 }
 
 const gameLoopModule = loadTypeScriptModule("src/features/division-engine/lib/game-loop.ts");
@@ -34,6 +47,23 @@ const longDivisionSolverModule = loadTypeScriptModule(
 const stepValidationModule = loadTypeScriptModule(
   "src/features/division-engine/lib/step-validation.ts",
 );
+const rewardMilestoneModule = (async () => {
+  const dinosaursModuleUrl = await transpileTypeScriptToDataUrl(
+    "src/features/rewards/lib/dinosaurs.ts",
+  );
+  const imageCacheModuleUrl = await transpileTypeScriptToDataUrl(
+    "src/features/rewards/lib/gemini-image-cache.ts",
+  );
+  const milestoneModuleUrl = await transpileTypeScriptToDataUrl(
+    "src/features/rewards/lib/milestones.ts",
+    {
+      "./dinosaurs": dinosaursModuleUrl,
+      "./gemini-image-cache": imageCacheModuleUrl,
+    },
+  );
+
+  return import(milestoneModuleUrl);
+})();
 
 function createSeededRandom(seed) {
   let state = seed >>> 0;
@@ -89,12 +119,13 @@ function createBaseState(overrides = {}) {
 }
 
 async function createOrchestrator(options = {}) {
-  const [{ createDivisionGameLoopOrchestrator }, problemGenerator, solver, stepValidation] =
+  const [{ createDivisionGameLoopOrchestrator }, problemGenerator, solver, stepValidation, rewards] =
     await Promise.all([
       gameLoopModule,
       problemGeneratorModule,
       longDivisionSolverModule,
       stepValidationModule,
+      rewardMilestoneModule,
     ]);
 
   return createDivisionGameLoopOrchestrator({
@@ -103,6 +134,11 @@ async function createOrchestrator(options = {}) {
       getDifficultyLevelForSolvedCount: problemGenerator.getDifficultyLevelForSolvedCount,
       solveLongDivision: solver.solveLongDivision,
       validateLongDivisionStepAnswer: stepValidation.validateLongDivisionStepAnswer,
+      resolveRewardMilestones: (request) =>
+        rewards.resolveRewardMilestones({
+          ...request,
+          now: options.now ?? (() => new Date("2026-02-17T12:00:00.000Z")),
+        }),
     },
     random: options.random ?? createSeededRandom(20260217),
     remainderMode: options.remainderMode ?? "forbid",
@@ -139,6 +175,7 @@ test("incorrect inline input keeps focus on the current active step", async () =
   assert.equal(result.validation.outcome, "incorrect");
   assert.equal(result.chainedToNextProblem, false);
   assert.equal(result.completedProblem, null);
+  assert.deepEqual(result.newlyUnlockedRewards, []);
   assert.equal(result.nextProblem, null);
   assert.equal(result.state.activeStepIndex, started.state.activeStepIndex);
   assert.equal(result.state.revealedStepCount, started.state.revealedStepCount);
@@ -163,6 +200,7 @@ test("correct inline input advances to the next step without changing solved cou
   assert.equal(result.validation.outcome, "correct");
   assert.equal(result.chainedToNextProblem, false);
   assert.equal(result.completedProblem, null);
+  assert.deepEqual(result.newlyUnlockedRewards, []);
   assert.equal(result.state.activeStepIndex, 1);
   assert.equal(result.state.revealedStepCount, 1);
   assert.equal(result.state.activeInputTarget?.stepId, started.state.steps[1].id);
@@ -219,6 +257,9 @@ test("final correct input updates solved counters and auto-chains into the next 
   assert.equal(finalResult.completedProblem?.problemId, completedProblemId);
   assert.equal(finalResult.completedProblem?.totalProblemsSolved, 5);
   assert.equal(finalResult.completedProblem?.solvedProblemsThisSession, 1);
+  assert.equal(finalResult.newlyUnlockedRewards.length, 1);
+  assert.equal(finalResult.newlyUnlockedRewards[0]?.dinosaurName, "Tyrannosaurus Rex");
+  assert.equal(finalResult.newlyUnlockedRewards[0]?.milestoneSolvedCount, 5);
   assert.ok(finalResult.nextProblem);
 
   assert.equal(state.progress.session.solvedProblems, 1);
@@ -226,10 +267,69 @@ test("final correct input updates solved counters and auto-chains into the next 
   assert.equal(state.progress.lifetime.totalProblemsSolved, 5);
   assert.equal(state.progress.lifetime.totalProblemsAttempted, 6);
   assert.equal(state.progress.lifetime.currentDifficultyLevel, 2);
+  assert.equal(state.progress.lifetime.rewardsUnlocked, 1);
+  assert.equal(state.unlockedRewards.length, 1);
+  assert.equal(state.unlockedRewards[0]?.dinosaurName, "Tyrannosaurus Rex");
   assert.equal(state.activeStepIndex, 0);
   assert.equal(state.revealedStepCount, 0);
   assert.equal(state.activeProblem?.difficultyLevel, 2);
   assert.notEqual(state.activeProblem?.id, completedProblemId);
+});
+
+test("milestone unlocks catch up in deterministic order when earlier rewards were missed", async () => {
+  const orchestrator = await createOrchestrator({
+    random: createSeededRandom(2026),
+    remainderMode: "forbid",
+  });
+  const started = orchestrator.startNextProblem(
+    createBaseState({
+      progress: {
+        lifetime: {
+          totalProblemsSolved: 9,
+          totalProblemsAttempted: 9,
+          currentDifficultyLevel: 2,
+          rewardsUnlocked: 0,
+        },
+      },
+      unlockedRewards: [],
+    }),
+  );
+
+  let state = started.state;
+  let finalResult = null;
+
+  for (let stepIndex = 0; stepIndex < started.state.steps.length; stepIndex += 1) {
+    if (state.activeStepIndex === null) {
+      assert.fail("Expected an active step while solving the current problem.");
+    }
+
+    const result = orchestrator.applyLiveStepInput({
+      state,
+      submittedValue: state.steps[state.activeStepIndex].expectedValue,
+    });
+    state = result.state;
+
+    if (stepIndex === started.state.steps.length - 1) {
+      finalResult = result;
+    }
+  }
+
+  assert.ok(finalResult);
+  assert.equal(finalResult.validation.outcome, "complete");
+  assert.equal(finalResult.completedProblem?.totalProblemsSolved, 10);
+  assert.deepEqual(
+    finalResult.newlyUnlockedRewards.map((reward) => reward.dinosaurName),
+    ["Tyrannosaurus Rex", "Velociraptor"],
+  );
+  assert.deepEqual(
+    state.unlockedRewards.map((reward) => reward.dinosaurName),
+    ["Tyrannosaurus Rex", "Velociraptor"],
+  );
+  assert.deepEqual(
+    state.unlockedRewards.map((reward) => reward.milestoneSolvedCount),
+    [5, 10],
+  );
+  assert.equal(state.progress.lifetime.rewardsUnlocked, 2);
 });
 
 test("applyLiveStepInput requires an active in-progress problem", async () => {
