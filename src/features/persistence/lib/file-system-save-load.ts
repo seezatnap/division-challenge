@@ -65,6 +65,57 @@ export interface FileSystemAccessRuntime {
   ) => Promise<FileSystemSaveFileHandle>;
 }
 
+interface JsonDownloadAnchorLike {
+  href: string;
+  download: string;
+  click: () => void;
+  remove?: () => void;
+}
+
+interface JsonBlobConstructorLike {
+  new (parts: readonly string[], options?: { type?: string }): unknown;
+}
+
+interface JsonUrlRuntimeLike {
+  createObjectURL: (blob: unknown) => string;
+  revokeObjectURL?: (url: string) => void;
+}
+
+interface JsonDocumentRuntimeLike {
+  createElement: (tagName: string) => unknown;
+  body?: {
+    appendChild: (node: unknown) => unknown;
+  };
+}
+
+interface JsonFallbackRuntimeLike {
+  Blob: JsonBlobConstructorLike;
+  URL: JsonUrlRuntimeLike;
+  document: JsonDocumentRuntimeLike;
+}
+
+export interface JsonSaveDownloadRuntime {
+  downloadJson: (fileName: string, json: string) => Promise<void> | void;
+}
+
+export interface JsonSaveFileLike {
+  name: string;
+  text: () => Promise<string>;
+}
+
+export interface ExportSessionToJsonDownloadOptions {
+  session: InMemoryGameSession;
+  clock?: () => Date;
+  downloader?: JsonSaveDownloadRuntime;
+  fallbackRuntime?: unknown;
+}
+
+export interface ExportSessionToJsonDownloadResult {
+  fileName: string;
+  saveFile: DinoDivisionSaveFile;
+  json: string;
+}
+
 export interface SaveSessionToFileSystemOptions {
   session: InMemoryGameSession;
   handle?: FileSystemSaveFileHandle | null;
@@ -85,6 +136,12 @@ export interface LoadSaveFromFileSystemOptions {
 
 export interface LoadSaveFromFileSystemResult {
   handle: FileSystemSaveFileHandle;
+  fileName: string;
+  saveFile: DinoDivisionSaveFile;
+  rawJson: string;
+}
+
+export interface LoadSaveFromJsonFileResult {
   fileName: string;
   saveFile: DinoDivisionSaveFile;
   rawJson: string;
@@ -380,6 +437,116 @@ function createSaveFilePickerOptions(playerName: string): SaveFilePickerOptionsL
   };
 }
 
+function createSaveJson(saveFile: DinoDivisionSaveFile): string {
+  return `${JSON.stringify(saveFile, null, 2)}\n`;
+}
+
+function asJsonDownloadAnchor(value: unknown): JsonDownloadAnchorLike {
+  if (!value || typeof value !== "object") {
+    throw new Error("JSON export fallback could not create a download anchor element.");
+  }
+
+  const candidate = value as JsonDownloadAnchorLike;
+  if (typeof candidate.click !== "function") {
+    throw new Error("JSON export fallback download anchor is missing click() support.");
+  }
+
+  return candidate;
+}
+
+function asJsonFallbackRuntime(value: unknown): JsonFallbackRuntimeLike {
+  if (
+    !value ||
+    (typeof value !== "object" && typeof value !== "function")
+  ) {
+    throw new Error("JSON save fallback is not available in this environment.");
+  }
+
+  const candidate = value as {
+    Blob?: unknown;
+    URL?: { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    document?: { createElement?: unknown; body?: { appendChild?: unknown } };
+  };
+
+  if (
+    typeof candidate.Blob !== "function" ||
+    !candidate.URL ||
+    typeof candidate.URL.createObjectURL !== "function" ||
+    !candidate.document ||
+    typeof candidate.document.createElement !== "function"
+  ) {
+    throw new Error("JSON save fallback is not available in this environment.");
+  }
+
+  return {
+    Blob: candidate.Blob as JsonBlobConstructorLike,
+    URL: candidate.URL as JsonUrlRuntimeLike,
+    document: candidate.document as JsonDocumentRuntimeLike,
+  };
+}
+
+function createBrowserJsonSaveDownloader(value: unknown): JsonSaveDownloadRuntime {
+  const runtime = asJsonFallbackRuntime(value);
+
+  return {
+    downloadJson(fileName: string, json: string): void {
+      const blob = new runtime.Blob([json], { type: "application/json" });
+      const objectUrl = runtime.URL.createObjectURL.call(runtime.URL, blob);
+      const anchor = asJsonDownloadAnchor(
+        runtime.document.createElement.call(runtime.document, "a"),
+      );
+      anchor.href = objectUrl;
+      anchor.download = fileName;
+      if (
+        runtime.document.body &&
+        typeof runtime.document.body.appendChild === "function"
+      ) {
+        runtime.document.body.appendChild.call(runtime.document.body, anchor);
+      }
+
+      try {
+        anchor.click();
+      } finally {
+        if (typeof anchor.remove === "function") {
+          anchor.remove();
+        }
+        runtime.URL.revokeObjectURL?.call(runtime.URL, objectUrl);
+      }
+    },
+  };
+}
+
+function createSavePayloadAndJson(
+  session: InMemoryGameSession,
+  clock: () => Date = defaultClock,
+): {
+  saveFile: DinoDivisionSaveFile;
+  json: string;
+} {
+  const saveFile = createDinoDivisionSavePayload(session, clock);
+
+  return {
+    saveFile,
+    json: createSaveJson(saveFile),
+  };
+}
+
+function asJsonSaveFile(value: unknown): JsonSaveFileLike {
+  if (!value || typeof value !== "object") {
+    throw new Error("A JSON save file is required for import.");
+  }
+
+  const candidate = value as { name?: unknown; text?: unknown };
+  if (typeof candidate.name !== "string" || typeof candidate.text !== "function") {
+    throw new Error("The selected JSON save file must provide name and text() values.");
+  }
+
+  return {
+    name: candidate.name,
+    text: () => (candidate.text as () => Promise<string>).call(value),
+  };
+}
+
 function isAbortError(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
@@ -434,6 +601,26 @@ export function supportsFileSystemAccessApi(
   return (
     typeof candidate.showOpenFilePicker === "function" &&
     typeof candidate.showSaveFilePicker === "function"
+  );
+}
+
+export function supportsJsonSaveImportExportFallback(
+  value: unknown = globalThis,
+): boolean {
+  if (!value || (typeof value !== "object" && typeof value !== "function")) {
+    return false;
+  }
+
+  const candidate = value as {
+    Blob?: unknown;
+    URL?: { createObjectURL?: unknown };
+    document?: { createElement?: unknown };
+  };
+
+  return (
+    typeof candidate.Blob === "function" &&
+    typeof candidate.URL?.createObjectURL === "function" &&
+    typeof candidate.document?.createElement === "function"
   );
 }
 
@@ -547,6 +734,43 @@ export function parseDinoDivisionSaveFile(rawJson: string): DinoDivisionSaveFile
   };
 }
 
+export async function exportSessionToJsonDownload(
+  options: ExportSessionToJsonDownloadOptions,
+): Promise<ExportSessionToJsonDownloadResult> {
+  const saveClock = options.clock ?? defaultClock;
+  const { saveFile, json } = createSavePayloadAndJson(options.session, saveClock);
+  const fileName = buildPlayerSaveFileName(saveFile.playerName);
+  const downloader =
+    options.downloader ??
+    createBrowserJsonSaveDownloader(options.fallbackRuntime ?? globalThis);
+
+  await downloader.downloadJson(fileName, json);
+
+  return {
+    fileName,
+    saveFile,
+    json,
+  };
+}
+
+export async function loadSaveFromJsonFile(
+  file: JsonSaveFileLike | null | undefined,
+): Promise<LoadSaveFromJsonFileResult | null> {
+  if (file === null || file === undefined) {
+    return null;
+  }
+
+  const saveFileInput = asJsonSaveFile(file);
+  const rawJson = await saveFileInput.text();
+  const saveFile = parseDinoDivisionSaveFile(rawJson);
+
+  return {
+    fileName: saveFileInput.name,
+    saveFile,
+    rawJson,
+  };
+}
+
 export async function loadSaveFromFileSystem(
   options: LoadSaveFromFileSystemOptions = {},
 ): Promise<LoadSaveFromFileSystemResult | null> {
@@ -600,8 +824,7 @@ export async function saveSessionToFileSystem(
   }
 
   await ensurePermission(handle, "readwrite", "save game progress");
-  const saveFile = createDinoDivisionSavePayload(options.session, options.clock);
-  const json = `${JSON.stringify(saveFile, null, 2)}\n`;
+  const { saveFile, json } = createSavePayloadAndJson(options.session, options.clock);
 
   const writable = await handle.createWritable();
 
