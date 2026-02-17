@@ -6,3 +6,5 @@ export const divisionEngineModule: FeatureModuleDescriptor = {
   summary: "Long-division problem generation, solving, and step validation primitives.",
   rootPath: "src/features/division-engine",
 };
+
+export * from "./problem-generator";
