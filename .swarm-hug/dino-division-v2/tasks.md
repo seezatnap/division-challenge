@@ -66,3 +66,7 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#37) Update `resolveRewardMilestones` to discard any pre-existing rewards beyond `highestEarnedRewardNumber` (based on `totalProblemsSolved`) and add regression tests for states where solved count is lower than the unlocked reward prefix. (B)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#38) Wrap the fire-and-forget `triggerNearMilestoneRewardPrefetch` call in `startNextProblemFromState` with rejection handling so prefetch failures cannot surface as unhandled promise rejections.
+- [ ] (#39) Update `triggerNearMilestoneRewardPrefetch` to map `"already-cached"` results from `prefetchGeminiRewardImageWithFilesystemCache` to `"skipped-already-cached"` (instead of `"prefetch-already-in-flight"`), and add a regression test for that race path.
