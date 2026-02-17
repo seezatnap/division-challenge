@@ -7,4 +7,15 @@
  * - Step validation and retry logic
  * - Difficulty progression rules
  */
-export {};
+
+export {
+  DifficultyLevel,
+  StepKind,
+  type DivisionProblem,
+  type QuotientDigitStep,
+  type MultiplyStep,
+  type SubtractStep,
+  type BringDownStep,
+  type DivisionStep,
+  type DivisionSolution,
+} from "@/types";

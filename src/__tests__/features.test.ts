@@ -9,6 +9,7 @@ const EXPECTED_FEATURES = [
   "rewards",
   "gallery",
   "persistence",
+  "theme",
 ];
 
 describe("Feature folder structure", () => {
