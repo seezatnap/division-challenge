@@ -147,14 +147,17 @@ export function resolveRewardMilestones(
     REWARD_UNLOCK_INTERVAL,
   );
   const contiguousPrefixLength = getContiguousRewardMilestonePrefixLength(request.unlockedRewards);
-  const unlockedRewards = cloneUnlockedRewards(request.unlockedRewards.slice(0, contiguousPrefixLength));
+  const retainedPrefixLength = Math.min(contiguousPrefixLength, highestEarnedRewardNumber);
+  const unlockedRewards = cloneUnlockedRewards(
+    request.unlockedRewards.slice(0, retainedPrefixLength),
+  );
   const newlyUnlockedRewards: UnlockedReward[] = [];
 
-  if (highestEarnedRewardNumber > contiguousPrefixLength) {
+  if (highestEarnedRewardNumber > retainedPrefixLength) {
     const earnedAt = resolveEarnedAt(request.earnedAt, request.now);
 
     for (
-      let rewardNumber = contiguousPrefixLength + 1;
+      let rewardNumber = retainedPrefixLength + 1;
       rewardNumber <= highestEarnedRewardNumber;
       rewardNumber += 1
     ) {
@@ -172,6 +175,6 @@ export function resolveRewardMilestones(
     newlyUnlockedRewards,
     highestEarnedRewardNumber,
     nextRewardNumber: unlockedRewards.length + 1,
-    discardedOutOfOrderRewards: request.unlockedRewards.length - contiguousPrefixLength,
+    discardedOutOfOrderRewards: request.unlockedRewards.length - retainedPrefixLength,
   };
 }
