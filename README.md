@@ -33,3 +33,8 @@ GEMINI_API_KEY=your_real_key
 - `npm run lint` - ESLint checks
 - `npm run typecheck` - TypeScript compile checks
 - `npm run test` - Unit tests
+
+## QA Runbook
+
+For developer QA steps (env validation, test/build gate, and browser support
+checks for File System Access API), see `docs/qa-runbook.md`.
