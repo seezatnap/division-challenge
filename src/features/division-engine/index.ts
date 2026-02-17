@@ -36,3 +36,5 @@ export {
   DIFFICULTY_THRESHOLDS,
   type DifficultyThreshold,
 } from "./difficulty-progression";
+
+export { solveDivisionProblem } from "./solver";
