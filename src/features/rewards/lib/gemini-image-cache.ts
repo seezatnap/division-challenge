@@ -9,6 +9,7 @@ import type {
 const DEFAULT_REWARD_IMAGE_DIRECTORY = path.join(process.cwd(), "public", "rewards");
 const CACHE_METADATA_SUFFIX = ".metadata.json";
 const DEFAULT_CACHE_MODEL = "filesystem-cache";
+const inFlightRewardImageGenerations = new Map<string, Promise<GeminiGeneratedImage>>();
 
 const SUPPORTED_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif"] as const;
 type SupportedImageExtension = (typeof SUPPORTED_IMAGE_EXTENSIONS)[number];
@@ -73,6 +74,15 @@ function normalizeDinosaurName(dinosaurName: string): string {
 function resolveOutputDirectory(options: FilesystemGeminiImageCacheOptions): string {
   const configuredOutputDirectory = getTrimmedNonEmptyString(options.outputDirectory);
   return configuredOutputDirectory ?? DEFAULT_REWARD_IMAGE_DIRECTORY;
+}
+
+function toInFlightRewardImageGenerationKey(
+  dinosaurName: string,
+  options: FilesystemGeminiImageCacheOptions,
+): string {
+  const slug = toRewardImageCacheSlug(dinosaurName);
+  const outputDirectory = path.resolve(resolveOutputDirectory(options));
+  return `${outputDirectory}:${slug}`;
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -254,8 +264,26 @@ export async function resolveGeminiRewardImageWithFilesystemCache(
     return cachedImage;
   }
 
-  const generatedImage = await generateImage({ dinosaurName: normalizedDinosaurName });
-  await persistGeminiRewardImageToFilesystemCache(generatedImage, options);
+  const inFlightGenerationKey = toInFlightRewardImageGenerationKey(normalizedDinosaurName, options);
+  const inFlightGeneration = inFlightRewardImageGenerations.get(inFlightGenerationKey);
 
-  return generatedImage;
+  if (inFlightGeneration) {
+    return inFlightGeneration;
+  }
+
+  const generationPromise = (async () => {
+    const generatedImage = await generateImage({ dinosaurName: normalizedDinosaurName });
+    await persistGeminiRewardImageToFilesystemCache(generatedImage, options);
+    return generatedImage;
+  })();
+
+  inFlightRewardImageGenerations.set(inFlightGenerationKey, generationPromise);
+
+  try {
+    return await generationPromise;
+  } finally {
+    if (inFlightRewardImageGenerations.get(inFlightGenerationKey) === generationPromise) {
+      inFlightRewardImageGenerations.delete(inFlightGenerationKey);
+    }
+  }
 }

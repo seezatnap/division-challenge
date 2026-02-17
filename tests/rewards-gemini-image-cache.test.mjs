@@ -107,6 +107,52 @@ test("resolveGeminiRewardImageWithFilesystemCache skips duplicate generation whe
   assert.deepEqual(secondResult, generatedImage);
 });
 
+test("resolveGeminiRewardImageWithFilesystemCache dedupes parallel in-flight generation requests", async () => {
+  const { resolveGeminiRewardImageWithFilesystemCache } = await geminiImageCacheModule;
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+  const generatedImage = createGeminiImage("Stegosaurus");
+  let generatorInvocationCount = 0;
+  let resolveGenerationGate = () => {};
+  let resolveGenerationStarted = () => {};
+
+  const generationGate = new Promise((resolve) => {
+    resolveGenerationGate = resolve;
+  });
+  const generationStarted = new Promise((resolve) => {
+    resolveGenerationStarted = resolve;
+  });
+
+  const firstRequest = resolveGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: "Stegosaurus" },
+    async (request) => {
+      generatorInvocationCount += 1;
+      assert.equal(request.dinosaurName, "Stegosaurus");
+      resolveGenerationStarted();
+      await generationGate;
+      return generatedImage;
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  await generationStarted;
+
+  const secondRequest = resolveGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: " Stegosaurus " },
+    async () => {
+      assert.fail("parallel request should share the in-flight generator promise");
+      return createGeminiImage("Stegosaurus");
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  resolveGenerationGate();
+  const [firstResult, secondResult] = await Promise.all([firstRequest, secondRequest]);
+
+  assert.equal(generatorInvocationCount, 1);
+  assert.deepEqual(firstResult, generatedImage);
+  assert.deepEqual(secondResult, generatedImage);
+});
+
 test("readCachedGeminiRewardImage loads pre-existing filesystem assets even when metadata is absent", async () => {
   const {
     readCachedGeminiRewardImage,
