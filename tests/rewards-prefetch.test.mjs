@@ -200,6 +200,28 @@ test("triggerNearMilestoneRewardPrefetch reports already-in-flight status when d
   assert.equal(result.target.dinosaurName, "Tyrannosaurus Rex");
 });
 
+test("triggerNearMilestoneRewardPrefetch reports skipped-already-cached when cache is filled during prefetch race", async () => {
+  const { triggerNearMilestoneRewardPrefetch } = await rewardPrefetchModule;
+
+  const result = await triggerNearMilestoneRewardPrefetch(
+    {
+      totalProblemsSolved: 3,
+      generateImage: async () => {
+        assert.fail("prefetch trigger test should not execute background generator directly");
+      },
+    },
+    {
+      doesRewardImageExistOnDisk: async () => false,
+      prefetchGeminiRewardImageWithFilesystemCache: async () => "already-cached",
+    },
+  );
+
+  assert.equal(result.status, "skipped-already-cached");
+  assert.equal(result.target.problemNumberWithinRewardInterval, 4);
+  assert.equal(result.target.rewardNumber, 1);
+  assert.equal(result.target.dinosaurName, "Tyrannosaurus Rex");
+});
+
 test("prefetch helper validates trigger configuration", async () => {
   const { shouldTriggerNearMilestonePrefetch } = await rewardPrefetchModule;
 
