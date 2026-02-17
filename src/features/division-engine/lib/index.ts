@@ -9,3 +9,4 @@ export const divisionEngineModule: FeatureModuleDescriptor = {
 
 export * from "./problem-generator";
 export * from "./long-division-solver";
+export * from "./step-validation";
