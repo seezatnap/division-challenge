@@ -342,7 +342,9 @@ function startNextProblemFromState(
     problemNumberWithinRewardInterval === NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS[1];
 
   if (shouldTriggerNearMilestonePrefetch && dependencies.triggerNearMilestoneRewardPrefetch) {
-    void dependencies.triggerNearMilestoneRewardPrefetch({ totalProblemsSolved });
+    void dependencies
+      .triggerNearMilestoneRewardPrefetch({ totalProblemsSolved })
+      ?.catch(() => undefined);
   }
 
   return {
