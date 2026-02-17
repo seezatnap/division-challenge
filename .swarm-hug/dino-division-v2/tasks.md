@@ -9,7 +9,7 @@
 
 ## Division Logic & Game State
 
-- [ ] (#5) Build a problem generator that scales from 2-digit ÷ 1-digit up to 4–5 digit ÷ 2–3 digit and supports both remainder and non-remainder cases [5 pts] (blocked by #2)
+- [x] (#5) Build a problem generator that scales from 2-digit ÷ 1-digit up to 4–5 digit ÷ 2–3 digit and supports both remainder and non-remainder cases [5 pts] (blocked by #2) (A)
 - [ ] (#6) Implement difficulty progression rules driven by cumulative solved counts (lifetime-aware) and expose current difficulty level to problem generation [5 pts] (blocked by #2)
 - [ ] (#7) Implement a pure long-division solver that emits the exact ordered workflow (quotient digit, multiply, subtract, bring-down) with expected values for each step [5 pts] (blocked by #2, #5)
 - [ ] (#8) Build step-validation/retry logic so correct answers advance immediately, incorrect answers keep focus on the same step, and hint hooks are returned for dino-themed feedback [5 pts] (blocked by #7)
@@ -35,7 +35,7 @@
 ## Gallery & Player Flow
 
 - [ ] (#21) Build the Dino Gallery view/section showing unlocked dinosaur image, name, and date earned, with empty-state messaging for new players and live refresh after unlocks [5 pts] (blocked by #3, #20)
-- [ ] (#22) Build the game-start flow that prompts for player name and offers “load existing save” vs “start new,” then initializes the in-memory game session [5 pts] (blocked by #2)
+- [x] (#22) Build the game-start flow that prompts for player name and offers “load existing save” vs “start new,” then initializes the in-memory game session [5 pts] (blocked by #2) (B)
 
 ## Save/Load Persistence
 
