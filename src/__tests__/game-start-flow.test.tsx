@@ -165,6 +165,48 @@ describe("GameStartFlow", () => {
     jest.restoreAllMocks();
   });
 
+  it("resolves with null and stays on load-or-new when file picker is cancelled", async () => {
+    jest.useFakeTimers();
+    advanceToLoadOrNew();
+
+    // Mock document.createElement to intercept the file input
+    const originalCreateElement = document.createElement.bind(document);
+    jest
+      .spyOn(document, "createElement")
+      .mockImplementation(
+        (tagName: string, options?: ElementCreationOptions) => {
+          const el = originalCreateElement(tagName, options);
+          if (tagName === "input") {
+            // Override click to simulate cancellation: no file selected,
+            // the window focus event fires instead of onchange.
+            el.click = () => {
+              // Simulate the focus event that fires when the dialog closes
+              window.dispatchEvent(new Event("focus"));
+            };
+          }
+          return el;
+        },
+      );
+
+    fireEvent.click(screen.getByText("Load Existing Save"));
+
+    // Advance past the 300ms delay in the focus handler
+    jest.advanceTimersByTime(400);
+
+    // Flush microtasks so React processes the resolved promise
+    await jest.runAllTimersAsync();
+
+    // The session should NOT have been initialized
+    expect(onSessionReady).not.toHaveBeenCalled();
+
+    // The UI should still show the load-or-new phase
+    expect(screen.getByText("Start New Game")).toBeInTheDocument();
+    expect(screen.getByText("Load Existing Save")).toBeInTheDocument();
+
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
   // ── Rendering null when ready ────────────────────────────────────
 
   it("renders nothing when session is ready", () => {
