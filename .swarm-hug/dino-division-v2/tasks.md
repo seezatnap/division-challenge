@@ -70,3 +70,7 @@
 ## Follow-up tasks (from sprint review)
 - [x] (#38) Wrap the fire-and-forget `triggerNearMilestoneRewardPrefetch` call in `startNextProblemFromState` with rejection handling so prefetch failures cannot surface as unhandled promise rejections. (B)
 - [ ] (#39) Update `triggerNearMilestoneRewardPrefetch` to map `"already-cached"` results from `prefetchGeminiRewardImageWithFilesystemCache` to `"skipped-already-cached"` (instead of `"prefetch-already-in-flight"`), and add a regression test for that race path.
+
+## Follow-up tasks (from sprint review)
+- [ ] (#40) Replace the hardcoded `https://dino-division.local` URL in `fetchEarnedRewardImageStatus` with same-origin handling for relative endpoints, and add a regression test that verifies the default `/api/rewards/image-status` request stays on the current origin.
+- [ ] (#41) Make `EarnedRewardRevealPanel` reset its internal reveal state when `dinosaurName`, `initialStatus`, or `initialImagePath` changes so new rewards don’t reuse stale phase/image data, and add a prop-change regression test.
