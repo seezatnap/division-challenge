@@ -77,3 +77,6 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#42) Fix persistence merge behavior so `saveSessionToFileSystem` does not overwrite a new active session’s `progress.session` with older higher-solved stats when session IDs differ, and add a regression test for save-after-load (new session) payload correctness. (blocked by #25) (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#43) Make `tests/player-journey-smoke.test.mjs` deterministic by replacing the fixed 20-turn `setImmediate` wait with explicit synchronization on near-milestone prefetch completion before asserting `prefetchStatuses` (the smoke test intermittently fails with `prefetchStatuses` still empty). (blocked by #32)
