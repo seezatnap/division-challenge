@@ -60,3 +60,11 @@
 ## Follow-up tasks (from sprint review)
 - [x] (#34) Fix `openFileViaInput` in GameStartFlow to resolve the promise on file picker cancellation (the comment at line 44 indicates a timeout was intended but never implemented, leaving a dangling promise) (blocked by #23) (B)
 - [x] (#35) Fix `buildSaveFile` to preserve prior `sessionHistory` entries when saving a session restored from a save file, preventing session history data loss on round-trip save/load cycles (blocked by #23) (B)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#36) Validate `dinosaurName` against the known dinosaur roster in `/api/generate-dino` POST route before invoking Gemini generation, to prevent arbitrary API quota consumption (blocked by #3, #17)
+- [ ] (#37) Fix `SaveLoadControls` to render save-failure messages with error styling instead of success styling (the error string is stored in `saveStatus` and rendered green) (blocked by #24)
+- [ ] (#38) Add field-level validation of `sessionHistory` entries in `validateSaveFile` (currently only checks for array presence, not entry shape) (blocked by #24)
+- [ ] (#39) Re-derive `currentDifficulty` from `totalProblemsSolved` in `restoreSessionFromSave` instead of trusting the stored value, to prevent version-skew bugs (blocked by #6, #24)
+- [ ] (#40) Fix `buildSaveFile` to avoid inflating `sessionsPlayed` when saved multiple times within a single session (blocked by #24)
+- [ ] (#41) Validate `sceneHint` input length and sanitize content in `/api/generate-dino` POST route to prevent prompt injection into Gemini requests (blocked by #16)
