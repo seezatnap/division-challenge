@@ -5,3 +5,4 @@ export * from "./gemini";
 export * from "./gemini-image-cache";
 export * from "./gemini-image-runtime";
 export * from "./gemini-image-service";
+export * from "./prefetch";

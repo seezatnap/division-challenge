@@ -22,6 +22,8 @@ import type {
 } from "@/features/rewards/lib/milestones";
 
 const DEFAULT_REMAINDER_MODE: DivisionProblemRemainderMode = "allow";
+const REWARD_PREFETCH_UNLOCK_INTERVAL = 5 as const;
+const NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS = [3, 4] as const;
 
 const STEP_KIND_TO_INPUT_LANE: Record<LongDivisionStep["kind"], ActiveInputLane> = {
   "quotient-digit": "quotient",
@@ -165,6 +167,9 @@ export interface DivisionGameLoopDependencies {
   resolveRewardMilestones(
     request: RewardMilestoneResolutionRequest,
   ): RewardMilestoneResolutionResult;
+  triggerNearMilestoneRewardPrefetch?(
+    request: NearMilestoneRewardPrefetchTriggerRequest,
+  ): void | Promise<unknown>;
 }
 
 export interface DivisionGameLoopOrchestratorOptions {
@@ -203,6 +208,10 @@ export interface DivisionGameLoopOrchestrator {
   initializeState(state: DivisionGameState | DivisionGameLoopState): DivisionGameLoopState;
   startNextProblem(state: DivisionGameState | DivisionGameLoopState): StartNextDivisionProblemResult;
   applyLiveStepInput(request: DivisionLiveStepInputRequest): DivisionLiveStepInputResult;
+}
+
+export interface NearMilestoneRewardPrefetchTriggerRequest {
+  totalProblemsSolved: number;
 }
 
 function isDivisionGameLoopState(state: DivisionGameState | DivisionGameLoopState): state is DivisionGameLoopState {
@@ -325,6 +334,16 @@ function startNextProblemFromState(
       },
     },
   };
+
+  const problemNumberWithinRewardInterval =
+    (totalProblemsSolved % REWARD_PREFETCH_UNLOCK_INTERVAL) + 1;
+  const shouldTriggerNearMilestonePrefetch =
+    problemNumberWithinRewardInterval === NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS[0] ||
+    problemNumberWithinRewardInterval === NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS[1];
+
+  if (shouldTriggerNearMilestonePrefetch && dependencies.triggerNearMilestoneRewardPrefetch) {
+    void dependencies.triggerNearMilestoneRewardPrefetch({ totalProblemsSolved });
+  }
 
   return {
     state: startedState,

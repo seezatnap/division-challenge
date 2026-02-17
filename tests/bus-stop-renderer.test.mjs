@@ -184,7 +184,18 @@ test("bus-stop renderer component uses inline workspace entries and avoids stand
     'className="work-rows"',
     "WorkspaceInlineEntry",
     'data-entry-inline="true"',
+    'data-entry-auto={isAutoEntry ? "true" : "false"}',
+    'data-entry-animation={isLockingIn ? "lock-in" : "none"}',
+    'data-workspace-live-typing={liveTypingEnabled ? "enabled" : "disabled"}',
+    'data-bring-down-animation={bringDownAnimationStepId ? "running" : "idle"}',
     'data-entry-glow={isActive ? "amber" : "none"}',
+    "applyLiveWorkspaceEntryInput",
+    "buildBringDownAnimationSourceByStepId",
+    "tryAutoAdvanceBringDownStep",
+    "validateLongDivisionStepAnswer",
+    "dividend-digit-bring-down-origin",
+    "bring-down-digit-slide",
+    "inline-entry-lock-in",
     "glow-amber",
     "contentEditable={isEditable}",
     "suppressContentEditableWarning={isEditable}",
@@ -208,6 +219,7 @@ test("home page renders the workspace through the reusable bus-stop renderer", a
     "BusStopLongDivisionRenderer",
     "workspacePreviewSolution",
     "solveLongDivision(workspacePreviewProblem)",
+    "enableLiveTyping",
   ]) {
     assert.ok(source.includes(fragment), `Expected home-page workspace fragment: ${fragment}`);
   }

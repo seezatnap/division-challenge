@@ -189,6 +189,59 @@ test("resolveRewardMilestones is idempotent once deterministic milestones are al
   assert.notStrictEqual(result.unlockedRewards[0], existingUnlockedRewards[0]);
 });
 
+test("resolveRewardMilestones discards pre-existing rewards beyond the solved-count milestone ceiling", async () => {
+  const { resolveRewardMilestones } = await rewardMilestonesModule;
+  const existingUnlockedRewards = [
+    createUnlockedReward(),
+    createUnlockedReward({
+      rewardId: "reward-2",
+      dinosaurName: "Velociraptor",
+      imagePath: "/rewards/velociraptor.png",
+      milestoneSolvedCount: 10,
+    }),
+  ];
+
+  const result = resolveRewardMilestones({
+    totalProblemsSolved: 5,
+    unlockedRewards: existingUnlockedRewards,
+    now: () => new Date("2026-02-17T14:30:00.000Z"),
+  });
+
+  assert.equal(result.highestEarnedRewardNumber, 1);
+  assert.equal(result.nextRewardNumber, 2);
+  assert.equal(result.discardedOutOfOrderRewards, 1);
+  assert.deepEqual(result.newlyUnlockedRewards, []);
+  assert.deepEqual(
+    result.unlockedRewards.map((reward) => reward.dinosaurName),
+    ["Tyrannosaurus Rex"],
+  );
+});
+
+test("resolveRewardMilestones clears all unlocked rewards when solved count is below the first milestone", async () => {
+  const { resolveRewardMilestones } = await rewardMilestonesModule;
+  const existingUnlockedRewards = [
+    createUnlockedReward(),
+    createUnlockedReward({
+      rewardId: "reward-2",
+      dinosaurName: "Velociraptor",
+      imagePath: "/rewards/velociraptor.png",
+      milestoneSolvedCount: 10,
+    }),
+  ];
+
+  const result = resolveRewardMilestones({
+    totalProblemsSolved: 0,
+    unlockedRewards: existingUnlockedRewards,
+    now: () => new Date("2026-02-17T14:45:00.000Z"),
+  });
+
+  assert.equal(result.highestEarnedRewardNumber, 0);
+  assert.equal(result.nextRewardNumber, 1);
+  assert.equal(result.discardedOutOfOrderRewards, 2);
+  assert.deepEqual(result.newlyUnlockedRewards, []);
+  assert.deepEqual(result.unlockedRewards, []);
+});
+
 test("milestone resolver validates numeric and timestamp input", async () => {
   const { createDeterministicRewardId, resolveRewardMilestones } =
     await rewardMilestonesModule;
