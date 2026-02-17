@@ -134,7 +134,8 @@ export default function Home() {
               <BusStopLongDivisionRenderer
                 dividend={workspacePreviewProblem.dividend}
                 divisor={workspacePreviewProblem.divisor}
-                revealedStepCount={workspacePreviewSolution.steps.length}
+                enableLiveTyping
+                revealedStepCount={0}
                 steps={workspacePreviewSolution.steps}
               />
 
