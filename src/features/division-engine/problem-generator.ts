@@ -1,4 +1,6 @@
 import { DifficultyLevel, DivisionProblem } from "@/types";
+import type { PlayerProgress } from "@/types";
+import { getCurrentDifficulty } from "./difficulty-progression";
 
 // ---------------------------------------------------------------------------
 // Difficulty-tier range definitions
@@ -152,4 +154,31 @@ function generateWithRemainder(
   }
 
   return { dividend, divisor, quotient, remainder, difficulty };
+}
+
+// ---------------------------------------------------------------------------
+// Progress-aware generation
+// ---------------------------------------------------------------------------
+
+export interface GenerateForPlayerOptions {
+  /**
+   * When true the generated problem will have remainder === 0.
+   * When false the remainder will be > 0.
+   * When omitted (undefined) it is chosen at random (~50/50).
+   */
+  allowRemainder?: boolean;
+}
+
+/**
+ * Generate a problem whose difficulty is automatically derived from the
+ * player's lifetime progress.  This is the recommended entry point for
+ * the game loop – callers do not need to determine the difficulty tier
+ * themselves.
+ */
+export function generateProblemForPlayer(
+  progress: PlayerProgress,
+  options: GenerateForPlayerOptions = {},
+): DivisionProblem {
+  const difficulty = getCurrentDifficulty(progress);
+  return generateProblem({ difficulty, allowRemainder: options.allowRemainder });
 }
