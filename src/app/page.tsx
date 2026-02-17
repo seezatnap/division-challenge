@@ -1,6 +1,12 @@
 import { featureModules } from "@/features";
-import { SAVE_FILE_SCHEMA_VERSION, type DinoDivisionSaveFile } from "@/features/contracts";
+import { solveLongDivision } from "@/features/division-engine";
+import {
+  SAVE_FILE_SCHEMA_VERSION,
+  type DinoDivisionSaveFile,
+  type DivisionProblem,
+} from "@/features/contracts";
 import { GameStartFlowPanel } from "@/features/persistence";
+import { BusStopLongDivisionRenderer } from "@/features/workspace-ui";
 
 const galleryPreview = [
   {
@@ -80,6 +86,16 @@ const coachMessages = [
   "The T-Rex says: multiply one more time!",
 ];
 
+const workspacePreviewProblem: DivisionProblem = {
+  id: "workspace-preview-problem",
+  dividend: 432,
+  divisor: 12,
+  allowRemainder: false,
+  difficultyLevel: 2,
+};
+
+const workspacePreviewSolution = solveLongDivision(workspacePreviewProblem);
+
 export default function Home() {
   return (
     <main className="jurassic-shell">
@@ -115,27 +131,12 @@ export default function Home() {
             </div>
 
             <div className="game-grid">
-              <article aria-label="Long-division board preview" className="workspace-paper">
-                <div className="workspace-lineup">
-                  <p className="workspace-label">Quotient</p>
-                  <div className="digit-track">
-                    <span className="digit-cell">3</span>
-                    <span className="digit-cell">6</span>
-                    <span className="digit-cell glow-amber">?</span>
-                  </div>
-                </div>
-
-                <div className="bus-stop">
-                  <p className="divisor-cell">12</p>
-                  <div className="bracket-stack">
-                    <p className="dividend-line">432</p>
-                    <p className="work-line">-36</p>
-                    <p className="work-line">72</p>
-                    <p className="work-line">-72</p>
-                    <p className="work-line final-line">0</p>
-                  </div>
-                </div>
-              </article>
+              <BusStopLongDivisionRenderer
+                dividend={workspacePreviewProblem.dividend}
+                divisor={workspacePreviewProblem.divisor}
+                revealedStepCount={workspacePreviewSolution.steps.length}
+                steps={workspacePreviewSolution.steps}
+              />
 
               <aside className="hint-stack">
                 <h3 className="hint-title">Dino Coach</h3>

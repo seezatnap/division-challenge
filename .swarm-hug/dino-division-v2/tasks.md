@@ -12,12 +12,12 @@
 - [x] (#5) Build a problem generator that scales from 2-digit ÷ 1-digit up to 4–5 digit ÷ 2–3 digit and supports both remainder and non-remainder cases [5 pts] (blocked by #2) (A)
 - [x] (#6) Implement difficulty progression rules driven by cumulative solved counts (lifetime-aware) and expose current difficulty level to problem generation [5 pts] (blocked by #2) (A)
 - [x] (#7) Implement a pure long-division solver that emits the exact ordered workflow (quotient digit, multiply, subtract, bring-down) with expected values for each step [5 pts] (blocked by #2, #5) (A)
-- [ ] (#8) Build step-validation/retry logic so correct answers advance immediately, incorrect answers keep focus on the same step, and hint hooks are returned for dino-themed feedback [5 pts] (blocked by #7)
+- [x] (#8) Build step-validation/retry logic so correct answers advance immediately, incorrect answers keep focus on the same step, and hint hooks are returned for dino-themed feedback [5 pts] (blocked by #7) (A)
 - [ ] (#9) Implement game-loop state orchestration for starting/completing problems, updating session/lifetime counters, and chaining to the next problem without form-submit flows [5 pts] (blocked by #5, #6, #8)
 
 ## Visual Workspace UI
 
-- [ ] (#10) Build the bus-stop long-division renderer with divisor left of bracket, dividend inside, quotient above, and dynamic work rows below (paper-like notation, not forms) [5 pts] (blocked by #2, #7)
+- [x] (#10) Build the bus-stop long-division renderer with divisor left of bracket, dividend inside, quotient above, and dynamic work rows below (paper-like notation, not forms) [5 pts] (blocked by #2, #7) (A)
 - [ ] (#11) Implement inline entry elements embedded in the workspace (styled to blend into notation) and remove any standalone form field/dropdown interaction model [5 pts] (blocked by #10)
 - [ ] (#12) Implement a single-active-cell glow manager (amber/gold pulse) that ensures exactly one target is highlighted at any time according to solver order [5 pts] (blocked by #7, #11)
 - [ ] (#13) Wire real-time typing so values appear as typed, lock in with micro-animation on correct entry, and auto-advance glow to the next target [5 pts] (blocked by #8, #12)
@@ -40,7 +40,7 @@
 ## Save/Load Persistence
 
 - [x] (#23) Implement File System Access API save/load flows with permission prompts, player-named JSON files (e.g., `rex-save.json`), and full required payload fields [5 pts] (blocked by #2, #22) (B)
-- [ ] (#24) Implement graceful fallback for environments without File System Access API (JSON export/import flow) while preserving identical schema and validation [5 pts] (blocked by #23)
+- [x] (#24) Implement graceful fallback for environments without File System Access API (JSON export/import flow) while preserving identical schema and validation [5 pts] (blocked by #23) (B)
 - [ ] (#25) Add persistence concurrency controls (queued/atomic writes + merge strategy) to prevent save races during rapid solves and reward unlock events [5 pts] (blocked by #20, #23)
 
 ## Theming & Motion
@@ -62,4 +62,4 @@
 - [x] (#35) Add API route tests for `POST /api/rewards/generate-image` covering invalid JSON input, known service-error mapping, and success response shape. (blocked by #16) (C)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#36) Prevent concurrent duplicate Gemini generations for the same dinosaur by adding per-dinosaur in-flight deduping in `resolveGeminiRewardImageWithFilesystemCache`, and add a parallel-request regression test that asserts the generator runs only once.
+- [x] (#36) Prevent concurrent duplicate Gemini generations for the same dinosaur by adding per-dinosaur in-flight deduping in `resolveGeminiRewardImageWithFilesystemCache`, and add a parallel-request regression test that asserts the generator runs only once. (B)

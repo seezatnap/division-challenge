@@ -19,6 +19,9 @@ test("game-start panel prompts for player name and provides both start options",
     "Player Name",
     "buildGameStartOptions",
     "createInMemoryGameSession",
+    "loadSaveFromJsonFile",
+    "exportSessionToJsonDownload",
+    "supportsJsonSaveImportExportFallback",
   ]) {
     assert.ok(componentSource.includes(fragment), `Expected game-start fragment: ${fragment}`);
   }

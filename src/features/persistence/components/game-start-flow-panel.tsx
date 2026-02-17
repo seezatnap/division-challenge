@@ -1,14 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import type { DinoDivisionSaveFile } from "@/features/contracts";
 import {
   buildGameStartOptions,
   createInMemoryGameSession,
+  exportSessionToJsonDownload,
+  loadSaveFromJsonFile,
   loadSaveFromFileSystem,
   saveSessionToFileSystem,
   supportsFileSystemAccessApi,
+  supportsJsonSaveImportExportFallback,
   type FileSystemSaveFileHandle,
   type GameStartMode,
   type InMemoryGameSession,
@@ -25,6 +28,7 @@ function formatStartModeLabel(mode: GameStartMode): string {
 export function GameStartFlowPanel({
   loadableSave = null,
 }: GameStartFlowPanelProps) {
+  const jsonImportInputRef = useRef<HTMLInputElement | null>(null);
   const [playerName, setPlayerName] = useState(loadableSave?.playerName ?? "");
   const [session, setSession] = useState<InMemoryGameSession | null>(null);
   const [saveHandle, setSaveHandle] = useState<FileSystemSaveFileHandle | null>(null);
@@ -34,12 +38,71 @@ export function GameStartFlowPanel({
 
   const hasFileSystemAccessApi =
     typeof window !== "undefined" && supportsFileSystemAccessApi(window);
-  const hasLoadableSave = loadableSave !== null || hasFileSystemAccessApi;
+  const hasJsonSaveFallback =
+    typeof window !== "undefined" &&
+    supportsJsonSaveImportExportFallback(window);
+  const hasLoadableSave =
+    loadableSave !== null || hasFileSystemAccessApi || hasJsonSaveFallback;
 
   const startOptions = useMemo(
     () => buildGameStartOptions(hasLoadableSave),
     [hasLoadableSave],
   );
+
+  function openJsonImportPicker(): void {
+    const input = jsonImportInputRef.current;
+    if (!input) {
+      throw new Error("JSON save import input is unavailable.");
+    }
+
+    input.value = "";
+    input.click();
+  }
+
+  async function handleJsonImportChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ): Promise<void> {
+    const [selectedFile] = Array.from(event.target.files ?? []);
+    event.target.value = "";
+
+    if (!selectedFile) {
+      setStatusMessage("Load canceled before selecting a save file.");
+      return;
+    }
+
+    setIsBusy(true);
+    setStatusMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const loadedSave = await loadSaveFromJsonFile(selectedFile);
+      if (!loadedSave) {
+        setStatusMessage("Load canceled before selecting a save file.");
+        return;
+      }
+
+      const initializedSession = createInMemoryGameSession({
+        playerName: loadedSave.saveFile.playerName,
+        mode: "load-existing-save",
+        saveFile: loadedSave.saveFile,
+      });
+
+      setPlayerName(initializedSession.playerName);
+      setSession(initializedSession);
+      setSaveHandle(null);
+      setStatusMessage(`Imported ${loadedSave.fileName}.`);
+    } catch (error) {
+      setSession(null);
+      setSaveHandle(null);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to import the selected JSON save file.",
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  }
 
   async function handleStart(mode: GameStartMode): Promise<void> {
     setIsBusy(true);
@@ -64,6 +127,12 @@ export function GameStartFlowPanel({
         setSession(initializedSession);
         setSaveHandle(loadedSave.handle);
         setStatusMessage(`Loaded ${loadedSave.fileName}.`);
+        return;
+      }
+
+      if (mode === "load-existing-save" && hasJsonSaveFallback) {
+        openJsonImportPicker();
+        setStatusMessage("Choose a JSON save file to import.");
         return;
       }
 
@@ -98,9 +167,11 @@ export function GameStartFlowPanel({
       return;
     }
 
-    if (!hasFileSystemAccessApi && !saveHandle) {
+    const shouldUseFileSystemAccess = hasFileSystemAccessApi || saveHandle !== null;
+
+    if (!shouldUseFileSystemAccess && !hasJsonSaveFallback) {
       setErrorMessage(
-        "File System Access API is unavailable, so this browser cannot save directly yet.",
+        "This environment cannot access save files directly or via JSON fallback export.",
       );
       return;
     }
@@ -110,18 +181,29 @@ export function GameStartFlowPanel({
     setErrorMessage(null);
 
     try {
-      const savedResult = await saveSessionToFileSystem({
-        session,
-        handle: saveHandle,
-      });
+      if (shouldUseFileSystemAccess) {
+        const savedResult = await saveSessionToFileSystem({
+          session,
+          handle: saveHandle,
+        });
 
-      if (!savedResult) {
-        setStatusMessage("Save canceled before writing a file.");
+        if (!savedResult) {
+          setStatusMessage("Save canceled before writing a file.");
+          return;
+        }
+
+        setSaveHandle(savedResult.handle);
+        setStatusMessage(`Saved ${savedResult.fileName}.`);
         return;
       }
 
-      setSaveHandle(savedResult.handle);
-      setStatusMessage(`Saved ${savedResult.fileName}.`);
+      const exportedResult = await exportSessionToJsonDownload({
+        session,
+        fallbackRuntime: window,
+      });
+
+      setSaveHandle(null);
+      setStatusMessage(`Exported ${exportedResult.fileName}.`);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -151,6 +233,24 @@ export function GameStartFlowPanel({
       <p className="game-start-helper">
         Choose whether to start fresh or load an existing expedition save.
       </p>
+
+      {!hasFileSystemAccessApi && hasJsonSaveFallback ? (
+        <p className="game-start-helper">
+          File System Access API is unavailable, so save/load uses JSON import/export fallback.
+        </p>
+      ) : null}
+
+      <input
+        accept=".json,application/json"
+        className="sr-only"
+        disabled={isBusy || !hasJsonSaveFallback}
+        onChange={(event) => {
+          void handleJsonImportChange(event);
+        }}
+        ref={jsonImportInputRef}
+        tabIndex={-1}
+        type="file"
+      />
 
       <div className="save-actions">
         {startOptions.map((option) => (
