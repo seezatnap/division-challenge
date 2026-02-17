@@ -153,6 +153,93 @@ test("resolveGeminiRewardImageWithFilesystemCache dedupes parallel in-flight gen
   assert.deepEqual(secondResult, generatedImage);
 });
 
+test("prefetchGeminiRewardImageWithFilesystemCache checks cache first and skips duplicate generation", async () => {
+  const {
+    prefetchGeminiRewardImageWithFilesystemCache,
+    resolveGeminiRewardImageWithFilesystemCache,
+  } = await geminiImageCacheModule;
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+  const generatedImage = createGeminiImage("Pteranodon");
+  let generatorInvocationCount = 0;
+
+  await resolveGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: "Pteranodon" },
+    async () => generatedImage,
+    { outputDirectory: cacheDirectory },
+  );
+
+  const prefetchStatus = await prefetchGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: " Pteranodon " },
+    async () => {
+      generatorInvocationCount += 1;
+      return createGeminiImage("Pteranodon", {
+        imageBase64: Buffer.from("unexpected-prefetch-bytes").toString("base64"),
+      });
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  assert.equal(prefetchStatus, "already-cached");
+  assert.equal(generatorInvocationCount, 0);
+});
+
+test("prefetchGeminiRewardImageWithFilesystemCache starts background generation once and dedupes in-flight calls", async () => {
+  const {
+    prefetchGeminiRewardImageWithFilesystemCache,
+    resolveGeminiRewardImageWithFilesystemCache,
+  } = await geminiImageCacheModule;
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+  const generatedImage = createGeminiImage("Carnotaurus");
+  let generatorInvocationCount = 0;
+  let resolveGenerationGate = () => {};
+  let resolveGenerationStarted = () => {};
+
+  const generationGate = new Promise((resolve) => {
+    resolveGenerationGate = resolve;
+  });
+  const generationStarted = new Promise((resolve) => {
+    resolveGenerationStarted = resolve;
+  });
+
+  const firstPrefetchStatus = await prefetchGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: "Carnotaurus" },
+    async (request) => {
+      generatorInvocationCount += 1;
+      assert.equal(request.dinosaurName, "Carnotaurus");
+      resolveGenerationStarted();
+      await generationGate;
+      return generatedImage;
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  await generationStarted;
+
+  const secondPrefetchStatus = await prefetchGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: " Carnotaurus " },
+    async () => {
+      assert.fail("parallel prefetch should reuse the in-flight generation");
+      return createGeminiImage("Carnotaurus");
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  resolveGenerationGate();
+  const resolvedImage = await resolveGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: "Carnotaurus" },
+    async () => {
+      assert.fail("resolved image should come from the prefetch generation");
+      return createGeminiImage("Carnotaurus");
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  assert.equal(firstPrefetchStatus, "started");
+  assert.equal(secondPrefetchStatus, "already-in-flight");
+  assert.equal(generatorInvocationCount, 1);
+  assert.deepEqual(resolvedImage, generatedImage);
+});
+
 test("readCachedGeminiRewardImage loads pre-existing filesystem assets even when metadata is absent", async () => {
   const {
     readCachedGeminiRewardImage,

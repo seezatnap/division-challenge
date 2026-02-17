@@ -29,7 +29,7 @@
 - [x] (#16) Build server-side Gemini image generation endpoints/services using `@google/generative-ai` and `gemini-2.0-flash-exp`, including robust response parsing and error handling [5 pts] (blocked by #4) (B)
 - [x] (#17) Implement filesystem image caching/existence checks so dinosaur art generation is skipped when the asset already exists (no duplicate generation) [5 pts] (blocked by #16) (B)
 - [x] (#18) Implement reward milestone logic (every 5 solved) with deterministic dinosaur assignment and safeguards for milestone ordering/retry issues observed in v1 [5 pts] (blocked by #3, #9, #17) (A)
-- [B] (#19) Implement near-milestone prefetch triggers (problem 3/4 of each set of 5) that check cache first and start background generation only when needed [5 pts] (blocked by #17, #18)
+- [x] (#19) Implement near-milestone prefetch triggers (problem 3/4 of each set of 5) that check cache first and start background generation only when needed [5 pts] (blocked by #17, #18) (B)
 - [ ] (#20) Implement earned-reward loading UX with egg-hatching animation, status polling for in-flight generation, and automatic reveal once image is ready [5 pts] (blocked by #18, #19)
 
 ## Gallery & Player Flow

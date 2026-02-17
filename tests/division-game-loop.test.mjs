@@ -139,6 +139,7 @@ async function createOrchestrator(options = {}) {
           ...request,
           now: options.now ?? (() => new Date("2026-02-17T12:00:00.000Z")),
         }),
+      triggerNearMilestoneRewardPrefetch: options.triggerNearMilestoneRewardPrefetch,
     },
     random: options.random ?? createSeededRandom(20260217),
     remainderMode: options.remainderMode ?? "forbid",
@@ -159,6 +160,32 @@ test("startNextProblem creates the active problem and increments attempted count
   assert.equal(result.state.progress.session.solvedProblems, 0);
   assert.equal(result.state.progress.lifetime.totalProblemsAttempted, 1);
   assert.equal(result.state.progress.lifetime.totalProblemsSolved, 0);
+});
+
+test("startNextProblem triggers near-milestone prefetch only for problems 3 and 4 of each 5-problem set", async () => {
+  const prefetchCalls = [];
+  const orchestrator = await createOrchestrator({
+    triggerNearMilestoneRewardPrefetch: (request) => {
+      prefetchCalls.push(request.totalProblemsSolved);
+    },
+  });
+
+  const solvedCountSamples = [0, 1, 2, 3, 4, 5, 7, 8, 9];
+
+  for (const totalProblemsSolved of solvedCountSamples) {
+    orchestrator.startNextProblem(
+      createBaseState({
+        progress: {
+          lifetime: {
+            totalProblemsSolved,
+            totalProblemsAttempted: totalProblemsSolved,
+          },
+        },
+      }),
+    );
+  }
+
+  assert.deepEqual(prefetchCalls, [2, 3, 7, 8]);
 });
 
 test("incorrect inline input keeps focus on the current active step", async () => {
