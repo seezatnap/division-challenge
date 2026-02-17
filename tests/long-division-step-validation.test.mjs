@@ -83,6 +83,25 @@ test("incorrect answers keep focus on the same step and return retry hint hooks"
   assert.equal(result.hintHook.messageKey, "dino.feedback.retry.multiply-result");
 });
 
+test("non-numeric submissions are treated as retry attempts without changing focus", async () => {
+  const { solveLongDivision } = await longDivisionSolverModule;
+  const { validateLongDivisionStepAnswer } = await stepValidationModule;
+
+  const solution = solveLongDivision(createProblem());
+  const result = validateLongDivisionStepAnswer({
+    steps: solution.steps,
+    currentStepIndex: 2,
+    submittedValue: "2a",
+  });
+
+  assert.equal(result.outcome, "incorrect");
+  assert.equal(result.didAdvance, false);
+  assert.equal(result.focusStepIndex, 2);
+  assert.equal(result.focusStepId, solution.steps[2].id);
+  assert.equal(result.normalizedSubmittedValue, null);
+  assert.equal(result.hintHook.id, "dino-feedback:retry:subtraction-result");
+});
+
 test("validator normalizes numeric input while checking correctness", async () => {
   const { solveLongDivision } = await longDivisionSolverModule;
   const { validateLongDivisionStepAnswer } = await stepValidationModule;
