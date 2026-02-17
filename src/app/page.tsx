@@ -1,5 +1,6 @@
 import { featureModules } from "@/features";
 import { solveLongDivision } from "@/features/division-engine";
+import { DinoGalleryPanel } from "@/features/gallery";
 import {
   SAVE_FILE_SCHEMA_VERSION,
   type DinoDivisionSaveFile,
@@ -8,24 +9,6 @@ import {
 import { GameStartFlowPanel } from "@/features/persistence";
 import { EarnedRewardRevealPanel } from "@/features/rewards";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui";
-
-const galleryPreview = [
-  {
-    dinosaurName: "Tyrannosaurus Rex",
-    earnedAt: "Feb 12",
-    style: "gallery-thumb-rex",
-  },
-  {
-    dinosaurName: "Velociraptor",
-    earnedAt: "Feb 14",
-    style: "gallery-thumb-raptor",
-  },
-  {
-    dinosaurName: "Brachiosaurus",
-    earnedAt: "Feb 16",
-    style: "gallery-thumb-brachio",
-  },
-];
 
 const loadableSavePreview: DinoDivisionSaveFile = {
   schemaVersion: SAVE_FILE_SCHEMA_VERSION,
@@ -147,15 +130,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="gallery-grid">
-                {galleryPreview.map((entry) => (
-                  <article className="gallery-card" key={entry.dinosaurName}>
-                    <div aria-hidden="true" className={`gallery-thumb ${entry.style}`} />
-                    <p className="gallery-name">{entry.dinosaurName}</p>
-                    <p className="gallery-meta">Earned {entry.earnedAt}</p>
-                  </article>
-                ))}
-              </div>
+              <DinoGalleryPanel unlockedRewards={loadableSavePreview.unlockedDinosaurs} />
             </section>
 
             <section
