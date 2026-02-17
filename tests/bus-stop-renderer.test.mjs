@@ -73,6 +73,24 @@ test("buildBusStopRenderModel reveals quotient cells and work rows by visible st
     partialModel.workRows.map((row) => `${row.kind}:${row.value}`),
     ["multiply-result:36", "subtraction-result:7", "bring-down:72"],
   );
+  assert.equal(partialModel.activeTargetId, "target-4");
+});
+
+test("buildBusStopRenderModel keeps the active work-row target visible as an inline pending cell", async () => {
+  const { buildBusStopRenderModel } = await busStopRenderModelModule;
+
+  const model = buildBusStopRenderModel({
+    divisor: 12,
+    dividend: 432,
+    steps: sampleSteps,
+    revealedStepCount: 2,
+  });
+
+  assert.equal(model.activeTargetId, "target-2");
+  assert.deepEqual(
+    model.workRows.map((row) => `${row.kind}:${row.value}:${row.isFilled ? "filled" : "pending"}`),
+    ["multiply-result:36:filled", "subtraction-result::pending"],
+  );
 });
 
 test("buildBusStopRenderModel clamps revealed step count and marks multiply rows with minus prefix", async () => {
@@ -93,6 +111,7 @@ test("buildBusStopRenderModel clamps revealed step count and marks multiply rows
     fullModel.workRows.map((row) => row.displayPrefix),
     ["-", "", "", "-", ""],
   );
+  assert.equal(fullModel.activeTargetId, null);
 
   const hiddenModel = buildBusStopRenderModel({
     divisor: 12,
@@ -106,9 +125,10 @@ test("buildBusStopRenderModel clamps revealed step count and marks multiply rows
     ["", ""],
   );
   assert.equal(hiddenModel.workRows.length, 0);
+  assert.equal(hiddenModel.activeTargetId, "target-0");
 });
 
-test("bus-stop renderer component is paper notation and avoids form controls", async () => {
+test("bus-stop renderer component uses inline workspace entries and avoids standalone form controls", async () => {
   const source = await readRepoFile("src/features/workspace-ui/components/bus-stop-long-division-renderer.tsx");
 
   for (const fragment of [
@@ -117,11 +137,15 @@ test("bus-stop renderer component is paper notation and avoids form controls", a
     'className="divisor-cell"',
     'className="bracket-stack"',
     'className="work-rows"',
+    "WorkspaceInlineEntry",
+    'data-entry-inline="true"',
+    "contentEditable={isEditable}",
+    "suppressContentEditableWarning={isEditable}",
   ]) {
     assert.ok(source.includes(fragment), `Expected renderer fragment: ${fragment}`);
   }
 
-  for (const disallowedFragment of ["<form", "<input", "<select", "<textarea"]) {
+  for (const disallowedFragment of ["<form", "<input", "<select", "<textarea", "<option", "dropdown"]) {
     assert.equal(
       source.includes(disallowedFragment),
       false,

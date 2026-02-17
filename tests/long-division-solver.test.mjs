@@ -108,6 +108,31 @@ test("solver keeps zero quotient digits in the emitted workflow", async () => {
   );
 });
 
+test("solver delays the first quotient step until the working number reaches the divisor", async () => {
+  const { solveLongDivision } = await longDivisionSolverModule;
+
+  const solution = solveLongDivision(
+    createProblem({
+      id: "division-test-leading-digits",
+      dividend: 105,
+      divisor: 25,
+      allowRemainder: true,
+      difficultyLevel: 2,
+    }),
+  );
+
+  assert.equal(solution.quotient, 4);
+  assert.equal(solution.remainder, 5);
+  assert.deepEqual(
+    solution.steps.map((step) => step.kind),
+    ["quotient-digit", "multiply-result", "subtraction-result"],
+  );
+  assert.deepEqual(
+    solution.steps.map((step) => step.expectedValue),
+    ["4", "100", "5"],
+  );
+});
+
 test("solver emits deterministic sequence indexes and input target ids", async () => {
   const { solveLongDivision } = await longDivisionSolverModule;
 

@@ -153,6 +153,23 @@ test("allow mode can emit both exact and remainder problems over a deterministic
   assert.equal(sawRemainder, true);
 });
 
+test("allow mode keeps allowRemainder aligned with arithmetic remainder outcomes", async () => {
+  const { generateDivisionProblem } = await divisionGeneratorModule;
+  const random = createSeededRandom(314159);
+
+  for (let level = 1; level <= 5; level += 1) {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const problem = generateDivisionProblem({
+        difficultyLevel: level,
+        remainderMode: "allow",
+        random,
+      });
+
+      assert.equal(problem.allowRemainder, problem.dividend % problem.divisor !== 0);
+    }
+  }
+});
+
 test("difficulty progression derives levels from cumulative solved problem counts", async () => {
   const {
     DIVISION_DIFFICULTY_PROGRESSION_RULES,
@@ -182,6 +199,31 @@ test("difficulty progression derives levels from cumulative solved problem count
   assert.equal(getDivisionDifficultyTierForSolvedCount(0).level, 1);
   assert.equal(getDivisionDifficultyTierForSolvedCount(20).level, 4);
   assert.equal(getDivisionDifficultyTierForSolvedCount(999).level, 5);
+});
+
+test("lifetime-aware generation follows progression threshold boundaries exactly", async () => {
+  const { generateDivisionProblemForSolvedCount } = await divisionGeneratorModule;
+  const random = createSeededRandom(271828);
+  const thresholdCases = [
+    { totalProblemsSolved: 4, expectedLevel: 1 },
+    { totalProblemsSolved: 5, expectedLevel: 2 },
+    { totalProblemsSolved: 11, expectedLevel: 2 },
+    { totalProblemsSolved: 12, expectedLevel: 3 },
+    { totalProblemsSolved: 19, expectedLevel: 3 },
+    { totalProblemsSolved: 20, expectedLevel: 4 },
+    { totalProblemsSolved: 34, expectedLevel: 4 },
+    { totalProblemsSolved: 35, expectedLevel: 5 },
+  ];
+
+  for (const { totalProblemsSolved, expectedLevel } of thresholdCases) {
+    const problem = generateDivisionProblemForSolvedCount({
+      totalProblemsSolved,
+      random,
+      remainderMode: "allow",
+    });
+
+    assert.equal(problem.difficultyLevel, expectedLevel);
+  }
 });
 
 test("difficulty progression requires solved counts to be non-negative integers", async () => {
