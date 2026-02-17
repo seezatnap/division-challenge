@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 import {
   buildJurassicParkCinematicPrompt,
@@ -13,7 +13,7 @@ import {
 const defaultGeminiImageServiceDependencies: GeminiImageServiceDependencies = {
   getRequestConfig: createGeminiImageRequestConfig,
   buildPrompt: buildJurassicParkCinematicPrompt,
-  createClient: (apiKey: string) => new GoogleGenerativeAI(apiKey),
+  createClient: (apiKey: string) => new GoogleGenAI({ apiKey }),
 };
 
 export function generateGeminiRewardImage(

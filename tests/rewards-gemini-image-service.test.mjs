@@ -80,19 +80,35 @@ test("extractInlineImageDataFromGeminiResponse reports missing image bytes with 
             },
           },
         ],
-        text() {
-          return "No image was generated";
+        promptFeedback: {
+          blockReason: "SAFETY",
+          blockReasonMessage: "Image output blocked.",
         },
+        text: "No image was generated",
       }),
     (error) => {
       assert.ok(error instanceof GeminiImageGenerationError);
       assert.equal(error.code, "GEMINI_IMAGE_MISSING");
       assert.equal(error.statusCode, 502);
       assert.match(error.message, /Finish reasons: SAFETY/);
+      assert.match(error.message, /Block reason: SAFETY/);
       assert.match(error.message, /Response text preview/);
       return true;
     },
   );
+});
+
+test("extractInlineImageDataFromGeminiResponse supports the Gen AI data accessor fallback", async () => {
+  const { extractInlineImageDataFromGeminiResponse } = await rewardsGeminiImageServiceModule;
+
+  const parsedImage = extractInlineImageDataFromGeminiResponse({
+    data: "YWJjZA==",
+  });
+
+  assert.deepEqual(parsedImage, {
+    mimeType: "image/png",
+    imageBase64: "YWJjZA==",
+  });
 });
 
 test("generateGeminiDinosaurImage builds prompt, invokes model, and returns parsed image output", async () => {
@@ -106,26 +122,20 @@ test("generateGeminiDinosaurImage builds prompt, invokes model, and returns pars
       assert.equal(apiKey, "test-key");
 
       return {
-        getGenerativeModel: ({ model }) => {
-          assert.equal(model, "gemini-2.0-flash-exp");
+        models: {
+          async generateContent(request) {
+            recordedRequests.push(request);
 
-          return {
-            async generateContent(request) {
-              recordedRequests.push(request);
-
-              return {
-                response: Promise.resolve({
-                  candidates: [
-                    {
-                      content: {
-                        parts: [{ inlineData: { data: "YWJjZA==", mimeType: "image/png" } }],
-                      },
-                    },
-                  ],
-                }),
-              };
-            },
-          };
+            return {
+              candidates: [
+                {
+                  content: {
+                    parts: [{ inlineData: { data: "YWJjZA==", mimeType: "image/png" } }],
+                  },
+                },
+              ],
+            };
+          },
         },
       };
     },
@@ -135,6 +145,7 @@ test("generateGeminiDinosaurImage builds prompt, invokes model, and returns pars
 
   assert.deepEqual(recordedRequests, [
     {
+      model: "gemini-2.0-flash-exp",
       contents: [
         {
           role: "user",
@@ -167,11 +178,11 @@ test("generateGeminiDinosaurImage maps dependency failures to explicit error cod
           },
           buildPrompt: (dinosaurName) => dinosaurName,
           createClient: () => ({
-            getGenerativeModel: () => ({
+            models: {
               async generateContent() {
                 return { response: { candidates: [] } };
               },
-            }),
+            },
           }),
         },
       ),
@@ -196,11 +207,11 @@ test("generateGeminiDinosaurImage maps upstream SDK failures to a request-failed
           getRequestConfig: () => ({ apiKey: "test-key", model: "gemini-2.0-flash-exp" }),
           buildPrompt: () => "prompt",
           createClient: () => ({
-            getGenerativeModel: () => ({
+            models: {
               async generateContent() {
                 throw new Error("upstream timeout");
               },
-            }),
+            },
           }),
         },
       ),
