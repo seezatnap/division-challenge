@@ -128,6 +128,9 @@ function createDeferred() {
 const persistenceModule = loadTypeScriptModule(
   "src/features/persistence/lib/file-system-save-load.ts",
 );
+const gameStartFlowModule = loadTypeScriptModule(
+  "src/features/persistence/lib/game-start-flow.ts",
+);
 
 test("buildPlayerSaveFileName creates player-named JSON files", async () => {
   const { buildPlayerSaveFileName } = await persistenceModule;
@@ -467,6 +470,94 @@ test("saveSessionToFileSystem merges stale incoming snapshots with latest on-dis
   assert.equal(mergedSave.progress.lifetime.totalProblemsSolved, 11);
   assert.equal(mergedSave.unlockedDinosaurs.length, 2);
   assert.equal(mergedSave.progress.lifetime.rewardsUnlocked, 2);
+});
+
+test("saveSessionToFileSystem preserves a newly loaded active session when save payload session IDs differ", async () => {
+  const { createDinoDivisionSavePayload, saveSessionToFileSystem } = await persistenceModule;
+  const { createInMemoryGameSession } = await gameStartFlowModule;
+
+  const existingSaveFile = createDinoDivisionSavePayload(
+    createSessionWithLifetimeProgress({
+      totalProblemsSolved: 31,
+      totalProblemsAttempted: 35,
+    }),
+    () => new Date("2026-02-17T12:15:00.000Z"),
+  );
+  let committedJson = JSON.stringify(existingSaveFile);
+
+  const handle = {
+    name: "rex-save.json",
+    async queryPermission() {
+      return "granted";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return committedJson;
+        },
+      };
+    },
+    async createWritable() {
+      let stagedJson = committedJson;
+
+      return {
+        async write(content) {
+          stagedJson = content;
+        },
+        async close() {
+          committedJson = stagedJson;
+        },
+        async abort() {
+          stagedJson = committedJson;
+        },
+      };
+    },
+  };
+
+  const loadedSession = createInMemoryGameSession({
+    playerName: existingSaveFile.playerName,
+    mode: "load-existing-save",
+    saveFile: existingSaveFile,
+    clock: () => new Date("2026-02-17T13:45:00.000Z"),
+    createSessionId: () => "session-load-2",
+  });
+
+  const saveResult = await saveSessionToFileSystem({
+    session: loadedSession,
+    handle,
+    clock: () => new Date("2026-02-17T13:46:00.000Z"),
+  });
+
+  assert.ok(saveResult);
+  assert.equal(saveResult.saveFile.progress.session.sessionId, "session-load-2");
+  assert.equal(saveResult.saveFile.progress.session.solvedProblems, 0);
+  assert.equal(saveResult.saveFile.progress.session.attemptedProblems, 0);
+  assert.equal(saveResult.saveFile.totalProblemsSolved, 31);
+  assert.equal(saveResult.saveFile.progress.lifetime.totalProblemsSolved, 31);
+
+  const persistedSave = JSON.parse(committedJson);
+  assert.equal(persistedSave.progress.session.sessionId, "session-load-2");
+  assert.equal(persistedSave.progress.session.startedAt, "2026-02-17T13:45:00.000Z");
+  assert.equal(persistedSave.progress.session.solvedProblems, 0);
+  assert.equal(persistedSave.progress.session.attemptedProblems, 0);
+
+  const newlyLoadedSessionHistoryEntry = persistedSave.sessionHistory.find(
+    (entry) => entry.sessionId === "session-load-2",
+  );
+  assert.deepEqual(newlyLoadedSessionHistoryEntry, {
+    sessionId: "session-load-2",
+    startedAt: "2026-02-17T13:45:00.000Z",
+    endedAt: null,
+    solvedProblems: 0,
+    attemptedProblems: 0,
+  });
+
+  const previousSessionHistoryEntry = persistedSave.sessionHistory.find(
+    (entry) => entry.sessionId === "session-live-1",
+  );
+  assert.ok(previousSessionHistoryEntry);
+  assert.equal(previousSessionHistoryEntry.solvedProblems, 31);
+  assert.equal(previousSessionHistoryEntry.attemptedProblems, 35);
 });
 
 test("saveSessionToFileSystem uses atomic write flow and aborts failed writes without committing", async () => {
