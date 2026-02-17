@@ -19,7 +19,7 @@
 
 - [x] (#10) Build the bus-stop long-division renderer with divisor left of bracket, dividend inside, quotient above, and dynamic work rows below (paper-like notation, not forms) [5 pts] (blocked by #2, #7) (A)
 - [x] (#11) Implement inline entry elements embedded in the workspace (styled to blend into notation) and remove any standalone form field/dropdown interaction model [5 pts] (blocked by #10) (B)
-- [ ] (#12) Implement a single-active-cell glow manager (amber/gold pulse) that ensures exactly one target is highlighted at any time according to solver order [5 pts] (blocked by #7, #11)
+- [A] (#12) Implement a single-active-cell glow manager (amber/gold pulse) that ensures exactly one target is highlighted at any time according to solver order [5 pts] (blocked by #7, #11)
 - [ ] (#13) Wire real-time typing so values appear as typed, lock in with micro-animation on correct entry, and auto-advance glow to the next target [5 pts] (blocked by #8, #12)
 - [ ] (#14) Implement the bring-down animation that visibly slides the next dividend digit into the working number and synchronizes state transitions [5 pts] (blocked by #10, #12)
 - [ ] (#15) Implement dino-themed feedback messaging for success/failure states (e.g., encouragement + playful retry hints) tied to validation outcomes [5 pts] (blocked by #13)
@@ -28,7 +28,7 @@
 
 - [x] (#16) Build server-side Gemini image generation endpoints/services using `@google/generative-ai` and `gemini-2.0-flash-exp`, including robust response parsing and error handling [5 pts] (blocked by #4) (B)
 - [x] (#17) Implement filesystem image caching/existence checks so dinosaur art generation is skipped when the asset already exists (no duplicate generation) [5 pts] (blocked by #16) (B)
-- [ ] (#18) Implement reward milestone logic (every 5 solved) with deterministic dinosaur assignment and safeguards for milestone ordering/retry issues observed in v1 [5 pts] (blocked by #3, #9, #17)
+- [A] (#18) Implement reward milestone logic (every 5 solved) with deterministic dinosaur assignment and safeguards for milestone ordering/retry issues observed in v1 [5 pts] (blocked by #3, #9, #17)
 - [ ] (#19) Implement near-milestone prefetch triggers (problem 3/4 of each set of 5) that check cache first and start background generation only when needed [5 pts] (blocked by #17, #18)
 - [ ] (#20) Implement earned-reward loading UX with egg-hatching animation, status polling for in-flight generation, and automatic reveal once image is ready [5 pts] (blocked by #18, #19)
 
