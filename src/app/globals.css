@@ -453,6 +453,91 @@ body {
   gap: 0.55rem;
 }
 
+.game-start-flow {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.62rem;
+}
+
+.game-start-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--jp-bark) 86%, black);
+}
+
+.game-start-input {
+  border-radius: 0.62rem;
+  border: 1px solid rgba(45, 36, 25, 0.26);
+  padding: 0.52rem 0.7rem;
+  font-size: 0.84rem;
+  background: rgba(255, 255, 255, 0.58);
+  color: color-mix(in srgb, var(--jp-bark) 88%, black);
+}
+
+.game-start-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--jp-amber) 72%, white);
+  outline-offset: 1px;
+}
+
+.game-start-helper {
+  font-size: 0.76rem;
+  color: color-mix(in srgb, var(--jp-jungle) 72%, var(--jp-bark));
+}
+
+.game-start-options {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.game-start-option {
+  border: 1px solid rgba(45, 36, 25, 0.18);
+  border-radius: 0.62rem;
+  background: rgba(255, 255, 255, 0.38);
+  padding: 0.46rem 0.55rem;
+}
+
+.game-start-option-title {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--jp-bark) 84%, black);
+}
+
+.game-start-option-copy {
+  display: block;
+  margin-top: 0.16rem;
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--jp-jungle) 70%, var(--jp-bark));
+}
+
+.game-start-error {
+  border: 1px solid rgba(174, 66, 24, 0.35);
+  border-radius: 0.62rem;
+  background: rgba(253, 236, 220, 0.84);
+  color: rgba(129, 38, 9, 0.95);
+  font-size: 0.76rem;
+  padding: 0.5rem 0.6rem;
+}
+
+.game-start-session {
+  border: 1px solid rgba(70, 96, 56, 0.28);
+  border-radius: 0.72rem;
+  background: linear-gradient(165deg, rgba(247, 239, 216, 0.75), rgba(113, 137, 81, 0.16));
+  padding: 0.62rem;
+}
+
+.game-start-session-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--jp-bark) 84%, black);
+}
+
+.game-start-session-meta {
+  margin-top: 0.24rem;
+  font-size: 0.74rem;
+  color: color-mix(in srgb, var(--jp-jungle) 68%, var(--jp-bark));
+}
+
 .jp-button {
   border-radius: 0.65rem;
   border: 1px solid rgba(45, 36, 25, 0.3);
@@ -468,6 +553,13 @@ body {
 .jp-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 0.5rem 1.15rem rgba(45, 36, 25, 0.2);
+}
+
+.jp-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .jp-button-secondary {

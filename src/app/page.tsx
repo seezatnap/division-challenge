@@ -1,4 +1,6 @@
 import { featureModules } from "@/features";
+import { SAVE_FILE_SCHEMA_VERSION, type DinoDivisionSaveFile } from "@/features/contracts";
+import { GameStartFlowPanel } from "@/features/persistence";
 
 const galleryPreview = [
   {
@@ -18,18 +20,59 @@ const galleryPreview = [
   },
 ];
 
-const savePreview = [
-  {
-    playerName: "Raptor Scout",
-    summary: "Solved 28 problems | Difficulty 4",
-    updatedAt: "Updated 09:15",
+const loadableSavePreview: DinoDivisionSaveFile = {
+  schemaVersion: SAVE_FILE_SCHEMA_VERSION,
+  playerName: "Raptor Scout",
+  totalProblemsSolved: 28,
+  currentDifficultyLevel: 4,
+  progress: {
+    session: {
+      sessionId: "session-preview-active",
+      startedAt: "2026-02-17T09:15:00.000Z",
+      solvedProblems: 6,
+      attemptedProblems: 8,
+    },
+    lifetime: {
+      totalProblemsSolved: 28,
+      totalProblemsAttempted: 34,
+      currentDifficultyLevel: 4,
+      rewardsUnlocked: 5,
+    },
   },
-  {
-    playerName: "Amber Ranger",
-    summary: "Solved 13 problems | Difficulty 2",
-    updatedAt: "Updated 07:42",
-  },
-];
+  unlockedDinosaurs: [
+    {
+      rewardId: "reward-rex-1",
+      dinosaurName: "Tyrannosaurus Rex",
+      imagePath: "/rewards/tyrannosaurus-rex.png",
+      earnedAt: "2026-02-12T09:15:00.000Z",
+      milestoneSolvedCount: 5,
+    },
+    {
+      rewardId: "reward-raptor-2",
+      dinosaurName: "Velociraptor",
+      imagePath: "/rewards/velociraptor.png",
+      earnedAt: "2026-02-14T12:40:00.000Z",
+      milestoneSolvedCount: 10,
+    },
+  ],
+  sessionHistory: [
+    {
+      sessionId: "session-preview-1",
+      startedAt: "2026-02-12T08:00:00.000Z",
+      endedAt: "2026-02-12T08:45:00.000Z",
+      solvedProblems: 10,
+      attemptedProblems: 12,
+    },
+    {
+      sessionId: "session-preview-2",
+      startedAt: "2026-02-14T12:00:00.000Z",
+      endedAt: "2026-02-14T12:55:00.000Z",
+      solvedProblems: 18,
+      attemptedProblems: 22,
+    },
+  ],
+  updatedAt: "2026-02-17T09:15:00.000Z",
+};
 
 const coachMessages = [
   "Roarsome lock-in! Keep the amber glow moving.",
@@ -148,24 +191,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="save-actions">
-                <button className="jp-button" type="button">
-                  Save Progress
-                </button>
-                <button className="jp-button jp-button-secondary" type="button">
-                  Load File
-                </button>
-              </div>
-
-              <ul className="save-list">
-                {savePreview.map((entry) => (
-                  <li className="save-item" key={entry.playerName}>
-                    <p className="save-name">{entry.playerName}</p>
-                    <p className="save-summary">{entry.summary}</p>
-                    <p className="save-updated">{entry.updatedAt}</p>
-                  </li>
-                ))}
-              </ul>
+              <GameStartFlowPanel loadableSave={loadableSavePreview} />
             </section>
           </div>
         </div>
