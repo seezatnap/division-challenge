@@ -268,23 +268,44 @@ body {
   padding: 0.95rem;
 }
 
-.workspace-lineup {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.7rem;
-}
-
 .workspace-label {
+  margin-bottom: 0.45rem;
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: color-mix(in srgb, var(--jp-jungle) 74%, var(--jp-fern));
 }
 
-.digit-track {
+.bus-stop-renderer {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.bus-stop-notation {
+  display: grid;
+  gap: 0.56rem;
+}
+
+.quotient-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.quotient-row-spacer {
+  visibility: hidden;
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding-top: 0.4rem;
+}
+
+.quotient-track {
   display: flex;
   gap: 0.45rem;
+  min-height: 2rem;
+  padding-left: 0.8rem;
 }
 
 .digit-cell {
@@ -298,8 +319,17 @@ body {
   color: var(--jp-bark);
 }
 
-.bus-stop {
-  margin-top: 1rem;
+.quotient-digit-cell {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.quotient-digit-empty {
+  color: transparent;
+  border-style: dotted;
+  background: rgba(247, 239, 216, 0.36);
+}
+
+.bus-stop-core {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.6rem;
@@ -317,11 +347,12 @@ body {
   border-left: 0.18rem solid rgba(45, 36, 25, 0.68);
   border-top: 0.18rem solid rgba(45, 36, 25, 0.68);
   border-top-left-radius: 0.35rem;
-  padding: 0.35rem 0 0 0.65rem;
+  padding: 0.35rem 0 0.25rem 0.65rem;
 }
 
 .dividend-line,
-.work-line {
+.work-line,
+.work-row-value {
   font-family: var(--font-jurassic-mono), "Courier New", monospace;
   font-size: 1.04rem;
   letter-spacing: 0.05em;
@@ -330,6 +361,38 @@ body {
 
 .work-line {
   margin-top: 0.34rem;
+}
+
+.work-rows {
+  margin-top: 0.25rem;
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.work-row {
+  display: grid;
+  grid-template-columns: 0.75rem 1fr;
+  align-items: center;
+}
+
+.work-row-op {
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 1.04rem;
+  color: color-mix(in srgb, var(--jp-bark) 86%, black);
+}
+
+.work-row[data-step-kind="bring-down"] .work-row-op {
+  color: transparent;
+}
+
+.work-row[data-step-kind="bring-down"] .work-row-value {
+  color: var(--jp-fern);
+}
+
+.work-row-placeholder {
+  opacity: 0.68;
 }
 
 .final-line {

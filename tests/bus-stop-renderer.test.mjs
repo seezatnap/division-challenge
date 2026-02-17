@@ -1,0 +1,143 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+import ts from "typescript";
+
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(testDir, "..");
+
+async function readRepoFile(relativePath) {
+  return readFile(path.join(repoRoot, relativePath), "utf8");
+}
+
+async function loadTypeScriptModule(relativePath) {
+  const absolutePath = path.join(repoRoot, relativePath);
+  const source = await readFile(absolutePath, "utf8");
+
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+    fileName: absolutePath,
+  }).outputText;
+
+  return import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+}
+
+function createStep(kind, sequenceIndex, expectedValue) {
+  return {
+    id: `step-${sequenceIndex}-${kind}`,
+    problemId: "workspace-problem",
+    kind,
+    sequenceIndex,
+    expectedValue,
+    inputTargetId: `target-${sequenceIndex}`,
+  };
+}
+
+const sampleSteps = [
+  createStep("quotient-digit", 0, "3"),
+  createStep("multiply-result", 1, "36"),
+  createStep("subtraction-result", 2, "7"),
+  createStep("bring-down", 3, "72"),
+  createStep("quotient-digit", 4, "6"),
+  createStep("multiply-result", 5, "72"),
+  createStep("subtraction-result", 6, "0"),
+];
+
+const busStopRenderModelModule = loadTypeScriptModule(
+  "src/features/workspace-ui/lib/bus-stop-render-model.ts",
+);
+
+test("buildBusStopRenderModel reveals quotient cells and work rows by visible step count", async () => {
+  const { buildBusStopRenderModel } = await busStopRenderModelModule;
+
+  const partialModel = buildBusStopRenderModel({
+    divisor: 12,
+    dividend: 432,
+    steps: sampleSteps,
+    revealedStepCount: 4,
+  });
+
+  assert.equal(partialModel.divisorText, "12");
+  assert.equal(partialModel.dividendText, "432");
+  assert.deepEqual(
+    partialModel.quotientCells.map((cell) => cell.value),
+    ["3", ""],
+  );
+  assert.deepEqual(
+    partialModel.workRows.map((row) => `${row.kind}:${row.value}`),
+    ["multiply-result:36", "subtraction-result:7", "bring-down:72"],
+  );
+});
+
+test("buildBusStopRenderModel clamps revealed step count and marks multiply rows with minus prefix", async () => {
+  const { buildBusStopRenderModel } = await busStopRenderModelModule;
+
+  const fullModel = buildBusStopRenderModel({
+    divisor: 12,
+    dividend: 432,
+    steps: sampleSteps,
+    revealedStepCount: 999,
+  });
+
+  assert.deepEqual(
+    fullModel.quotientCells.map((cell) => cell.value),
+    ["3", "6"],
+  );
+  assert.deepEqual(
+    fullModel.workRows.map((row) => row.displayPrefix),
+    ["-", "", "", "-", ""],
+  );
+
+  const hiddenModel = buildBusStopRenderModel({
+    divisor: 12,
+    dividend: 432,
+    steps: sampleSteps,
+    revealedStepCount: Number.NEGATIVE_INFINITY,
+  });
+
+  assert.deepEqual(
+    hiddenModel.quotientCells.map((cell) => cell.value),
+    ["", ""],
+  );
+  assert.equal(hiddenModel.workRows.length, 0);
+});
+
+test("bus-stop renderer component is paper notation and avoids form controls", async () => {
+  const source = await readRepoFile("src/features/workspace-ui/components/bus-stop-long-division-renderer.tsx");
+
+  for (const fragment of [
+    'data-ui-component="bus-stop-renderer"',
+    'className="quotient-track"',
+    'className="divisor-cell"',
+    'className="bracket-stack"',
+    'className="work-rows"',
+  ]) {
+    assert.ok(source.includes(fragment), `Expected renderer fragment: ${fragment}`);
+  }
+
+  for (const disallowedFragment of ["<form", "<input", "<select", "<textarea"]) {
+    assert.equal(
+      source.includes(disallowedFragment),
+      false,
+      `Renderer should avoid form control markup: ${disallowedFragment}`,
+    );
+  }
+});
+
+test("home page renders the workspace through the reusable bus-stop renderer", async () => {
+  const source = await readRepoFile("src/app/page.tsx");
+
+  for (const fragment of [
+    "BusStopLongDivisionRenderer",
+    "workspacePreviewSolution",
+    "solveLongDivision(workspacePreviewProblem)",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected home-page workspace fragment: ${fragment}`);
+  }
+});
