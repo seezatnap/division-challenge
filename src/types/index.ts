@@ -32,3 +32,8 @@ export {
   type SessionRecord,
   type SaveFile,
 } from "./save-file";
+
+export {
+  type GameStartPhase,
+  type GameSession,
+} from "./game-session";
