@@ -8,11 +8,7 @@ import {
   validatePlayerName,
   saveFileNameFromPlayer,
 } from "./session-init";
-import {
-  isFileSystemAccessSupported,
-  loadFromDisk,
-  loadFromFile,
-} from "@/features/persistence/save-load";
+import { loadGame } from "@/features/persistence/save-load";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -21,30 +17,6 @@ import {
 export interface GameStartFlowProps {
   /** Called when the session is fully initialized and play can begin. */
   onSessionReady: (session: GameSession) => void;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Open a file via a hidden `<input type="file">` element (fallback for
- * browsers without the File System Access API).
- */
-function openFileViaInput(): Promise<File | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".json";
-
-    input.onchange = () => {
-      resolve(input.files?.[0] ?? null);
-    };
-
-    // If the user cancels, we never get an event — resolve after a timeout.
-    // In practice the component stays interactive so this is just cleanup.
-    input.click();
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -83,36 +55,18 @@ export function GameStartFlow({ onSessionReady }: GameStartFlowProps) {
   const handleLoadSave = useCallback(async () => {
     setLoadError(null);
 
-    if (isFileSystemAccessSupported()) {
-      // Use File System Access API — prompts for permission via native picker
-      const result = await loadFromDisk();
+    const result = await loadGame();
 
-      if (result.cancelled) return;
-      if (!result.success || !result.saveFile) {
-        setLoadError(result.error ?? "Could not load save file. Please try again.");
-        return;
-      }
-
-      const session = restoreSessionFromSave(result.saveFile);
-      setPlayerName(result.saveFile.playerName);
-      setPhase("ready");
-      onSessionReady(session);
-    } else {
-      // Fallback: hidden file input
-      const file = await openFileViaInput();
-      if (!file) return;
-
-      const result = await loadFromFile(file);
-      if (!result.success || !result.saveFile) {
-        setLoadError(result.error ?? "This file doesn't look like a valid save file.");
-        return;
-      }
-
-      const session = restoreSessionFromSave(result.saveFile);
-      setPlayerName(result.saveFile.playerName);
-      setPhase("ready");
-      onSessionReady(session);
+    if (result.cancelled) return;
+    if (!result.success || !result.saveFile) {
+      setLoadError(result.error ?? "Could not load save file. Please try again.");
+      return;
     }
+
+    const session = restoreSessionFromSave(result.saveFile);
+    setPlayerName(result.saveFile.playerName);
+    setPhase("ready");
+    onSessionReady(session);
   }, [onSessionReady]);
 
   // ── Back to name entry ─────────────────────────────────────────────
