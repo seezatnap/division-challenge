@@ -6,3 +6,5 @@ export const persistenceModule: FeatureModuleDescriptor = {
   summary: "File System Access save/load adapters with schema-safe fallback support.",
   rootPath: "src/features/persistence",
 };
+
+export * from "./game-start-flow";
