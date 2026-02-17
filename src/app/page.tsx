@@ -6,6 +6,7 @@ import {
   type DivisionProblem,
 } from "@/features/contracts";
 import { GameStartFlowPanel } from "@/features/persistence";
+import { EarnedRewardRevealPanel } from "@/features/rewards";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui";
 
 const galleryPreview = [
@@ -155,6 +156,29 @@ export default function Home() {
                   </article>
                 ))}
               </div>
+            </section>
+
+            <section
+              aria-labelledby="earned-reward-surface-heading"
+              className="jurassic-panel motif-canopy"
+              data-ui-surface="earned-reward"
+            >
+              <div className="surface-header">
+                <div>
+                  <p className="surface-kicker">Reward Hatch</p>
+                  <h2 className="surface-title" id="earned-reward-surface-heading">
+                    Newly Earned Dino
+                  </h2>
+                </div>
+              </div>
+
+              <EarnedRewardRevealPanel
+                dinosaurName="Stegosaurus"
+                initialStatus="generating"
+                maxPollAttempts={2}
+                milestoneSolvedCount={15}
+                pollIntervalMs={200}
+              />
             </section>
 
             <section

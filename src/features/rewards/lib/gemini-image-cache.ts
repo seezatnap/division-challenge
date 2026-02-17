@@ -46,6 +46,14 @@ export interface CachedRewardImageFile {
   extension: SupportedImageExtension;
 }
 
+export type GeminiRewardImageGenerationStatus = "ready" | "generating" | "missing";
+
+export interface GeminiRewardImageGenerationStatusSnapshot {
+  dinosaurName: string;
+  status: GeminiRewardImageGenerationStatus;
+  imagePath: string | null;
+}
+
 export type GeminiRewardImagePrefetchStatus =
   | "already-cached"
   | "already-in-flight"
@@ -96,6 +104,13 @@ function isNotFoundError(error: unknown): boolean {
 
 function getCacheMetadataPath(absoluteImagePath: string): string {
   return `${absoluteImagePath}${CACHE_METADATA_SUFFIX}`;
+}
+
+function toRewardImagePublicPath(
+  dinosaurName: string,
+  extension: SupportedImageExtension,
+): string {
+  return `/rewards/${toRewardImageCacheSlug(dinosaurName)}.${extension}`;
 }
 
 function getMimeTypeForExtension(extension: SupportedImageExtension): string {
@@ -226,6 +241,37 @@ export async function readCachedGeminiRewardImage(
     model: metadata.model,
     mimeType: metadata.mimeType,
     imageBase64: imageBuffer.toString("base64"),
+  };
+}
+
+export async function getGeminiRewardImageGenerationStatus(
+  dinosaurName: string,
+  options: FilesystemGeminiImageCacheOptions = {},
+): Promise<GeminiRewardImageGenerationStatusSnapshot> {
+  const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
+  const cachedFile = await findCachedRewardImageFile(normalizedDinosaurName, options);
+
+  if (cachedFile) {
+    return {
+      dinosaurName: normalizedDinosaurName,
+      status: "ready",
+      imagePath: toRewardImagePublicPath(normalizedDinosaurName, cachedFile.extension),
+    };
+  }
+
+  const inFlightGeneration = getInFlightRewardImageGeneration(normalizedDinosaurName, options);
+  if (inFlightGeneration) {
+    return {
+      dinosaurName: normalizedDinosaurName,
+      status: "generating",
+      imagePath: null,
+    };
+  }
+
+  return {
+    dinosaurName: normalizedDinosaurName,
+    status: "missing",
+    imagePath: null,
   };
 }
 
