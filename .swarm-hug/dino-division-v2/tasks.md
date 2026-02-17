@@ -60,3 +60,6 @@
 ## Follow-up tasks (from sprint review)
 - [x] (#34) Migrate the rewards image generation integration off deprecated `@google/generative-ai` to the supported Google Gen AI SDK, and update parsing/error handling for the new client response shape. (blocked by #16) (C)
 - [x] (#35) Add API route tests for `POST /api/rewards/generate-image` covering invalid JSON input, known service-error mapping, and success response shape. (blocked by #16) (C)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#36) Prevent concurrent duplicate Gemini generations for the same dinosaur by adding per-dinosaur in-flight deduping in `resolveGeminiRewardImageWithFilesystemCache`, and add a parallel-request regression test that asserts the generator runs only once.
