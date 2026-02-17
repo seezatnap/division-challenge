@@ -18,15 +18,19 @@ import {
 } from "@/features/division-engine/lib/step-validation";
 import {
   applyLiveWorkspaceEntryInput,
+  buildBringDownAnimationSourceByStepId,
   buildBusStopRenderModel,
   createLiveWorkspaceTypingState,
   resolveInlineWorkspaceEntryValue,
   sanitizeInlineWorkspaceEntryValue,
+  tryAutoAdvanceBringDownStep,
+  type LiveWorkspaceEntryInputTransition,
   type LiveWorkspaceTypingState,
   type WorkspaceDraftEntryValues,
 } from "@/features/workspace-ui/lib";
 
 const LOCK_IN_ANIMATION_DURATION_MS = 280;
+const BRING_DOWN_ANIMATION_DURATION_MS = 420;
 const NON_DIGIT_KEY_PATTERN = /^\D$/;
 const EMPTY_DRAFT_ENTRY_VALUES: WorkspaceDraftEntryValues = {};
 
@@ -49,6 +53,7 @@ interface WorkspaceInlineEntryProps {
   isFilled: boolean;
   isActive: boolean;
   isInteractive: boolean;
+  isAutoEntry: boolean;
   isLockingIn: boolean;
   onInput?: (stepId: string, event: FormEvent<HTMLSpanElement>) => void;
   onKeyDown?: (stepId: string, event: KeyboardEvent<HTMLSpanElement>) => void;
@@ -87,12 +92,13 @@ function WorkspaceInlineEntry({
   isFilled,
   isActive,
   isInteractive,
+  isAutoEntry,
   isLockingIn,
   onInput,
   onKeyDown,
   onPaste,
 }: WorkspaceInlineEntryProps) {
-  const isEditable = isInteractive && !isFilled && Boolean(targetId);
+  const isEditable = isInteractive && !isFilled && !isAutoEntry && Boolean(targetId);
 
   return (
     <span
@@ -100,6 +106,7 @@ function WorkspaceInlineEntry({
       className={buildInlineEntryClassName({ lane, isFilled, isActive, isLockingIn })}
       contentEditable={isEditable}
       data-entry-active={isActive ? "true" : "false"}
+      data-entry-auto={isAutoEntry ? "true" : "false"}
       data-entry-animation={isLockingIn ? "lock-in" : "none"}
       data-entry-glow={isActive ? "amber" : "none"}
       data-entry-inline="true"
@@ -158,7 +165,17 @@ export function BusStopLongDivisionRenderer({
   const lockingStepIds =
     lockInAnimationState.stepIdentity === stepIdentity ? lockInAnimationState.stepIds : {};
   const lockTimeoutByStepIdRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const bringDownAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
+  const [bringDownAnimationState, setBringDownAnimationState] = useState<{
+    stepIdentity: string;
+    stepId: string | null;
+  }>({
+    stepIdentity,
+    stepId: null,
+  });
+  const bringDownAnimationStepId =
+    bringDownAnimationState.stepIdentity === stepIdentity ? bringDownAnimationState.stepId : null;
 
   const effectiveRevealedStepCount = liveTypingEnabled
     ? liveTypingState.revealedStepCount
@@ -177,6 +194,28 @@ export function BusStopLongDivisionRenderer({
       }),
     [divisor, dividend, steps, effectiveRevealedStepCount],
   );
+  const dividendDigits = useMemo(() => Array.from(renderModel.dividendText), [renderModel.dividendText]);
+  const bringDownAnimationSourceByStepId = useMemo(
+    () =>
+      buildBringDownAnimationSourceByStepId({
+        divisor,
+        dividend,
+        steps,
+      }),
+    [dividend, divisor, steps],
+  );
+  const activeBringDownAnimationSource = bringDownAnimationStepId
+    ? bringDownAnimationSourceByStepId[bringDownAnimationStepId] ?? null
+    : null;
+
+  const clearBringDownAnimationTimeout = useCallback(() => {
+    if (!bringDownAnimationTimeoutRef.current) {
+      return;
+    }
+
+    clearTimeout(bringDownAnimationTimeoutRef.current);
+    bringDownAnimationTimeoutRef.current = null;
+  }, []);
 
   useEffect(() => {
     liveTypingStateRef.current = liveTypingState;
@@ -190,8 +229,9 @@ export function BusStopLongDivisionRenderer({
         clearTimeout(timeoutHandle);
       }
       timeoutHandles.clear();
+      clearBringDownAnimationTimeout();
     };
-  }, []);
+  }, [clearBringDownAnimationTimeout]);
 
   useEffect(() => {
     if (!liveTypingEnabled || !renderModel.activeTargetId) {
@@ -214,6 +254,23 @@ export function BusStopLongDivisionRenderer({
       activeEntry.focus();
     }
   }, [liveTypingEnabled, renderModel.activeTargetId]);
+
+  useEffect(() => {
+    clearBringDownAnimationTimeout();
+  }, [clearBringDownAnimationTimeout, stepIdentity]);
+
+  const clearBringDownAnimationState = useCallback(() => {
+    setBringDownAnimationState((currentState) => {
+      if (currentState.stepIdentity !== stepIdentity || currentState.stepId === null) {
+        return currentState;
+      }
+
+      return {
+        stepIdentity,
+        stepId: null,
+      };
+    });
+  }, [stepIdentity]);
 
   const queueLockInAnimation = useCallback((stepId: string) => {
     const timeoutKey = `${stepIdentity}:${stepId}`;
@@ -260,20 +317,8 @@ export function BusStopLongDivisionRenderer({
     lockTimeoutByStepIdRef.current.set(timeoutKey, timeoutHandle);
   }, [stepIdentity]);
 
-  const applyInlineEntryTransition = useCallback(
-    (stepId: string, rawValue: string) => {
-      if (!liveTypingEnabled) {
-        return;
-      }
-
-      const transition = applyLiveWorkspaceEntryInput({
-        steps,
-        state: liveTypingStateRef.current,
-        stepId,
-        rawValue,
-        validateStep: validateLongDivisionStepAnswer,
-      });
-
+  const applyCommittedTransition = useCallback(
+    (transition: LiveWorkspaceEntryInputTransition) => {
       liveTypingStateRef.current = transition.state;
       setLiveTypingRuntimeState({
         stepIdentity,
@@ -288,7 +333,90 @@ export function BusStopLongDivisionRenderer({
         queueLockInAnimation(transition.lockedStepId);
       }
     },
-    [liveTypingEnabled, onStepValidation, queueLockInAnimation, stepIdentity, steps],
+    [onStepValidation, queueLockInAnimation, stepIdentity],
+  );
+
+  const queueBringDownAnimationForStep = useCallback(
+    (stepId: string) => {
+      setBringDownAnimationState({
+        stepIdentity,
+        stepId,
+      });
+
+      clearBringDownAnimationTimeout();
+
+      bringDownAnimationTimeoutRef.current = setTimeout(() => {
+        clearBringDownAnimationState();
+
+        const transition = tryAutoAdvanceBringDownStep({
+          steps,
+          state: liveTypingStateRef.current,
+          validateStep: validateLongDivisionStepAnswer,
+        });
+        if (transition) {
+          applyCommittedTransition(transition);
+        }
+
+        bringDownAnimationTimeoutRef.current = null;
+      }, BRING_DOWN_ANIMATION_DURATION_MS);
+    },
+    [
+      applyCommittedTransition,
+      clearBringDownAnimationState,
+      clearBringDownAnimationTimeout,
+      stepIdentity,
+      steps,
+    ],
+  );
+
+  const commitLiveWorkspaceTransition = useCallback(
+    (transition: LiveWorkspaceEntryInputTransition) => {
+      applyCommittedTransition(transition);
+
+      if (!liveTypingEnabled || !transition.didAdvance || !transition.validation) {
+        clearBringDownAnimationTimeout();
+        clearBringDownAnimationState();
+        return;
+      }
+
+      const focusStepIndex = transition.validation.focusStepIndex;
+      const nextStep = typeof focusStepIndex === "number" ? steps[focusStepIndex] : null;
+
+      if (nextStep?.kind === "bring-down") {
+        queueBringDownAnimationForStep(nextStep.id);
+        return;
+      }
+
+      clearBringDownAnimationTimeout();
+      clearBringDownAnimationState();
+    },
+    [
+      applyCommittedTransition,
+      clearBringDownAnimationState,
+      clearBringDownAnimationTimeout,
+      liveTypingEnabled,
+      queueBringDownAnimationForStep,
+      steps,
+    ],
+  );
+
+  const applyInlineEntryTransition = useCallback(
+    (stepId: string, rawValue: string) => {
+      if (!liveTypingEnabled) {
+        return;
+      }
+
+      const transition = applyLiveWorkspaceEntryInput({
+        steps,
+        state: liveTypingStateRef.current,
+        stepId,
+        rawValue,
+        validateStep: validateLongDivisionStepAnswer,
+      });
+
+      commitLiveWorkspaceTransition(transition);
+    },
+    [commitLiveWorkspaceTransition, liveTypingEnabled, steps],
   );
 
   const handleInlineEntryInput = useCallback(
@@ -336,6 +464,7 @@ export function BusStopLongDivisionRenderer({
     <article
       aria-label="Long-division workspace"
       className="workspace-paper bus-stop-renderer"
+      data-bring-down-animation={bringDownAnimationStepId ? "running" : "idle"}
       data-ui-component="bus-stop-renderer"
       data-workspace-live-typing={liveTypingEnabled ? "enabled" : "disabled"}
       ref={workspaceRef}
@@ -350,6 +479,7 @@ export function BusStopLongDivisionRenderer({
             {renderModel.quotientCells.map((cell) => (
               <WorkspaceInlineEntry
                 isActive={cell.isActive}
+                isAutoEntry={false}
                 isFilled={cell.isFilled}
                 isInteractive={liveTypingEnabled}
                 isLockingIn={Boolean(lockingStepIds[cell.stepId])}
@@ -374,7 +504,23 @@ export function BusStopLongDivisionRenderer({
         <div className="bus-stop-core">
           <p className="divisor-cell">{renderModel.divisorText}</p>
           <div className="bracket-stack">
-            <p className="dividend-line">{renderModel.dividendText}</p>
+            <p className="dividend-line" data-bring-down-source-step-id={bringDownAnimationStepId ?? ""}>
+              {dividendDigits.map((digit, digitIndex) => {
+                const isBringDownSourceDigit =
+                  activeBringDownAnimationSource?.sourceDividendDigitIndex === digitIndex;
+
+                return (
+                  <span
+                    className={`dividend-digit${isBringDownSourceDigit ? " dividend-digit-bring-down-origin" : ""}`}
+                    data-bring-down-origin={isBringDownSourceDigit ? "active" : "idle"}
+                    data-dividend-digit-index={digitIndex}
+                    key={`dividend-digit-${digitIndex}`}
+                  >
+                    {digit}
+                  </span>
+                );
+              })}
+            </p>
 
             <ol className="work-rows">
               {renderModel.workRows.length === 0 ? (
@@ -390,24 +536,35 @@ export function BusStopLongDivisionRenderer({
                     <span aria-hidden="true" className="work-row-op">
                       {row.displayPrefix || "\u00a0"}
                     </span>
-                    <WorkspaceInlineEntry
-                      isActive={row.isActive}
-                      isFilled={row.isFilled}
-                      isInteractive={liveTypingEnabled}
-                      isLockingIn={Boolean(lockingStepIds[row.stepId])}
-                      lane="work-row"
-                      onInput={liveTypingEnabled ? handleInlineEntryInput : undefined}
-                      onKeyDown={liveTypingEnabled ? handleInlineEntryKeyDown : undefined}
-                      onPaste={liveTypingEnabled ? handleInlineEntryPaste : undefined}
-                      stepId={row.stepId}
-                      targetId={row.targetId}
-                      value={resolveInlineWorkspaceEntryValue({
-                        stepId: row.stepId,
-                        lockedValue: row.value,
-                        isFilled: row.isFilled,
-                        draftEntryValues,
-                      })}
-                    />
+                    <div
+                      className="work-row-value-shell"
+                      data-bring-down-animation={bringDownAnimationStepId === row.stepId ? "running" : "idle"}
+                    >
+                      <WorkspaceInlineEntry
+                        isActive={row.isActive}
+                        isAutoEntry={row.kind === "bring-down" && liveTypingEnabled}
+                        isFilled={row.isFilled}
+                        isInteractive={liveTypingEnabled}
+                        isLockingIn={Boolean(lockingStepIds[row.stepId])}
+                        lane="work-row"
+                        onInput={liveTypingEnabled ? handleInlineEntryInput : undefined}
+                        onKeyDown={liveTypingEnabled ? handleInlineEntryKeyDown : undefined}
+                        onPaste={liveTypingEnabled ? handleInlineEntryPaste : undefined}
+                        stepId={row.stepId}
+                        targetId={row.targetId}
+                        value={resolveInlineWorkspaceEntryValue({
+                          stepId: row.stepId,
+                          lockedValue: row.value,
+                          isFilled: row.isFilled,
+                          draftEntryValues,
+                        })}
+                      />
+                      {bringDownAnimationStepId === row.stepId ? (
+                        <span aria-hidden="true" className="bring-down-digit-slide">
+                          {activeBringDownAnimationSource?.digit ?? "\u00a0"}
+                        </span>
+                      ) : null}
+                    </div>
                   </li>
                 ))
               )}

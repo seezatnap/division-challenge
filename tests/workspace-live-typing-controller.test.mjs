@@ -51,6 +51,14 @@ const sampleSteps = [
   createStep("subtraction-result", 2, "0"),
 ];
 
+const bringDownSampleSteps = [
+  createStep("quotient-digit", 0, "3"),
+  createStep("multiply-result", 1, "36"),
+  createStep("subtraction-result", 2, "7"),
+  createStep("bring-down", 3, "72"),
+  createStep("quotient-digit", 4, "6"),
+];
+
 test("createLiveWorkspaceTypingState clamps the revealed step count", async () => {
   const { createLiveWorkspaceTypingState } = await controllerModule;
 
@@ -180,4 +188,44 @@ test("resolveInlineWorkspaceEntryValue prefers locked values and falls back to d
     }),
     "",
   );
+});
+
+test("tryAutoAdvanceBringDownStep auto-locks active bring-down rows and advances focus", async () => {
+  const [{ createLiveWorkspaceTypingState, tryAutoAdvanceBringDownStep }, { validateLongDivisionStepAnswer }] =
+    await Promise.all([controllerModule, stepValidationModule]);
+
+  const state = createLiveWorkspaceTypingState({
+    stepCount: bringDownSampleSteps.length,
+    revealedStepCount: 3,
+  });
+
+  const transition = tryAutoAdvanceBringDownStep({
+    steps: bringDownSampleSteps,
+    state,
+    validateStep: validateLongDivisionStepAnswer,
+  });
+
+  assert.notEqual(transition, null);
+  assert.equal(transition?.didAdvance, true);
+  assert.equal(transition?.lockedStepId, bringDownSampleSteps[3].id);
+  assert.equal(transition?.validation?.outcome, "correct");
+  assert.equal(transition?.state.revealedStepCount, 4);
+});
+
+test("tryAutoAdvanceBringDownStep returns null when the active step is not bring-down", async () => {
+  const [{ createLiveWorkspaceTypingState, tryAutoAdvanceBringDownStep }, { validateLongDivisionStepAnswer }] =
+    await Promise.all([controllerModule, stepValidationModule]);
+
+  const state = createLiveWorkspaceTypingState({
+    stepCount: bringDownSampleSteps.length,
+    revealedStepCount: 1,
+  });
+
+  const transition = tryAutoAdvanceBringDownStep({
+    steps: bringDownSampleSteps,
+    state,
+    validateStep: validateLongDivisionStepAnswer,
+  });
+
+  assert.equal(transition, null);
 });
