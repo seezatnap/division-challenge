@@ -6,3 +6,5 @@ export const workspaceUiModule: FeatureModuleDescriptor = {
   summary: "Bus-stop renderer, glowing active cell controls, and typing interaction surface.",
   rootPath: "src/features/workspace-ui",
 };
+
+export * from "./bus-stop-long-division-renderer";
