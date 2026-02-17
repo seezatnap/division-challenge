@@ -37,6 +37,12 @@ export interface ApplyLiveWorkspaceEntryInputRequest {
   validateStep: LiveWorkspaceStepValidator;
 }
 
+export interface TryAutoAdvanceBringDownStepRequest {
+  steps: readonly LongDivisionStep[];
+  state: LiveWorkspaceTypingState;
+  validateStep: LiveWorkspaceStepValidator;
+}
+
 export interface LiveWorkspaceEntryInputTransition {
   state: LiveWorkspaceTypingState;
   sanitizedValue: string;
@@ -194,4 +200,36 @@ export function applyLiveWorkspaceEntryInput({
     lockedStepId: stepId,
     didAdvance: true,
   };
+}
+
+export function tryAutoAdvanceBringDownStep({
+  steps,
+  state,
+  validateStep,
+}: TryAutoAdvanceBringDownStepRequest): LiveWorkspaceEntryInputTransition | null {
+  if (!Array.isArray(steps) || steps.length === 0) {
+    throw new Error("steps must include at least one long-division step.");
+  }
+
+  if (typeof validateStep !== "function") {
+    throw new TypeError("validateStep must be a function.");
+  }
+
+  const activeStepIndex = clampRevealedStepCount(steps.length, state.revealedStepCount);
+  if (activeStepIndex >= steps.length) {
+    return null;
+  }
+
+  const activeStep = steps[activeStepIndex];
+  if (activeStep.kind !== "bring-down") {
+    return null;
+  }
+
+  return applyLiveWorkspaceEntryInput({
+    steps,
+    state,
+    stepId: activeStep.id,
+    rawValue: activeStep.expectedValue,
+    validateStep,
+  });
 }
