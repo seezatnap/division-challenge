@@ -152,3 +152,86 @@ test("allow mode can emit both exact and remainder problems over a deterministic
   assert.equal(sawExact, true);
   assert.equal(sawRemainder, true);
 });
+
+test("difficulty progression derives levels from cumulative solved problem counts", async () => {
+  const {
+    DIVISION_DIFFICULTY_PROGRESSION_RULES,
+    getDifficultyLevelForSolvedCount,
+    getDivisionDifficultyTierForSolvedCount,
+  } = await divisionGeneratorModule;
+
+  assert.deepEqual(DIVISION_DIFFICULTY_PROGRESSION_RULES, [
+    { level: 1, minimumSolvedCount: 0 },
+    { level: 2, minimumSolvedCount: 5 },
+    { level: 3, minimumSolvedCount: 12 },
+    { level: 4, minimumSolvedCount: 20 },
+    { level: 5, minimumSolvedCount: 35 },
+  ]);
+
+  assert.equal(getDifficultyLevelForSolvedCount(0), 1);
+  assert.equal(getDifficultyLevelForSolvedCount(4), 1);
+  assert.equal(getDifficultyLevelForSolvedCount(5), 2);
+  assert.equal(getDifficultyLevelForSolvedCount(11), 2);
+  assert.equal(getDifficultyLevelForSolvedCount(12), 3);
+  assert.equal(getDifficultyLevelForSolvedCount(19), 3);
+  assert.equal(getDifficultyLevelForSolvedCount(20), 4);
+  assert.equal(getDifficultyLevelForSolvedCount(34), 4);
+  assert.equal(getDifficultyLevelForSolvedCount(35), 5);
+  assert.equal(getDifficultyLevelForSolvedCount(500), 5);
+
+  assert.equal(getDivisionDifficultyTierForSolvedCount(0).level, 1);
+  assert.equal(getDivisionDifficultyTierForSolvedCount(20).level, 4);
+  assert.equal(getDivisionDifficultyTierForSolvedCount(999).level, 5);
+});
+
+test("difficulty progression requires solved counts to be non-negative integers", async () => {
+  const { getDifficultyLevelForSolvedCount, generateDivisionProblemForSolvedCount } =
+    await divisionGeneratorModule;
+
+  assert.throws(
+    () => getDifficultyLevelForSolvedCount(-1),
+    /totalProblemsSolved must be a non-negative integer/,
+  );
+  assert.throws(
+    () => getDifficultyLevelForSolvedCount(1.5),
+    /totalProblemsSolved must be a non-negative integer/,
+  );
+
+  assert.throws(
+    () =>
+      generateDivisionProblemForSolvedCount({
+        totalProblemsSolved: -2,
+      }),
+    /totalProblemsSolved must be a non-negative integer/,
+  );
+});
+
+test("lifetime-aware generation resolves difficulty from solved count before creating a problem", async () => {
+  const { generateDivisionProblemForSolvedCount, getDivisionDifficultyTierForSolvedCount } =
+    await divisionGeneratorModule;
+  const random = createSeededRandom(24680);
+
+  const solvedCountSamples = [0, 6, 12, 23, 44];
+
+  for (const totalProblemsSolved of solvedCountSamples) {
+    const tier = getDivisionDifficultyTierForSolvedCount(totalProblemsSolved);
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const problem = generateDivisionProblemForSolvedCount({
+        totalProblemsSolved,
+        random,
+        remainderMode: "allow",
+      });
+
+      assert.equal(problem.difficultyLevel, tier.level);
+      assert.ok(
+        digitCount(problem.dividend) >= tier.minDividendDigits &&
+          digitCount(problem.dividend) <= tier.maxDividendDigits,
+      );
+      assert.ok(
+        digitCount(problem.divisor) >= tier.minDivisorDigits &&
+          digitCount(problem.divisor) <= tier.maxDivisorDigits,
+      );
+    }
+  }
+});
