@@ -34,7 +34,7 @@
 
 ## Gallery & Player Flow
 
-- [C] (#21) Build the Dino Gallery view/section showing unlocked dinosaur image, name, and date earned, with empty-state messaging for new players and live refresh after unlocks [5 pts] (blocked by #3, #20)
+- [x] (#21) Build the Dino Gallery view/section showing unlocked dinosaur image, name, and date earned, with empty-state messaging for new players and live refresh after unlocks [5 pts] (blocked by #3, #20) (C)
 - [x] (#22) Build the game-start flow that prompts for player name and offers “load existing save” vs “start new,” then initializes the in-memory game session [5 pts] (blocked by #2) (B)
 
 ## Save/Load Persistence
@@ -46,13 +46,13 @@
 ## Theming & Motion
 
 - [x] (#26) Apply Jurassic-themed visual design system (earth/jungle palette, themed typography, motif overlays) across game, gallery, and save/load UI with responsive mobile/desktop layouts [5 pts] (blocked by #1) (B)
-- [A] (#27) Polish motion system (glow cadence, row transitions, lock-in pulses, hatch/reveal states) so the workspace feels dynamic/live rather than form-based [5 pts] (blocked by #13, #14, #20, #26)
+- [x] (#27) Polish motion system (glow cadence, row transitions, lock-in pulses, hatch/reveal states) so the workspace feels dynamic/live rather than form-based [5 pts] (blocked by #13, #14, #20, #26) (A)
 
 ## Testing & Release Readiness
 
 - [x] (#28) Add unit tests for problem generation tiers, remainder handling, progression rules, solver step sequencing, and validation/retry behavior [5 pts] (blocked by #5, #6, #7, #8) (A)
-- [A] (#29) Add UI integration tests for in-place typing, single-glow enforcement, correct/incorrect step transitions, and bring-down animation state progression [5 pts] (blocked by #13, #14, #15)
-- [B] (#30) Add reward pipeline tests for milestone triggering, deterministic dinosaur selection, prefetch behavior, dedupe checks, and in-flight polling/reveal [5 pts] (blocked by #18, #19, #20)
+- [x] (#29) Add UI integration tests for in-place typing, single-glow enforcement, correct/incorrect step transitions, and bring-down animation state progression [5 pts] (blocked by #13, #14, #15) (A)
+- [x] (#30) Add reward pipeline tests for milestone triggering, deterministic dinosaur selection, prefetch behavior, dedupe checks, and in-flight polling/reveal [5 pts] (blocked by #18, #19, #20) (B)
 - [ ] (#31) Add persistence tests covering FS API permissions, save/load schema integrity, fallback import/export, and save-race protection logic [5 pts] (blocked by #23, #24, #25)
 - [ ] (#32) Run end-to-end smoke tests for full player journey (new game, solve loop, reward unlock, gallery refresh, save/load restore) and capture regressions against v1 known issues [5 pts] (blocked by #21, #27, #30, #31)
 - [ ] (#33) Write developer runbook/README updates for setup, `GEMINI_API_KEY`, file storage behavior, fallback behavior, and test execution workflow [5 pts] (blocked by #32)
@@ -69,7 +69,7 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#38) Wrap the fire-and-forget `triggerNearMilestoneRewardPrefetch` call in `startNextProblemFromState` with rejection handling so prefetch failures cannot surface as unhandled promise rejections. (B)
-- [B] (#39) Update `triggerNearMilestoneRewardPrefetch` to map `"already-cached"` results from `prefetchGeminiRewardImageWithFilesystemCache` to `"skipped-already-cached"` (instead of `"prefetch-already-in-flight"`), and add a regression test for that race path.
+- [x] (#39) Update `triggerNearMilestoneRewardPrefetch` to map `"already-cached"` results from `prefetchGeminiRewardImageWithFilesystemCache` to `"skipped-already-cached"` (instead of `"prefetch-already-in-flight"`), and add a regression test for that race path. (B)
 
 ## Follow-up tasks (from sprint review)
 - [ ] (#40) Replace the hardcoded `https://dino-division.local` URL in `fetchEarnedRewardImageStatus` with same-origin handling for relative endpoints, and add a regression test that verifies the default `/api/rewards/image-status` request stays on the current origin.
