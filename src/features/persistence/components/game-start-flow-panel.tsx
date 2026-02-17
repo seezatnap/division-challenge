@@ -6,6 +6,10 @@ import type { DinoDivisionSaveFile } from "@/features/contracts";
 import {
   buildGameStartOptions,
   createInMemoryGameSession,
+  loadSaveFromFileSystem,
+  saveSessionToFileSystem,
+  supportsFileSystemAccessApi,
+  type FileSystemSaveFileHandle,
   type GameStartMode,
   type InMemoryGameSession,
 } from "@/features/persistence/lib";
@@ -23,15 +27,46 @@ export function GameStartFlowPanel({
 }: GameStartFlowPanelProps) {
   const [playerName, setPlayerName] = useState(loadableSave?.playerName ?? "");
   const [session, setSession] = useState<InMemoryGameSession | null>(null);
+  const [saveHandle, setSaveHandle] = useState<FileSystemSaveFileHandle | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+
+  const hasFileSystemAccessApi =
+    typeof window !== "undefined" && supportsFileSystemAccessApi(window);
+  const hasLoadableSave = loadableSave !== null || hasFileSystemAccessApi;
 
   const startOptions = useMemo(
-    () => buildGameStartOptions(loadableSave !== null),
-    [loadableSave],
+    () => buildGameStartOptions(hasLoadableSave),
+    [hasLoadableSave],
   );
 
-  function handleStart(mode: GameStartMode): void {
+  async function handleStart(mode: GameStartMode): Promise<void> {
+    setIsBusy(true);
+    setStatusMessage(null);
+    setErrorMessage(null);
+
     try {
+      if (mode === "load-existing-save" && hasFileSystemAccessApi) {
+        const loadedSave = await loadSaveFromFileSystem();
+        if (!loadedSave) {
+          setStatusMessage("Load canceled before selecting a save file.");
+          return;
+        }
+
+        const initializedSession = createInMemoryGameSession({
+          playerName: loadedSave.saveFile.playerName,
+          mode,
+          saveFile: loadedSave.saveFile,
+        });
+
+        setPlayerName(initializedSession.playerName);
+        setSession(initializedSession);
+        setSaveHandle(loadedSave.handle);
+        setStatusMessage(`Loaded ${loadedSave.fileName}.`);
+        return;
+      }
+
       const initializedSession = createInMemoryGameSession({
         playerName,
         mode,
@@ -39,14 +74,62 @@ export function GameStartFlowPanel({
       });
 
       setSession(initializedSession);
-      setErrorMessage(null);
+      setSaveHandle(null);
+      setStatusMessage(
+        mode === "start-new"
+          ? "Started a new expedition session."
+          : "Loaded bundled preview save data.",
+      );
     } catch (error) {
       setSession(null);
+      setSaveHandle(null);
       setErrorMessage(
         error instanceof Error
           ? error.message
           : "Unable to initialize the game session.",
       );
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleSaveSession(): Promise<void> {
+    if (!session) {
+      return;
+    }
+
+    if (!hasFileSystemAccessApi && !saveHandle) {
+      setErrorMessage(
+        "File System Access API is unavailable, so this browser cannot save directly yet.",
+      );
+      return;
+    }
+
+    setIsBusy(true);
+    setStatusMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const savedResult = await saveSessionToFileSystem({
+        session,
+        handle: saveHandle,
+      });
+
+      if (!savedResult) {
+        setStatusMessage("Save canceled before writing a file.");
+        return;
+      }
+
+      setSaveHandle(savedResult.handle);
+      setStatusMessage(`Saved ${savedResult.fileName}.`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to save this session.",
+      );
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -72,11 +155,13 @@ export function GameStartFlowPanel({
       <div className="save-actions">
         {startOptions.map((option) => (
           <button
-            aria-disabled={option.disabled}
+            aria-disabled={option.disabled || isBusy}
             className={`jp-button${option.mode === "load-existing-save" ? " jp-button-secondary" : ""}`}
-            disabled={option.disabled}
+            disabled={option.disabled || isBusy}
             key={option.mode}
-            onClick={() => handleStart(option.mode)}
+            onClick={() => {
+              void handleStart(option.mode);
+            }}
             title={option.description}
             type="button"
           >
@@ -100,6 +185,12 @@ export function GameStartFlowPanel({
         </p>
       ) : null}
 
+      {statusMessage ? (
+        <p className="game-start-helper" role="status">
+          {statusMessage}
+        </p>
+      ) : null}
+
       {session ? (
         <article className="game-start-session">
           <p className="game-start-session-title">Session initialized in memory</p>
@@ -111,6 +202,18 @@ export function GameStartFlowPanel({
           <p className="game-start-session-meta">
             Lifetime solved: {session.gameState.progress.lifetime.totalProblemsSolved}
           </p>
+          <div className="save-actions">
+            <button
+              className="jp-button jp-button-secondary"
+              disabled={isBusy}
+              onClick={() => {
+                void handleSaveSession();
+              }}
+              type="button"
+            >
+              Save Session JSON
+            </button>
+          </div>
         </article>
       ) : null}
     </div>

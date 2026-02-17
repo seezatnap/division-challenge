@@ -1,11 +1,13 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 import {
   buildJurassicParkCinematicPrompt,
   createGeminiImageRequestConfig,
 } from "./gemini";
+import { resolveGeminiRewardImageWithFilesystemCache } from "./gemini-image-cache";
 import {
   generateGeminiDinosaurImage,
+  parseGeminiImageGenerationRequest,
   type GeminiGeneratedImage,
   type GeminiImageServiceDependencies,
 } from "./gemini-image-service";
@@ -13,12 +15,17 @@ import {
 const defaultGeminiImageServiceDependencies: GeminiImageServiceDependencies = {
   getRequestConfig: createGeminiImageRequestConfig,
   buildPrompt: buildJurassicParkCinematicPrompt,
-  createClient: (apiKey: string) => new GoogleGenerativeAI(apiKey),
+  createClient: (apiKey: string) => new GoogleGenAI({ apiKey }),
 };
 
-export function generateGeminiRewardImage(
+export async function generateGeminiRewardImage(
   payload: unknown,
   dependencies: GeminiImageServiceDependencies = defaultGeminiImageServiceDependencies,
 ): Promise<GeminiGeneratedImage> {
-  return generateGeminiDinosaurImage(payload, dependencies);
+  const request = parseGeminiImageGenerationRequest(payload);
+
+  return resolveGeminiRewardImageWithFilesystemCache(
+    request,
+    (parsedRequest) => generateGeminiDinosaurImage(parsedRequest, dependencies),
+  );
 }
