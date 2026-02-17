@@ -1,8 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import {
+  createGalleryRewardFromUnlock,
+  dispatchDinoGalleryRewardsUpdatedEvent,
+} from "@/features/gallery/lib";
 import {
   fetchEarnedRewardImageStatus,
   pollEarnedRewardImageUntilReady,
@@ -82,6 +86,7 @@ export function EarnedRewardRevealPanel({
   );
   const [imagePath, setImagePath] = useState<string | null>(initialImagePath);
   const [pollAttempt, setPollAttempt] = useState(0);
+  const revealedRewardBroadcastKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (phase !== "cracking") {
@@ -158,6 +163,26 @@ export function EarnedRewardRevealPanel({
       isCancelled = true;
     };
   }, [dinosaurName, maxPollAttempts, phase, pollIntervalMs, statusEndpoint]);
+
+  useEffect(() => {
+    if (phase !== "revealed" || !imagePath) {
+      return;
+    }
+
+    const broadcastKey = `${dinosaurName}|${milestoneSolvedCount}|${imagePath}`;
+    if (revealedRewardBroadcastKeyRef.current === broadcastKey) {
+      return;
+    }
+
+    revealedRewardBroadcastKeyRef.current = broadcastKey;
+
+    const unlockedReward = createGalleryRewardFromUnlock({
+      dinosaurName,
+      imagePath,
+      milestoneSolvedCount,
+    });
+    dispatchDinoGalleryRewardsUpdatedEvent([unlockedReward]);
+  }, [dinosaurName, imagePath, milestoneSolvedCount, phase]);
 
   return (
     <article
