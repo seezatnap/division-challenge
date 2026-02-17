@@ -30,6 +30,24 @@ test("earned reward panel uses egg-hatching loading UX and polling helpers", asy
   }
 });
 
+test("earned reward panel resets reveal state when reward identity props change", async () => {
+  const source = await readRepoFile("src/features/rewards/components/earned-reward-reveal-panel.tsx");
+
+  for (const fragment of [
+    "function createRewardRevealResetKey(",
+    'return `${dinosaurName}|${initialStatus}|${initialImagePath ?? ""}`;',
+    "<EarnedRewardRevealPanelContent",
+    "key={rewardRevealResetKey}",
+    "initialStatus={initialStatus}",
+    "initialImagePath={initialImagePath}",
+  ]) {
+    assert.ok(
+      source.includes(fragment),
+      `Expected prop-change reveal state reset fragment: ${fragment}`,
+    );
+  }
+});
+
 test("home page renders the earned reward reveal surface", async () => {
   const source = await readRepoFile("src/app/page.tsx");
 

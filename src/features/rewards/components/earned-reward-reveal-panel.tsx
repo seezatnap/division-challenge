@@ -37,6 +37,14 @@ export interface EarnedRewardRevealPanelProps {
   statusEndpoint?: string;
 }
 
+function createRewardRevealResetKey(
+  dinosaurName: string,
+  initialStatus: EarnedRewardImageStatus,
+  initialImagePath: string | null,
+): string {
+  return `${dinosaurName}|${initialStatus}|${initialImagePath ?? ""}`;
+}
+
 function toInitialRevealPhase(
   initialStatus: EarnedRewardImageStatus,
   initialImagePath: string | null,
@@ -72,7 +80,7 @@ function resolveRewardStatusChipLabel(phase: RewardRevealPhase): string {
   return "Egg Hatching";
 }
 
-export function EarnedRewardRevealPanel({
+function EarnedRewardRevealPanelContent({
   dinosaurName,
   milestoneSolvedCount,
   initialStatus = "generating",
@@ -261,5 +269,28 @@ export function EarnedRewardRevealPanel({
         </p>
       ) : null}
     </article>
+  );
+}
+
+export function EarnedRewardRevealPanel({
+  dinosaurName,
+  initialStatus = "generating",
+  initialImagePath = null,
+  ...props
+}: EarnedRewardRevealPanelProps) {
+  const rewardRevealResetKey = createRewardRevealResetKey(
+    dinosaurName,
+    initialStatus,
+    initialImagePath,
+  );
+
+  return (
+    <EarnedRewardRevealPanelContent
+      key={rewardRevealResetKey}
+      dinosaurName={dinosaurName}
+      initialImagePath={initialImagePath}
+      initialStatus={initialStatus}
+      {...props}
+    />
   );
 }

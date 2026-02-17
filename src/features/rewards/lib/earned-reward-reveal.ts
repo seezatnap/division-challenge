@@ -38,6 +38,12 @@ export interface FetchEarnedRewardImageStatusRequest {
 }
 
 type JsonRecord = Record<string, unknown>;
+interface ResolvedStatusEndpoint {
+  endpointUrl: URL;
+  useAbsoluteRequestUrl: boolean;
+}
+
+const RELATIVE_ENDPOINT_BASE_URL = "http://localhost";
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
@@ -105,12 +111,36 @@ function defaultWait(durationMs: number): Promise<void> {
   });
 }
 
-function resolveStatusEndpoint(endpoint: string): string {
+function resolveStatusEndpoint(endpoint: string): ResolvedStatusEndpoint {
   if (/^https?:\/\//i.test(endpoint)) {
-    return endpoint;
+    return {
+      endpointUrl: new URL(endpoint),
+      useAbsoluteRequestUrl: true,
+    };
   }
 
-  return `https://dino-division.local${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const currentOrigin = getTrimmedNonEmptyString(globalThis.location?.origin);
+
+  if (currentOrigin && currentOrigin !== "null") {
+    return {
+      endpointUrl: new URL(normalizedEndpoint, currentOrigin),
+      useAbsoluteRequestUrl: true,
+    };
+  }
+
+  return {
+    endpointUrl: new URL(normalizedEndpoint, RELATIVE_ENDPOINT_BASE_URL),
+    useAbsoluteRequestUrl: false,
+  };
+}
+
+function toStatusRequestUrl(resolvedEndpoint: ResolvedStatusEndpoint): string {
+  if (resolvedEndpoint.useAbsoluteRequestUrl) {
+    return resolvedEndpoint.endpointUrl.toString();
+  }
+
+  return `${resolvedEndpoint.endpointUrl.pathname}${resolvedEndpoint.endpointUrl.search}${resolvedEndpoint.endpointUrl.hash}`;
 }
 
 export async function fetchEarnedRewardImageStatus(
@@ -123,10 +153,10 @@ export async function fetchEarnedRewardImageStatus(
     throw new Error("fetchFn must be available to request reward image status.");
   }
 
-  const endpointUrl = new URL(resolveStatusEndpoint(endpoint));
-  endpointUrl.searchParams.set("dinosaurName", dinosaurName);
+  const resolvedEndpoint = resolveStatusEndpoint(endpoint);
+  resolvedEndpoint.endpointUrl.searchParams.set("dinosaurName", dinosaurName);
 
-  const response = await fetchFn(endpointUrl.toString(), {
+  const response = await fetchFn(toStatusRequestUrl(resolvedEndpoint), {
     method: "GET",
     headers: {
       Accept: "application/json",

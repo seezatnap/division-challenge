@@ -26,6 +26,30 @@ async function loadTypeScriptModule(relativePath) {
 
 const rewardRevealModule = loadTypeScriptModule("src/features/rewards/lib/earned-reward-reveal.ts");
 
+function withTestLocation(url) {
+  const hasLocation = "location" in globalThis;
+  const originalLocation = globalThis.location;
+
+  Object.defineProperty(globalThis, "location", {
+    value: new URL(url),
+    configurable: true,
+    writable: true,
+  });
+
+  return () => {
+    if (!hasLocation) {
+      Reflect.deleteProperty(globalThis, "location");
+      return;
+    }
+
+    Object.defineProperty(globalThis, "location", {
+      value: originalLocation,
+      configurable: true,
+      writable: true,
+    });
+  };
+}
+
 test("pollEarnedRewardImageUntilReady polls in-flight generation until a ready image is returned", async () => {
   const { pollEarnedRewardImageUntilReady } = await rewardRevealModule;
   const seenAttempts = [];
@@ -148,6 +172,41 @@ test("fetchEarnedRewardImageStatus calls the status endpoint and parses the data
     seenUrl.includes("/api/rewards/image-status?dinosaurName=Stegosaurus"),
     `Expected request URL to include encoded dinosaurName, got: ${seenUrl}`,
   );
+});
+
+test("fetchEarnedRewardImageStatus keeps the default status request on the current origin", async () => {
+  const { DEFAULT_REWARD_STATUS_ENDPOINT, fetchEarnedRewardImageStatus } = await rewardRevealModule;
+  const restoreLocation = withTestLocation("https://play.dino-division.test/rewards");
+  let seenUrl = "";
+
+  try {
+    await fetchEarnedRewardImageStatus({
+      dinosaurName: "Parasaurolophus",
+      fetchFn: async (input) => {
+        seenUrl = String(input);
+        return new Response(
+          JSON.stringify({
+            data: {
+              dinosaurName: "Parasaurolophus",
+              status: "generating",
+              imagePath: null,
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      },
+    });
+  } finally {
+    restoreLocation();
+  }
+
+  const requestUrl = new URL(seenUrl);
+  assert.equal(requestUrl.origin, "https://play.dino-division.test");
+  assert.equal(requestUrl.pathname, DEFAULT_REWARD_STATUS_ENDPOINT);
+  assert.equal(requestUrl.searchParams.get("dinosaurName"), "Parasaurolophus");
 });
 
 test("fetchEarnedRewardImageStatus surfaces API error messages", async () => {
