@@ -11,7 +11,7 @@
 
 - [x] (#5) Build a problem generator that scales from 2-digit ÷ 1-digit up to 4–5 digit ÷ 2–3 digit and supports both remainder and non-remainder cases [5 pts] (blocked by #2) (A)
 - [x] (#6) Implement difficulty progression rules driven by cumulative solved counts (lifetime-aware) and expose current difficulty level to problem generation [5 pts] (blocked by #2) (A)
-- [A] (#7) Implement a pure long-division solver that emits the exact ordered workflow (quotient digit, multiply, subtract, bring-down) with expected values for each step [5 pts] (blocked by #2, #5)
+- [x] (#7) Implement a pure long-division solver that emits the exact ordered workflow (quotient digit, multiply, subtract, bring-down) with expected values for each step [5 pts] (blocked by #2, #5) (A)
 - [ ] (#8) Build step-validation/retry logic so correct answers advance immediately, incorrect answers keep focus on the same step, and hint hooks are returned for dino-themed feedback [5 pts] (blocked by #7)
 - [ ] (#9) Implement game-loop state orchestration for starting/completing problems, updating session/lifetime counters, and chaining to the next problem without form-submit flows [5 pts] (blocked by #5, #6, #8)
 
@@ -27,7 +27,7 @@
 ## Reward Pipeline (Gemini + Prefetch)
 
 - [x] (#16) Build server-side Gemini image generation endpoints/services using `@google/generative-ai` and `gemini-2.0-flash-exp`, including robust response parsing and error handling [5 pts] (blocked by #4) (B)
-- [B] (#17) Implement filesystem image caching/existence checks so dinosaur art generation is skipped when the asset already exists (no duplicate generation) [5 pts] (blocked by #16)
+- [x] (#17) Implement filesystem image caching/existence checks so dinosaur art generation is skipped when the asset already exists (no duplicate generation) [5 pts] (blocked by #16) (B)
 - [ ] (#18) Implement reward milestone logic (every 5 solved) with deterministic dinosaur assignment and safeguards for milestone ordering/retry issues observed in v1 [5 pts] (blocked by #3, #9, #17)
 - [ ] (#19) Implement near-milestone prefetch triggers (problem 3/4 of each set of 5) that check cache first and start background generation only when needed [5 pts] (blocked by #17, #18)
 - [ ] (#20) Implement earned-reward loading UX with egg-hatching animation, status polling for in-flight generation, and automatic reveal once image is ready [5 pts] (blocked by #18, #19)
@@ -39,7 +39,7 @@
 
 ## Save/Load Persistence
 
-- [B] (#23) Implement File System Access API save/load flows with permission prompts, player-named JSON files (e.g., `rex-save.json`), and full required payload fields [5 pts] (blocked by #2, #22)
+- [x] (#23) Implement File System Access API save/load flows with permission prompts, player-named JSON files (e.g., `rex-save.json`), and full required payload fields [5 pts] (blocked by #2, #22) (B)
 - [ ] (#24) Implement graceful fallback for environments without File System Access API (JSON export/import flow) while preserving identical schema and validation [5 pts] (blocked by #23)
 - [ ] (#25) Add persistence concurrency controls (queued/atomic writes + merge strategy) to prevent save races during rapid solves and reward unlock events [5 pts] (blocked by #20, #23)
 
@@ -58,5 +58,5 @@
 - [ ] (#33) Write developer runbook/README updates for setup, `GEMINI_API_KEY`, file storage behavior, fallback behavior, and test execution workflow [5 pts] (blocked by #32)
 
 ## Follow-up tasks (from sprint review)
-- [C] (#34) Migrate the rewards image generation integration off deprecated `@google/generative-ai` to the supported Google Gen AI SDK, and update parsing/error handling for the new client response shape. (blocked by #16)
-- [C] (#35) Add API route tests for `POST /api/rewards/generate-image` covering invalid JSON input, known service-error mapping, and success response shape. (blocked by #16)
+- [x] (#34) Migrate the rewards image generation integration off deprecated `@google/generative-ai` to the supported Google Gen AI SDK, and update parsing/error handling for the new client response shape. (blocked by #16) (C)
+- [x] (#35) Add API route tests for `POST /api/rewards/generate-image` covering invalid JSON input, known service-error mapping, and success response shape. (blocked by #16) (C)
