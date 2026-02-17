@@ -267,3 +267,80 @@ test("saveSessionToFileSystem and loadSaveFromFileSystem return null when picker
   assert.equal(saveResult, null);
   assert.equal(loadResult, null);
 });
+
+test("supportsJsonSaveImportExportFallback detects when JSON fallback runtime is available", async () => {
+  const { supportsJsonSaveImportExportFallback } = await persistenceModule;
+
+  assert.equal(supportsJsonSaveImportExportFallback(null), false);
+  assert.equal(
+    supportsJsonSaveImportExportFallback({
+      Blob: class MockBlob {},
+      URL: { createObjectURL() {} },
+      document: { createElement() {} },
+    }),
+    true,
+  );
+});
+
+test("exportSessionToJsonDownload reuses save schema and player-named JSON output", async () => {
+  const { exportSessionToJsonDownload, REQUIRED_SAVE_FILE_FIELDS } = await persistenceModule;
+  const downloadEvents = [];
+
+  const exportResult = await exportSessionToJsonDownload({
+    session: createInMemorySession(),
+    clock: () => new Date("2026-02-17T13:00:00.000Z"),
+    downloader: {
+      async downloadJson(fileName, json) {
+        downloadEvents.push({ fileName, json });
+      },
+    },
+  });
+
+  assert.equal(exportResult.fileName, "rex-save.json");
+  assert.equal(downloadEvents.length, 1);
+  assert.equal(downloadEvents[0].fileName, "rex-save.json");
+
+  const parsedSave = JSON.parse(downloadEvents[0].json);
+  assert.deepEqual(Object.keys(parsedSave), [...REQUIRED_SAVE_FILE_FIELDS]);
+  assert.equal(parsedSave.playerName, "Rex");
+  assert.equal(parsedSave.updatedAt, "2026-02-17T13:00:00.000Z");
+});
+
+test("loadSaveFromJsonFile parses and validates fallback imports with the same schema rules", async () => {
+  const { createDinoDivisionSavePayload, loadSaveFromJsonFile } = await persistenceModule;
+  const jsonPayload = JSON.stringify(
+    createDinoDivisionSavePayload(
+      createInMemorySession(),
+      () => new Date("2026-02-17T13:30:00.000Z"),
+    ),
+  );
+
+  const loadResult = await loadSaveFromJsonFile({
+    name: "rex-save.json",
+    async text() {
+      return jsonPayload;
+    },
+  });
+
+  assert.ok(loadResult);
+  assert.equal(loadResult.fileName, "rex-save.json");
+  assert.equal(loadResult.saveFile.playerName, "Rex");
+  assert.equal(loadResult.saveFile.unlockedDinosaurs.length, 2);
+});
+
+test("loadSaveFromJsonFile returns null on canceled imports and rejects invalid payloads", async () => {
+  const { loadSaveFromJsonFile } = await persistenceModule;
+
+  assert.equal(await loadSaveFromJsonFile(null), null);
+
+  await assert.rejects(
+    async () =>
+      loadSaveFromJsonFile({
+        name: "broken-save.json",
+        async text() {
+          return JSON.stringify({ playerName: "Rex" });
+        },
+      }),
+    /Missing required save field "schemaVersion"/,
+  );
+});
