@@ -1,5 +1,6 @@
 import type { PlayerProgress } from "./progress";
 import type { UnlockedReward } from "./rewards";
+import type { SessionRecord } from "./save-file";
 
 // ---------------------------------------------------------------------------
 // In-Memory Game Session
@@ -24,4 +25,6 @@ export interface GameSession {
   progress: PlayerProgress;
   /** Dinosaur rewards unlocked so far. */
   unlockedRewards: UnlockedReward[];
+  /** Session history entries carried forward from a loaded save file. */
+  priorSessionHistory: SessionRecord[];
 }

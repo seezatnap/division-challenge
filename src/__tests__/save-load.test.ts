@@ -1,5 +1,5 @@
 import { DifficultyLevel, SAVE_FILE_VERSION } from "@/types";
-import type { GameSession, SaveFile } from "@/types";
+import type { GameSession, SaveFile, SessionRecord } from "@/types";
 import {
   isFileSystemAccessSupported,
   buildSaveFile,
@@ -10,6 +10,7 @@ import {
   loadFromFile,
   saveViaDownload,
 } from "@/features/persistence/save-load";
+import { restoreSessionFromSave } from "@/features/game-session/session-init";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -41,6 +42,7 @@ function makeSession(overrides?: Partial<GameSession>): GameSession {
         milestoneNumber: 1,
       },
     ],
+    priorSessionHistory: [],
     ...overrides,
   };
 }
@@ -632,5 +634,99 @@ describe("round-trip save/load", () => {
     expect(restored.totalProblemsSolved).toBe(13);
     expect(restored.version).toBe(SAVE_FILE_VERSION);
     expect(restored.unlockedRewards).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Session history preservation across save/load cycles
+// ---------------------------------------------------------------------------
+
+describe("sessionHistory preservation", () => {
+  const priorHistory: SessionRecord[] = [
+    {
+      startedAt: "2026-02-16T08:00:00.000Z",
+      endedAt: "2026-02-16T08:30:00.000Z",
+      problemsSolved: 5,
+      problemsAttempted: 6,
+    },
+    {
+      startedAt: "2026-02-16T14:00:00.000Z",
+      endedAt: "2026-02-16T14:45:00.000Z",
+      problemsSolved: 7,
+      problemsAttempted: 8,
+    },
+  ];
+
+  it("preserves prior session history entries in buildSaveFile output", () => {
+    const session = makeSession({ priorSessionHistory: priorHistory });
+    const save = buildSaveFile(session);
+
+    // Prior entries + current session entry
+    expect(save.sessionHistory).toHaveLength(3);
+    expect(save.sessionHistory[0]).toEqual(priorHistory[0]);
+    expect(save.sessionHistory[1]).toEqual(priorHistory[1]);
+    expect(save.sessionHistory[2].problemsSolved).toBe(3);
+    expect(save.sessionHistory[2].problemsAttempted).toBe(4);
+  });
+
+  it("appends current session as the last entry in sessionHistory", () => {
+    const session = makeSession({ priorSessionHistory: priorHistory });
+    const save = buildSaveFile(session);
+
+    const lastEntry = save.sessionHistory[save.sessionHistory.length - 1];
+    expect(lastEntry.startedAt).toBe("2026-02-17T10:00:00.000Z");
+    expect(lastEntry.endedAt).not.toBeNull();
+  });
+
+  it("produces a single entry when priorSessionHistory is empty", () => {
+    const session = makeSession({ priorSessionHistory: [] });
+    const save = buildSaveFile(session);
+
+    expect(save.sessionHistory).toHaveLength(1);
+    expect(save.sessionHistory[0].problemsSolved).toBe(3);
+  });
+
+  it("preserves sessionHistory across a full save → load → save round-trip", () => {
+    // Session 1: first save (no prior history)
+    const session1 = makeSession({ priorSessionHistory: [] });
+    const save1 = buildSaveFile(session1);
+    expect(save1.sessionHistory).toHaveLength(1);
+
+    // Restore from save1 → creates session2 with prior history
+    const session2 = restoreSessionFromSave(save1);
+    expect(session2.priorSessionHistory).toHaveLength(1);
+    expect(session2.priorSessionHistory[0].problemsSolved).toBe(3);
+
+    // Simulate playing in session2
+    session2.progress.session.problemsSolved = 5;
+    session2.progress.session.problemsAttempted = 7;
+
+    // Save session2 → should have 2 history entries
+    const save2 = buildSaveFile(session2);
+    expect(save2.sessionHistory).toHaveLength(2);
+    expect(save2.sessionHistory[0].problemsSolved).toBe(3); // from session 1
+    expect(save2.sessionHistory[1].problemsSolved).toBe(5); // from session 2
+
+    // Restore from save2 → creates session3
+    const session3 = restoreSessionFromSave(save2);
+    expect(session3.priorSessionHistory).toHaveLength(2);
+
+    // Simulate playing in session3
+    session3.progress.session.problemsSolved = 2;
+    session3.progress.session.problemsAttempted = 3;
+
+    // Save session3 → should have 3 history entries
+    const save3 = buildSaveFile(session3);
+    expect(save3.sessionHistory).toHaveLength(3);
+    expect(save3.sessionHistory[0].problemsSolved).toBe(3); // session 1
+    expect(save3.sessionHistory[1].problemsSolved).toBe(5); // session 2
+    expect(save3.sessionHistory[2].problemsSolved).toBe(2); // session 3
+  });
+
+  it("does not share array references between session and save file", () => {
+    const session = makeSession({ priorSessionHistory: [...priorHistory] });
+    const save = buildSaveFile(session);
+
+    expect(save.sessionHistory).not.toBe(session.priorSessionHistory);
   });
 });

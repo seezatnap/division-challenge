@@ -51,6 +51,11 @@ describe("createNewSession", () => {
     const session = createNewSession("Rex");
     expect(session.unlockedRewards).toEqual([]);
   });
+
+  it("starts with empty prior session history", () => {
+    const session = createNewSession("Rex");
+    expect(session.priorSessionHistory).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -113,6 +118,51 @@ describe("restoreSessionFromSave", () => {
   it("does not share array references with the save file", () => {
     const session = restoreSessionFromSave(mockSave);
     expect(session.unlockedRewards).not.toBe(mockSave.unlockedRewards);
+  });
+
+  it("carries over session history from the save file", () => {
+    const saveWithHistory: SaveFile = {
+      ...mockSave,
+      sessionHistory: [
+        {
+          startedAt: "2025-01-01T08:00:00.000Z",
+          endedAt: "2025-01-01T08:30:00.000Z",
+          problemsSolved: 5,
+          problemsAttempted: 6,
+        },
+        {
+          startedAt: "2025-01-02T10:00:00.000Z",
+          endedAt: "2025-01-02T10:45:00.000Z",
+          problemsSolved: 8,
+          problemsAttempted: 9,
+        },
+      ],
+    };
+    const session = restoreSessionFromSave(saveWithHistory);
+    expect(session.priorSessionHistory).toHaveLength(2);
+    expect(session.priorSessionHistory[0].problemsSolved).toBe(5);
+    expect(session.priorSessionHistory[1].problemsSolved).toBe(8);
+  });
+
+  it("does not share sessionHistory array reference with the save file", () => {
+    const saveWithHistory: SaveFile = {
+      ...mockSave,
+      sessionHistory: [
+        {
+          startedAt: "2025-01-01T08:00:00.000Z",
+          endedAt: "2025-01-01T08:30:00.000Z",
+          problemsSolved: 5,
+          problemsAttempted: 6,
+        },
+      ],
+    };
+    const session = restoreSessionFromSave(saveWithHistory);
+    expect(session.priorSessionHistory).not.toBe(saveWithHistory.sessionHistory);
+  });
+
+  it("sets empty priorSessionHistory when save file has no history", () => {
+    const session = restoreSessionFromSave(mockSave);
+    expect(session.priorSessionHistory).toEqual([]);
   });
 });
 
