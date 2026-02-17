@@ -49,4 +49,4 @@
 - [x] (#22) Retry failed reward milestones without requiring a future milestone trigger (including after reload when `totalProblemsSolved` already crossed a reward boundary), so a failed reward at 5 solved is not deferred indefinitely. (A)
 
 ## Follow-up tasks (from sprint review)
-- [A] (#23) Update the `lint` script in `package.json` to lint project files (for example, `eslint .`) so the QA gate in `docs/qa-runbook.md` performs real lint validation instead of exiting via ESLint help output.
+- [x] (#23) Update the `lint` script in `package.json` to lint project files (for example, `eslint .`) so the QA gate in `docs/qa-runbook.md` performs real lint validation instead of exiting via ESLint help output. (A)
