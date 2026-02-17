@@ -36,18 +36,18 @@ interface LongDivisionWorkbenchProps {
 
 function getFeedbackClassName(tone: string): string {
   if (tone === "success") {
-    return "border-emerald-500 bg-emerald-900/50 text-emerald-50";
+    return "dino-status-success";
   }
 
   if (tone === "error") {
-    return "border-amber-500 bg-amber-900/30 text-amber-100";
+    return "dino-status-error";
   }
 
   if (tone === "complete") {
-    return "border-lime-500 bg-lime-900/30 text-lime-100";
+    return "dino-status-complete";
   }
 
-  return "border-emerald-700 bg-emerald-950/40 text-emerald-100";
+  return "dino-status-idle";
 }
 
 export default function LongDivisionWorkbench({
@@ -153,62 +153,62 @@ export default function LongDivisionWorkbench({
   }
 
   return (
-    <section className="mt-6 rounded-xl border border-emerald-700 bg-emerald-950/40 p-5">
+    <section className="jurassic-card mt-6 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold tracking-tight">
+        <h3 className="jurassic-heading text-lg font-semibold">
           Work on Paper Practice
         </h3>
-        <p className="text-sm text-emerald-100">
+        <p className="jurassic-copy text-sm">
           Solved this run:{" "}
           <span className="font-semibold">{workbenchState.solvedCount}</span>{" "}
           | Lifetime solved:{" "}
           <span className="font-semibold">{workbenchState.lifetimeSolvedCount}</span>
         </p>
       </div>
-      <p className="mt-2 text-xs uppercase tracking-[0.12em] text-emerald-200">
+      <p className="fossil-label mt-2">
         Next reward in {solvesUntilNextReward} solved problem
         {solvesUntilNextReward === 1 ? "" : "s"}
       </p>
 
       <div
         key={workbenchState.problem.id}
-        className={`mt-4 rounded-lg border border-emerald-700 bg-emerald-900/30 p-4 transition-opacity duration-300 ${
+        className={`jurassic-card mt-4 p-4 transition-opacity duration-300 ${
           workbenchState.pendingAdvance ? "opacity-70" : "opacity-100"
         }`}
       >
-        <p className="text-xs uppercase tracking-[0.12em] text-emerald-200">
+        <p className="fossil-label">
           Current Problem
         </p>
-        <div className="mt-2 flex items-start text-3xl font-black text-emerald-50">
+        <div className="mt-2 flex items-start text-3xl font-black text-[var(--sandstone)]">
           <span className="pr-3">{workbenchState.problem.divisor}</span>
-          <span className="border-l-2 border-t-2 border-emerald-300 px-3 py-1">
+          <span className="border-l-2 border-t-2 border-amber-200/70 px-3 py-1">
             {workbenchState.problem.dividend}
           </span>
         </div>
-        <p className="mt-2 text-sm text-emerald-100">
+        <p className="jurassic-copy mt-2 text-sm">
           Difficulty: {difficultyLabel}
         </p>
-        <p className="mt-1 text-sm text-emerald-100">
+        <p className="jurassic-copy mt-1 text-sm">
           Step Progress: {completedStepCount}/{totalStepCount}
         </p>
       </div>
 
-      <div className="mt-4 rounded-lg border border-emerald-700 bg-emerald-900/20 p-4">
-        <p className="text-xs uppercase tracking-[0.12em] text-emerald-200">
+      <div className="jurassic-card mt-4 p-4">
+        <p className="fossil-label">
           Current Step
         </p>
         {currentStep ? (
           <>
-            <p className="mt-2 text-sm font-semibold text-emerald-50">
+            <p className="mt-2 text-sm font-semibold text-[var(--sandstone)]">
               {getLongDivisionStepLabel(currentStep.step)} (cycle{" "}
               {currentStep.cycleIndex + 1})
             </p>
-            <p className="mt-1 text-sm text-emerald-100">
+            <p className="jurassic-copy mt-1 text-sm">
               {buildLongDivisionStepPrompt(currentStep)}
             </p>
           </>
         ) : (
-          <p className="mt-2 text-sm text-emerald-100">
+          <p className="jurassic-copy mt-2 text-sm">
             Problem complete. Stand by for the next challenge.
           </p>
         )}
@@ -225,13 +225,13 @@ export default function LongDivisionWorkbench({
             value={stepInput}
             onChange={(event) => setStepInput(event.target.value)}
             disabled={isInputDisabled}
-            className="w-40 rounded-md border border-emerald-600 bg-emerald-950 px-3 py-2 text-emerald-50 outline-none ring-emerald-400 transition focus:ring-2 disabled:cursor-not-allowed disabled:border-emerald-800 disabled:text-emerald-300"
+            className="dino-input w-40"
             placeholder="Enter answer"
           />
           <button
             type="submit"
             disabled={isInputDisabled}
-            className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-800 disabled:text-emerald-200"
+            className="dino-button-primary px-4 py-2 text-sm"
           >
             Check Step
           </button>
@@ -239,7 +239,7 @@ export default function LongDivisionWorkbench({
             <button
               type="button"
               onClick={handleAdvanceNowClick}
-              className="rounded-md border border-lime-500 px-4 py-2 text-sm font-semibold text-lime-100 transition hover:bg-lime-900/40"
+              className="dino-button-secondary px-4 py-2 text-sm"
             >
               Next Problem Now
             </button>
@@ -250,13 +250,13 @@ export default function LongDivisionWorkbench({
       <p
         role="status"
         aria-live="polite"
-        className={`mt-4 rounded-md border px-3 py-2 text-sm ${getFeedbackClassName(workbenchState.feedback.tone)}`}
+        className={`dino-status mt-4 ${getFeedbackClassName(workbenchState.feedback.tone)}`}
       >
         {workbenchState.feedback.message}
       </p>
 
       <div className="mt-4">
-        <p className="text-xs uppercase tracking-[0.12em] text-emerald-200">
+        <p className="fossil-label">
           Paper Trail
         </p>
         {recentAttempts.length > 0 ? (
@@ -265,9 +265,7 @@ export default function LongDivisionWorkbench({
               <li
                 key={`${attempt.step}-${attempt.cycleIndex}-${index}`}
                 className={`rounded-md border px-3 py-2 text-sm ${
-                  attempt.isCorrect
-                    ? "border-emerald-600 bg-emerald-900/40 text-emerald-100"
-                    : "border-amber-600 bg-amber-900/30 text-amber-100"
+                  attempt.isCorrect ? "dino-attempt-success" : "dino-attempt-error"
                 }`}
               >
                 <span className="font-semibold">
@@ -283,7 +281,7 @@ export default function LongDivisionWorkbench({
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-emerald-100">
+          <p className="jurassic-copy mt-2 text-sm">
             Checked steps will appear here as you work through the problem.
           </p>
         )}

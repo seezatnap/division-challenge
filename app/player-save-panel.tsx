@@ -125,7 +125,7 @@ export default function PlayerSavePanel() {
         return;
       }
 
-      setRewardStatusMessage("Generating your dinosaur reward...");
+      setRewardStatusMessage("Compys are sketching your next dinosaur reward...");
 
       const rewardResult = await processPendingRewardMilestones({
         playerSave: queuedRuntimeState.playerSave,
@@ -208,7 +208,9 @@ export default function PlayerSavePanel() {
       const latestUnlockedDinosaur =
         rewardResult.unlockedDinosaurs[rewardResult.unlockedDinosaurs.length - 1];
       if (latestUnlockedDinosaur) {
-        setRewardStatusMessage(`Unlocked ${latestUnlockedDinosaur.name}!`);
+        setRewardStatusMessage(
+          `${latestUnlockedDinosaur.name} stomped into your gallery!`,
+        );
       }
     }
   }
@@ -222,7 +224,9 @@ export default function PlayerSavePanel() {
       runtimeStateRef.current = nextState;
       setRuntimeState(nextState);
       setPlayerNameInput(nextState.playerSave.playerName);
-      setStatusMessage(`Started a new game for ${nextState.playerSave.playerName}.`);
+      setStatusMessage(
+        `Expedition started for ${nextState.playerSave.playerName}.`,
+      );
     } catch (error) {
       setStatusMessage(getErrorMessage(error));
     }
@@ -249,10 +253,10 @@ export default function PlayerSavePanel() {
           loadedPlayerName,
         )
       ) {
-        setStatusMessage(`Loaded existing save for ${loadedPlayerName}.`);
+        setStatusMessage(`Welcome back, ${loadedPlayerName}. Save loaded.`);
       } else {
         setStatusMessage(
-          `Loaded save for ${loadedPlayerName} instead of ${requestedPlayerName}.`,
+          `Loaded ${loadedPlayerName}'s save instead of ${requestedPlayerName}.`,
         );
       }
     } catch (error) {
@@ -283,7 +287,7 @@ export default function PlayerSavePanel() {
         saveResult &&
         doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)
       ) {
-        setStatusMessage(`Saved progress to ${saveResult.fileName}.`);
+        setStatusMessage(`Field notes secured in ${saveResult.fileName}.`);
       }
     } catch (error) {
       if (doesRuntimeStateMatchKey(runtimeStateRef.current, runtimeStateKey)) {
@@ -305,45 +309,46 @@ export default function PlayerSavePanel() {
     runtimeState?.mode === "loaded-save" ? "Loaded Existing Save" : "Started New Game";
 
   return (
-    <section className="mt-8 rounded-xl border border-emerald-700 bg-emerald-950/40 p-6">
-      <h2 className="text-xl font-semibold tracking-tight">Game Start</h2>
+    <section className="jurassic-card mt-8 p-6">
+      <p className="fossil-label">Mission Control</p>
+      <h2 className="jurassic-heading mt-2 text-xl font-semibold">Game Start</h2>
       {runtimeState ? (
         <>
-          <div className="mt-4 rounded-lg border border-emerald-700 bg-emerald-900/40 p-4 text-sm text-emerald-100">
+          <div className="jurassic-card mt-4 p-4 text-sm">
             <p>
-              <span className="font-semibold text-emerald-50">Mode:</span>{" "}
+              <span className="font-semibold text-[var(--sandstone)]">Mode:</span>{" "}
               {runtimeModeLabel}
             </p>
             <p>
-              <span className="font-semibold text-emerald-50">Player:</span>{" "}
+              <span className="font-semibold text-[var(--sandstone)]">Player:</span>{" "}
               {runtimeState.playerSave.playerName}
             </p>
             <p>
-              <span className="font-semibold text-emerald-50">
+              <span className="font-semibold text-[var(--sandstone)]">
                 Total Problems Solved:
               </span>{" "}
               {runtimeState.playerSave.totalProblemsSolved}
             </p>
             <p>
-              <span className="font-semibold text-emerald-50">
+              <span className="font-semibold text-[var(--sandstone)]">
                 Current Difficulty:
               </span>{" "}
               {runtimeState.playerSave.currentDifficulty}
             </p>
             <p>
-              <span className="font-semibold text-emerald-50">
+              <span className="font-semibold text-[var(--sandstone)]">
                 Unlocked Dinosaurs:
               </span>{" "}
               {runtimeState.playerSave.unlockedDinosaurs.length}
             </p>
             <p>
-              <span className="font-semibold text-emerald-50">
+              <span className="font-semibold text-[var(--sandstone)]">
                 Session History Entries:
               </span>{" "}
               {runtimeState.playerSave.sessionHistory.length}
             </p>
             <p>
-              <span className="font-semibold text-emerald-50">
+              <span className="font-semibold text-[var(--sandstone)]">
                 Initialized At:
               </span>{" "}
               {runtimeState.initializedAt}
@@ -353,7 +358,7 @@ export default function PlayerSavePanel() {
                 type="button"
                 onClick={handleSaveProgressClick}
                 disabled={!isSupported || isBusy}
-                className="rounded-md bg-lime-500 px-3 py-2 font-semibold text-emerald-950 transition hover:bg-lime-400 disabled:cursor-not-allowed disabled:bg-emerald-800 disabled:text-emerald-200"
+                className="dino-button-primary px-3 py-2"
               >
                 {isBusy ? "Working..." : "Save Progress"}
               </button>
@@ -361,12 +366,12 @@ export default function PlayerSavePanel() {
                 type="button"
                 onClick={handleResetFlowClick}
                 disabled={isBusy}
-                className="rounded-md border border-emerald-500 px-3 py-2 font-semibold text-emerald-50 transition hover:bg-emerald-800/60 disabled:cursor-not-allowed disabled:border-emerald-800 disabled:text-emerald-200"
+                className="dino-button-secondary px-3 py-2"
               >
                 Start With Different Player
               </button>
             </div>
-            <p className="mt-3 text-xs text-emerald-200">
+            <p className="jurassic-copy mt-3 text-xs">
               {isSupported
                 ? "Save your progress to keep difficulty, unlocked dinosaurs, and session history across sessions."
                 : FILE_SYSTEM_ACCESS_UNSUPPORTED_MESSAGE}
@@ -387,12 +392,15 @@ export default function PlayerSavePanel() {
         </>
       ) : (
         <>
-          <p className="mt-2 text-sm text-emerald-100">
+          <p className="jurassic-copy mt-2 text-sm">
             Enter a player name, then choose whether to load an existing save
             or start a new game.
           </p>
 
-          <label htmlFor="player-name" className="mt-5 block text-sm font-medium">
+          <label
+            htmlFor="player-name"
+            className="mt-5 block text-sm font-medium text-[var(--sandstone)]"
+          >
             Player Name
           </label>
           <input
@@ -400,7 +408,7 @@ export default function PlayerSavePanel() {
             type="text"
             value={playerNameInput}
             onChange={(event) => setPlayerNameInput(event.target.value)}
-            className="mt-2 w-full rounded-md border border-emerald-600 bg-emerald-950 px-3 py-2 text-emerald-50 outline-none ring-emerald-400 transition focus:ring-2"
+            className="dino-input mt-2 w-full"
             placeholder="Enter player name"
           />
 
@@ -409,7 +417,7 @@ export default function PlayerSavePanel() {
               type="button"
               onClick={handleStartNewGameClick}
               disabled={isBusy}
-              className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-800 disabled:text-emerald-200"
+              className="dino-button-primary px-4 py-2 text-sm"
             >
               {isBusy ? "Working..." : "Start New Game"}
             </button>
@@ -417,13 +425,13 @@ export default function PlayerSavePanel() {
               type="button"
               onClick={handleLoadExistingSaveClick}
               disabled={!isSupported || isBusy}
-              className="rounded-md border border-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-800/60 disabled:cursor-not-allowed disabled:border-emerald-800 disabled:text-emerald-200"
+              className="dino-button-secondary px-4 py-2 text-sm"
             >
               {isBusy ? "Working..." : "Load Existing Save"}
             </button>
           </div>
 
-          <p className="mt-4 text-sm text-emerald-100">
+          <p className="jurassic-copy mt-4 text-sm">
             {isSupported
               ? "Loading existing saves uses the File System Access API."
               : FILE_SYSTEM_ACCESS_UNSUPPORTED_MESSAGE}
@@ -432,12 +440,12 @@ export default function PlayerSavePanel() {
       )}
 
       {statusMessage ? (
-        <p role="status" className="mt-4 text-sm text-emerald-100">
+        <p role="status" className="dino-status dino-status-idle mt-4">
           {statusMessage}
         </p>
       ) : null}
       {runtimeState && rewardStatusMessage ? (
-        <p role="status" className="mt-2 text-sm text-lime-100">
+        <p role="status" className="dino-status dino-status-success mt-2">
           {rewardStatusMessage}
         </p>
       ) : null}

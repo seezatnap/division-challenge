@@ -1,12 +1,228 @@
 @import "tailwindcss";
 
 :root {
-  --background: #052e16;
-  --foreground: #ecfdf5;
+  --jungle-night: #10170f;
+  --jungle-canopy: #1f3020;
+  --jungle-fern: #3a4f2d;
+  --jungle-moss: #5f7746;
+  --amber-fossil: #c89854;
+  --amber-fossil-hover: #ddad68;
+  --sandstone: #f2e4c0;
+  --bone: #f8f5e8;
+  --ink: #1a2317;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  margin: 0;
+  min-height: 100vh;
+  color: var(--bone);
+  font-family: var(--font-jurassic-body), "Trebuchet MS", "Segoe UI", sans-serif;
+  background-color: var(--jungle-night);
+  background-image:
+    radial-gradient(circle at 18% 14%, rgb(95 119 70 / 26%) 0 10%, transparent 42%),
+    radial-gradient(circle at 84% 8%, rgb(200 152 84 / 16%) 0 11%, transparent 38%),
+    radial-gradient(circle at 90% 80%, rgb(58 79 45 / 22%) 0 12%, transparent 37%),
+    linear-gradient(160deg, #10170f 0%, #1b2818 58%, #111810 100%);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-jurassic-heading), "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+.dino-screen {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.1rem, 3vw, 2.4rem);
+}
+
+.jurassic-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: min(100%, 70rem);
+  border-radius: 1.4rem;
+  border: 1px solid rgb(200 152 84 / 40%);
+  background: linear-gradient(
+    156deg,
+    rgb(34 48 29 / 93%) 0%,
+    rgb(22 31 20 / 94%) 55%,
+    rgb(20 28 18 / 96%) 100%
+  );
+  box-shadow:
+    0 30px 58px rgb(0 0 0 / 44%),
+    inset 0 1px 0 rgb(255 255 255 / 7%);
+}
+
+.jurassic-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.26;
+  background-image:
+    radial-gradient(circle at 8% 20%, rgb(242 228 192 / 36%) 0 0.35rem, transparent 0.38rem),
+    radial-gradient(circle at 11% 16%, rgb(242 228 192 / 34%) 0 0.25rem, transparent 0.28rem),
+    radial-gradient(circle at 14% 20%, rgb(242 228 192 / 36%) 0 0.35rem, transparent 0.38rem),
+    radial-gradient(circle at 84% 66%, rgb(242 228 192 / 24%) 0 0.4rem, transparent 0.43rem),
+    radial-gradient(circle at 87% 62%, rgb(242 228 192 / 22%) 0 0.3rem, transparent 0.33rem),
+    radial-gradient(circle at 90% 66%, rgb(242 228 192 / 24%) 0 0.4rem, transparent 0.43rem),
+    repeating-linear-gradient(
+      -62deg,
+      rgb(95 119 70 / 24%) 0 2px,
+      transparent 2px 21px
+    );
+}
+
+.jurassic-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.jurassic-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgb(200 152 84 / 35%);
+  background: linear-gradient(170deg, rgb(33 47 28 / 78%), rgb(22 31 20 / 74%));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
+}
+
+.jurassic-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.2;
+  background:
+    linear-gradient(132deg, transparent 0 68%, rgb(242 228 192 / 30%) 68% 69%, transparent 69% 100%),
+    repeating-linear-gradient(-56deg, rgb(200 152 84 / 26%) 0 2px, transparent 2px 20px);
+}
+
+.jurassic-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.jurassic-heading {
+  color: var(--sandstone);
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 0 rgb(0 0 0 / 32%);
+}
+
+.jurassic-copy {
+  color: rgb(228 236 210 / 92%);
+}
+
+.fossil-label {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgb(232 214 164 / 92%);
+}
+
+.dino-input {
+  border-radius: 0.62rem;
+  border: 1px solid rgb(160 128 80 / 65%);
+  background: rgb(14 20 13 / 78%);
+  color: var(--bone);
+  padding: 0.58rem 0.72rem;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.dino-input:focus {
+  border-color: rgb(214 168 105 / 92%);
+  box-shadow: 0 0 0 2px rgb(214 168 105 / 28%);
+}
+
+.dino-input:disabled {
+  cursor: not-allowed;
+  border-color: rgb(95 109 86 / 45%);
+  color: rgb(186 198 173 / 72%);
+}
+
+.dino-button-primary {
+  border-radius: 0.62rem;
+  border: 1px solid rgb(125 92 47 / 70%);
+  background: var(--amber-fossil);
+  color: var(--ink);
+  font-weight: 700;
+  transition: background-color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.dino-button-primary:hover {
+  background: var(--amber-fossil-hover);
+}
+
+.dino-button-primary:active {
+  transform: translateY(1px);
+}
+
+.dino-button-secondary {
+  border-radius: 0.62rem;
+  border: 1px solid rgb(214 168 105 / 62%);
+  background: rgb(0 0 0 / 0%);
+  color: var(--sandstone);
+  font-weight: 700;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.dino-button-secondary:hover {
+  background: rgb(200 152 84 / 16%);
+}
+
+.dino-button-primary:disabled,
+.dino-button-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.dino-status {
+  border-radius: 0.72rem;
+  border-width: 1px;
+  padding: 0.68rem 0.8rem;
+  font-size: 0.93rem;
+}
+
+.dino-status-idle {
+  border-color: rgb(129 151 94 / 56%);
+  background: rgb(30 43 26 / 62%);
+  color: rgb(226 237 207 / 90%);
+}
+
+.dino-status-success {
+  border-color: rgb(147 185 85 / 66%);
+  background: rgb(35 58 29 / 68%);
+  color: rgb(232 244 206 / 94%);
+}
+
+.dino-status-error {
+  border-color: rgb(194 127 83 / 62%);
+  background: rgb(70 36 23 / 56%);
+  color: rgb(255 223 200 / 93%);
+}
+
+.dino-status-complete {
+  border-color: rgb(224 178 95 / 74%);
+  background: rgb(66 57 23 / 64%);
+  color: rgb(255 236 184 / 95%);
+}
+
+.dino-attempt-success {
+  border: 1px solid rgb(134 163 92 / 58%);
+  background: rgb(40 59 32 / 56%);
+  color: rgb(228 237 204 / 90%);
+}
+
+.dino-attempt-error {
+  border: 1px solid rgb(193 124 82 / 55%);
+  background: rgb(70 36 24 / 50%);
+  color: rgb(255 224 203 / 92%);
 }

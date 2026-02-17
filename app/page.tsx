@@ -2,12 +2,16 @@ import PlayerSavePanel from "./player-save-panel";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-emerald-950 px-6 text-emerald-50">
-      <main className="w-full max-w-2xl rounded-2xl border border-emerald-700 bg-emerald-900/40 p-10 shadow-xl">
-        <h1 className="text-3xl font-bold tracking-tight">Dino Division</h1>
-        <p className="mt-3 text-emerald-100">
-          Start by entering a player name, then choose between loading an
-          existing save or beginning a new game.
+    <div className="dino-screen">
+      <main className="jurassic-shell px-4 py-7 sm:px-8 sm:py-10">
+        <p className="fossil-label">Isla Nublar Learning Lab</p>
+        <h1 className="jurassic-heading mt-3 text-3xl font-bold sm:text-4xl">
+          Dino Division
+        </h1>
+        <p className="jurassic-copy mt-3 max-w-3xl text-base sm:text-lg">
+          Tackle long division one fossil layer at a time. Name your explorer,
+          load a save, or begin a fresh expedition through Jurassic math
+          challenges.
         </p>
         <PlayerSavePanel />
       </main>
