@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { UnlockedReward } from "@/features/contracts";
 import {
@@ -30,6 +31,7 @@ export function DinoGalleryPanel({
   const [galleryRewards, setGalleryRewards] =
     useState<UnlockedReward[]>(sortedUnlockedRewards);
   const [refreshStatus, setRefreshStatus] = useState<string>("");
+  const [selectedReward, setSelectedReward] = useState<UnlockedReward | null>(null);
 
   useEffect(() => {
     setGalleryRewards(sortedUnlockedRewards);
@@ -75,6 +77,34 @@ export function DinoGalleryPanel({
     };
   }, []);
 
+  useEffect(() => {
+    if (!selectedReward) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setSelectedReward(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedReward]);
+
+  function closeSelectedReward(): void {
+    setSelectedReward(null);
+  }
+
+  const modalHost = typeof document !== "undefined" ? document.body : null;
+
   if (galleryRewards.length === 0) {
     return (
       <div className="gallery-shell" data-gallery-state="empty">
@@ -95,26 +125,78 @@ export function DinoGalleryPanel({
       <div className="gallery-grid">
         {galleryRewards.map((reward) => (
           <article className="gallery-card" key={reward.rewardId}>
-            <div className="gallery-thumb">
-              <Image
-                alt={`${reward.dinosaurName} unlocked reward image`}
-                className="gallery-image"
-                height={352}
-                loading="lazy"
-                src={reward.imagePath}
-                width={640}
-              />
-            </div>
-            <p className="gallery-name">{reward.dinosaurName}</p>
-            <p className="gallery-meta">
-              Earned{" "}
-              <time dateTime={reward.earnedAt}>
-                {formatGalleryEarnedDate(reward.earnedAt)}
-              </time>
-            </p>
+            <button
+              aria-haspopup="dialog"
+              className="gallery-card-trigger"
+              onClick={() => {
+                setSelectedReward(reward);
+              }}
+              type="button"
+            >
+              <div className="gallery-thumb">
+                <Image
+                  alt={`${reward.dinosaurName} unlocked reward image`}
+                  className="gallery-image"
+                  height={352}
+                  loading="lazy"
+                  src={reward.imagePath}
+                  width={640}
+                />
+              </div>
+              <p className="gallery-name">{reward.dinosaurName}</p>
+              <p className="gallery-meta">
+                Earned{" "}
+                <time dateTime={reward.earnedAt}>
+                  {formatGalleryEarnedDate(reward.earnedAt)}
+                </time>
+              </p>
+            </button>
           </article>
         ))}
       </div>
+
+      {selectedReward && modalHost
+        ? createPortal(
+        <div
+          className="jp-modal-backdrop"
+          data-ui-surface="gallery-detail-modal"
+          onClick={closeSelectedReward}
+          role="presentation"
+        >
+          <section
+            aria-label={`${selectedReward.dinosaurName} details`}
+            aria-modal="true"
+            className="jp-modal gallery-detail-modal"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <p className="surface-kicker">Gallery Detail</p>
+            <h3 className="surface-title gallery-detail-title">{selectedReward.dinosaurName}</h3>
+            <p className="gallery-detail-meta">
+              Milestone {selectedReward.milestoneSolvedCount} • Earned{" "}
+              <time dateTime={selectedReward.earnedAt}>
+                {formatGalleryEarnedDate(selectedReward.earnedAt)}
+              </time>
+            </p>
+            <Image
+              alt={`${selectedReward.dinosaurName} unlocked reward image`}
+              className="gallery-detail-image"
+              height={540}
+              loading="lazy"
+              src={selectedReward.imagePath}
+              width={960}
+            />
+            <button className="jp-button" onClick={closeSelectedReward} type="button">
+              Close
+            </button>
+          </section>
+        </div>
+          ,
+          modalHost,
+        )
+        : null}
     </div>
   );
 }

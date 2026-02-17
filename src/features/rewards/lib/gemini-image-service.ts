@@ -46,8 +46,13 @@ export interface GeminiServiceRequestConfig {
   model: string;
 }
 
+export interface GeminiGenerateContentRequestConfig {
+  responseModalities: ["IMAGE"];
+}
+
 export interface GeminiGenerateContentRequest {
   model: string;
+  config: GeminiGenerateContentRequestConfig;
   contents: [{ role: "user"; parts: [{ text: string }] }];
 }
 
@@ -84,6 +89,7 @@ type JsonObject = Record<string, unknown>;
 
 const BASE64_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
 const MAX_TEXT_PREVIEW_LENGTH = 120;
+const IMAGE_RESPONSE_MODALITIES = ["IMAGE"] as const;
 
 function isRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null;
@@ -241,6 +247,9 @@ export function buildGeminiGenerateContentRequest(
 
   return {
     model,
+    config: {
+      responseModalities: [...IMAGE_RESPONSE_MODALITIES],
+    },
     contents: [
       {
         role: "user",
@@ -385,6 +394,10 @@ export async function generateGeminiDinosaurImage(
 
   let generateContentResult: unknown;
   try {
+    console.log("[rewards] submitting Gemini image request", {
+      dinosaurName: request.dinosaurName,
+      model,
+    });
     generateContentResult = await client.models.generateContent(generateContentRequest);
   } catch (cause) {
     throw new GeminiImageGenerationError(

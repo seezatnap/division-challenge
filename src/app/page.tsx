@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { featureModules } from "@/features/registry";
 import {
-  generateDivisionProblemForSolvedCount,
+  generateDivisionProblem,
+  getDigitCount,
   solveLongDivision,
   type LongDivisionStepValidationResult,
 } from "@/features/division-engine";
@@ -31,6 +31,8 @@ import {
 } from "@/features/rewards/lib/dinosaurs";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
 
+const PROVISIONAL_REWARD_IMAGE_PATH = "/window.svg";
+
 const loadableSavePreview: DinoDivisionSaveFile = {
   schemaVersion: SAVE_FILE_SCHEMA_VERSION,
   playerName: "Raptor Scout",
@@ -54,14 +56,14 @@ const loadableSavePreview: DinoDivisionSaveFile = {
     {
       rewardId: "reward-rex-1",
       dinosaurName: "Tyrannosaurus Rex",
-      imagePath: "/rewards/tyrannosaurus-rex.png",
+      imagePath: PROVISIONAL_REWARD_IMAGE_PATH,
       earnedAt: "2026-02-12T09:15:00.000Z",
       milestoneSolvedCount: 5,
     },
     {
       rewardId: "reward-raptor-2",
       dinosaurName: "Velociraptor",
-      imagePath: "/rewards/velociraptor.png",
+      imagePath: PROVISIONAL_REWARD_IMAGE_PATH,
       earnedAt: "2026-02-14T12:40:00.000Z",
       milestoneSolvedCount: 10,
     },
@@ -87,10 +89,10 @@ const loadableSavePreview: DinoDivisionSaveFile = {
 
 const workspacePreviewProblem: DivisionProblem = {
   id: "workspace-preview-problem",
-  dividend: 432,
+  dividend: 4320,
   divisor: 12,
   allowRemainder: false,
-  difficultyLevel: 2,
+  difficultyLevel: 1,
 };
 
 const workspacePreviewSolution = solveLongDivision(workspacePreviewProblem);
@@ -112,11 +114,16 @@ interface ActiveRewardRevealState {
   initialImagePath: string | null;
 }
 
-const INITIAL_TOTAL_PROBLEMS_SOLVED = 14;
-const INITIAL_TOTAL_PROBLEMS_ATTEMPTED = 16;
+const INITIAL_TOTAL_PROBLEMS_SOLVED = 0;
+const INITIAL_TOTAL_PROBLEMS_ATTEMPTED = 0;
 const INITIAL_SESSION_PROBLEMS_SOLVED = 0;
-const INITIAL_SESSION_PROBLEMS_ATTEMPTED = 1;
+const INITIAL_SESSION_PROBLEMS_ATTEMPTED = 0;
 const NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS = [3, 4] as const;
+const LIVE_PROBLEM_MIN_DIVISOR = 3;
+const LIVE_PROBLEM_MAX_DIVISOR = 12;
+const LIVE_PROBLEM_DIVIDEND_DIGITS = 4;
+const LIVE_PROBLEM_MAX_GENERATION_ATTEMPTS = 180;
+const LIVE_PROBLEM_FIXED_DIFFICULTY_LEVEL = 3;
 
 function toRewardImageSlug(dinosaurName: string): string {
   const slug = dinosaurName
@@ -127,8 +134,33 @@ function toRewardImageSlug(dinosaurName: string): string {
   return slug.length > 0 ? slug : "reward-image";
 }
 
-function toRewardImagePath(dinosaurName: string): string {
-  return `/rewards/${toRewardImageSlug(dinosaurName)}.png`;
+function toRewardImageExtensionFromMimeType(mimeType: string | null): string {
+  if (!mimeType) {
+    return "png";
+  }
+
+  const normalizedMimeType = mimeType.trim().toLowerCase();
+  if (normalizedMimeType === "image/svg+xml") {
+    return "svg";
+  }
+  if (normalizedMimeType === "image/webp") {
+    return "webp";
+  }
+  if (normalizedMimeType === "image/gif") {
+    return "gif";
+  }
+  if (normalizedMimeType === "image/jpeg" || normalizedMimeType === "image/jpg") {
+    return "jpg";
+  }
+
+  return "png";
+}
+
+function toRewardImagePathFromMimeType(
+  dinosaurName: string,
+  mimeType: string | null,
+): string {
+  return `/rewards/${toRewardImageSlug(dinosaurName)}.${toRewardImageExtensionFromMimeType(mimeType)}`;
 }
 
 function resolveNextRewardNumber(totalProblemsSolved: number): number {
@@ -178,7 +210,7 @@ function createUnlockedReward(
   return {
     rewardId: `reward-${rewardNumber}`,
     dinosaurName,
-    imagePath: toRewardImagePath(dinosaurName),
+    imagePath: PROVISIONAL_REWARD_IMAGE_PATH,
     earnedAt,
     milestoneSolvedCount: getMilestoneSolvedCountForRewardNumber(
       rewardNumber,
@@ -191,10 +223,29 @@ function resolveNextLiveProblem(totalProblemsSolved: number): {
   problem: DivisionProblem;
   steps: readonly LongDivisionStep[];
 } {
-  const problem = generateDivisionProblemForSolvedCount({
-    totalProblemsSolved,
-    remainderMode: "allow",
-  });
+  let problem: DivisionProblem | null = null;
+
+  for (let attempt = 0; attempt < LIVE_PROBLEM_MAX_GENERATION_ATTEMPTS; attempt += 1) {
+    const candidate = generateDivisionProblem({
+      difficultyLevel: LIVE_PROBLEM_FIXED_DIFFICULTY_LEVEL,
+      remainderMode: "forbid",
+    });
+    if (
+      getDigitCount(candidate.dividend) === LIVE_PROBLEM_DIVIDEND_DIGITS &&
+      candidate.divisor >= LIVE_PROBLEM_MIN_DIVISOR &&
+      candidate.divisor <= LIVE_PROBLEM_MAX_DIVISOR
+    ) {
+      problem = candidate;
+      break;
+    }
+  }
+
+  if (!problem) {
+    throw new Error(
+      `Unable to generate constrained live problem with a ${LIVE_PROBLEM_DIVIDEND_DIGITS}-digit dividend and divisor in [${LIVE_PROBLEM_MIN_DIVISOR}, ${LIVE_PROBLEM_MAX_DIVISOR}].`,
+    );
+  }
+
   const solution = solveLongDivision(problem);
 
   return {
@@ -244,9 +295,9 @@ export default function Home() {
     useState<ActiveRewardRevealState>(initialActiveRewardRevealState);
   const [rewardGenerationNotice, setRewardGenerationNotice] =
     useState<string | null>(null);
+  const [isNextProblemReady, setIsNextProblemReady] = useState(false);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
-  const rewardGenerationInFlightRef = useRef<Record<string, true>>({});
 
   useEffect(() => {
     gameSessionRef.current = gameSession;
@@ -254,6 +305,7 @@ export default function Home() {
 
   useEffect(() => {
     completedProblemIdRef.current = null;
+    setIsNextProblemReady(false);
   }, [gameSession.activeProblem.id]);
 
   const syncRewardImageStatus = useCallback(async (dinosaurName: string) => {
@@ -312,14 +364,9 @@ export default function Home() {
   const requestRewardImageGeneration = useCallback(
     async (dinosaurName: string) => {
       const normalizedDinosaurName = dinosaurName.trim();
-      if (
-        normalizedDinosaurName.length === 0 ||
-        rewardGenerationInFlightRef.current[normalizedDinosaurName]
-      ) {
+      if (normalizedDinosaurName.length === 0) {
         return;
       }
-
-      rewardGenerationInFlightRef.current[normalizedDinosaurName] = true;
 
       try {
         const response = await fetch("/api/rewards/generate-image", {
@@ -332,11 +379,19 @@ export default function Home() {
             dinosaurName: normalizedDinosaurName,
           }),
         });
+        const responseBody = (await response.json().catch(() => null)) as
+          | {
+              data?: {
+                dinosaurName?: string;
+                mimeType?: string;
+              };
+              error?: {
+                message?: string;
+              };
+            }
+          | null;
 
         if (!response.ok) {
-          const responseBody = (await response.json().catch(() => null)) as
-            | { error?: { message?: string } }
-            | null;
           const errorMessage =
             responseBody?.error?.message ??
             `Reward generation request failed with status ${response.status}.`;
@@ -344,22 +399,123 @@ export default function Home() {
           return;
         }
 
-        await syncRewardImageStatus(normalizedDinosaurName);
+        const resolvedDinosaurName =
+          responseBody?.data?.dinosaurName?.trim() || normalizedDinosaurName;
+        const resolvedImagePath = toRewardImagePathFromMimeType(
+          resolvedDinosaurName,
+          responseBody?.data?.mimeType?.trim() ?? null,
+        );
+
+        setGameSession((currentState) => {
+          let didChange = false;
+          const nextUnlockedRewards = currentState.unlockedRewards.map((reward) => {
+            if (
+              reward.dinosaurName !== resolvedDinosaurName ||
+              reward.imagePath === resolvedImagePath
+            ) {
+              return reward;
+            }
+
+            didChange = true;
+            return {
+              ...reward,
+              imagePath: resolvedImagePath,
+            };
+          });
+
+          if (!didChange) {
+            return currentState;
+          }
+
+          return {
+            ...currentState,
+            unlockedRewards: nextUnlockedRewards,
+          };
+        });
+
+        setActiveRewardReveal((currentReveal) => {
+          if (currentReveal.dinosaurName !== resolvedDinosaurName) {
+            return currentReveal;
+          }
+
+          return {
+            ...currentReveal,
+            initialStatus: "ready",
+            initialImagePath: resolvedImagePath,
+          };
+        });
+
+        await syncRewardImageStatus(resolvedDinosaurName);
         setRewardGenerationNotice(null);
       } catch {
         setRewardGenerationNotice(
           "Reward generation request failed before reaching the server.",
         );
-      } finally {
-        delete rewardGenerationInFlightRef.current[normalizedDinosaurName];
       }
     },
     [syncRewardImageStatus],
   );
 
   useEffect(() => {
-    for (const unlockedReward of gameSessionRef.current.unlockedRewards) {
+    for (const unlockedReward of gameSession.unlockedRewards) {
       void requestRewardImageGeneration(unlockedReward.dinosaurName);
+    }
+  }, [gameSession.unlockedRewards, requestRewardImageGeneration]);
+
+  const advanceToNextProblem = useCallback(() => {
+    let unlockedRewardForGeneration: UnlockedReward | null = null;
+    let prefetchTargetDinosaurName: string | null = null;
+
+    setGameSession((currentState) => {
+      const nextTotalProblemsSolved = currentState.totalProblemsSolved + 1;
+      const nextUnlockedRewards = [...currentState.unlockedRewards];
+      const nextEarnedRewardNumber = getRewardNumberForSolvedCount(
+        nextTotalProblemsSolved,
+        REWARD_UNLOCK_INTERVAL,
+      );
+
+      if (nextEarnedRewardNumber > nextUnlockedRewards.length) {
+        const unlockedReward = createUnlockedReward(
+          nextEarnedRewardNumber,
+          new Date().toISOString(),
+        );
+        nextUnlockedRewards.push(unlockedReward);
+        unlockedRewardForGeneration = unlockedReward;
+      }
+
+      const { problem: nextProblem, steps: nextSteps } =
+        resolveNextLiveProblem(nextTotalProblemsSolved);
+      if (shouldTriggerNearMilestonePrefetch(nextTotalProblemsSolved)) {
+        prefetchTargetDinosaurName = resolveNextRewardTarget(
+          nextTotalProblemsSolved,
+        ).dinosaurName;
+      }
+
+      return {
+        activeProblem: nextProblem,
+        steps: nextSteps,
+        sessionSolvedProblems: currentState.sessionSolvedProblems + 1,
+        sessionAttemptedProblems: currentState.sessionAttemptedProblems + 1,
+        totalProblemsSolved: nextTotalProblemsSolved,
+        totalProblemsAttempted: currentState.totalProblemsAttempted + 1,
+        unlockedRewards: nextUnlockedRewards,
+      };
+    });
+
+    setIsNextProblemReady(false);
+
+    if (unlockedRewardForGeneration) {
+      setActiveRewardReveal({
+        dinosaurName: unlockedRewardForGeneration.dinosaurName,
+        milestoneSolvedCount: unlockedRewardForGeneration.milestoneSolvedCount,
+        initialStatus: "generating",
+        initialImagePath: null,
+      });
+      void requestRewardImageGeneration(unlockedRewardForGeneration.dinosaurName);
+    }
+
+    if (prefetchTargetDinosaurName) {
+      void requestRewardImageGeneration(prefetchTargetDinosaurName);
     }
   }, [requestRewardImageGeneration]);
 
@@ -378,67 +534,11 @@ export default function Home() {
       if (completedProblemIdRef.current === currentProblemId) {
         return;
       }
+
       completedProblemIdRef.current = currentProblemId;
-
-      let unlockedRewardForGeneration: UnlockedReward | null = null;
-      let prefetchTargetDinosaurName: string | null = null;
-
-      setGameSession((currentState) => {
-        const completedProblemId = currentState.activeProblem.id;
-        if (!validation.currentStepId.startsWith(`${completedProblemId}:`)) {
-          return currentState;
-        }
-
-        const nextTotalProblemsSolved = currentState.totalProblemsSolved + 1;
-        const nextUnlockedRewards = [...currentState.unlockedRewards];
-        const nextEarnedRewardNumber = getRewardNumberForSolvedCount(
-          nextTotalProblemsSolved,
-          REWARD_UNLOCK_INTERVAL,
-        );
-
-        if (nextEarnedRewardNumber > nextUnlockedRewards.length) {
-          const unlockedReward = createUnlockedReward(
-            nextEarnedRewardNumber,
-            new Date().toISOString(),
-          );
-          nextUnlockedRewards.push(unlockedReward);
-          unlockedRewardForGeneration = unlockedReward;
-        }
-
-        const { problem: nextProblem, steps: nextSteps } =
-          resolveNextLiveProblem(nextTotalProblemsSolved);
-        if (shouldTriggerNearMilestonePrefetch(nextTotalProblemsSolved)) {
-          prefetchTargetDinosaurName = resolveNextRewardTarget(
-            nextTotalProblemsSolved,
-          ).dinosaurName;
-        }
-
-        return {
-          activeProblem: nextProblem,
-          steps: nextSteps,
-          sessionSolvedProblems: currentState.sessionSolvedProblems + 1,
-          sessionAttemptedProblems: currentState.sessionAttemptedProblems + 1,
-          totalProblemsSolved: nextTotalProblemsSolved,
-          totalProblemsAttempted: currentState.totalProblemsAttempted + 1,
-          unlockedRewards: nextUnlockedRewards,
-        };
-      });
-
-      if (unlockedRewardForGeneration) {
-        setActiveRewardReveal({
-          dinosaurName: unlockedRewardForGeneration.dinosaurName,
-          milestoneSolvedCount: unlockedRewardForGeneration.milestoneSolvedCount,
-          initialStatus: "generating",
-          initialImagePath: null,
-        });
-        void requestRewardImageGeneration(unlockedRewardForGeneration.dinosaurName);
-      }
-
-      if (prefetchTargetDinosaurName) {
-        void requestRewardImageGeneration(prefetchTargetDinosaurName);
-      }
+      setIsNextProblemReady(true);
     },
-    [requestRewardImageGeneration],
+    [],
   );
 
   const activeLaneLabel = formatActiveInputLane(
@@ -451,15 +551,6 @@ export default function Home() {
         <header className="jurassic-panel jurassic-hero motif-canopy">
           <p className="eyebrow">Dino Division v2</p>
           <h1 className="hero-title">Jurassic Command Deck</h1>
-          <p className="hero-copy">
-            Earth-tone surfaces, jungle overlays, and amber-glow focus states now span the live game board, reward
-            gallery, and save/load controls for both handheld and desktop play.
-          </p>
-          <div className="hero-badges">
-            <span className="jp-badge">Earth + Jungle Palette</span>
-            <span className="jp-badge">Themed Typography</span>
-            <span className="jp-badge">Motif Overlays</span>
-          </div>
         </header>
 
         <div className="jurassic-layout">
@@ -472,7 +563,7 @@ export default function Home() {
               <div>
                 <p className="surface-kicker">Game Workspace</p>
                 <h2 className="surface-title" id="game-surface-heading">
-                  Amber Glow Division Board
+                  DNA Division Sequencer
                 </h2>
               </div>
               <p className="status-chip">
@@ -487,6 +578,18 @@ export default function Home() {
               onStepValidation={handleWorkspaceStepValidation}
               steps={gameSession.steps}
             />
+            {isNextProblemReady ? (
+              <div className="next-problem-action-row">
+                <button
+                  className="jp-button"
+                  data-ui-action="next-problem"
+                  onClick={advanceToNextProblem}
+                  type="button"
+                >
+                  NEXT
+                </button>
+              </div>
+            ) : null}
           </section>
 
           <div className="side-stack">
@@ -554,21 +657,6 @@ export default function Home() {
             </section>
           </div>
         </div>
-
-        <section aria-labelledby="module-map-heading" className="jurassic-panel module-map">
-          <h2 className="surface-title" id="module-map-heading">
-            Feature Module Map
-          </h2>
-          <ul className="module-grid">
-            {featureModules.map((module) => (
-              <li className="module-card" key={module.id}>
-                <p className="module-title">{module.title}</p>
-                <p className="module-summary">{module.summary}</p>
-                <p className="module-path">{module.rootPath}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
       </div>
     </main>
   );

@@ -28,6 +28,9 @@ const manualSolvePlan = [
   { digit: "7", stepId: "workspace-preview-problem:step:5:multiply-result", digitIndex: "0" },
   { digit: "2", stepId: "workspace-preview-problem:step:5:multiply-result", digitIndex: "1" },
   { digit: "0", stepId: "workspace-preview-problem:step:6:subtraction-result", digitIndex: "0" },
+  { digit: "0", stepId: "workspace-preview-problem:step:8:quotient-digit", digitIndex: "0" },
+  { digit: "0", stepId: "workspace-preview-problem:step:9:multiply-result", digitIndex: "0" },
+  { digit: "0", stepId: "workspace-preview-problem:step:10:subtraction-result", digitIndex: "0" },
 ];
 
 let serverProcess = null;
@@ -519,16 +522,28 @@ test("visual workflow: solving a full problem advances to the next question and 
 
   try {
     const solvedBefore = await page.locator(".surface-header .status-chip").first().innerText();
-    assert.ok(solvedBefore.includes("Solved: 14"), `Expected solved count before run to be 14, received: ${solvedBefore}`);
+    assert.ok(solvedBefore.includes("Solved: 0"), `Expected solved count before run to be 0, received: ${solvedBefore}`);
 
     await typeDigitsFollowingPlan(page, manualSolvePlan, manualSolvePlan.length, false);
     await page.waitForTimeout(1_000);
 
+    const revealModal = page.locator('[data-ui-surface="reward-reveal-modal"]');
+    if ((await revealModal.count()) > 0) {
+      await page
+        .locator('[data-ui-surface="reward-reveal-modal"] .jp-button')
+        .filter({ hasText: "Back To Board" })
+        .first()
+        .click();
+    }
+
+    await page.waitForSelector('[data-ui-action="next-problem"]', { timeout: 10_000 });
+    await page.click('[data-ui-action="next-problem"]');
+
     const solvedAfter = await page.locator(".surface-header .status-chip").first().innerText();
-    assert.ok(solvedAfter.includes("Solved: 15"), `Expected solved count after run to be 15, received: ${solvedAfter}`);
+    assert.ok(solvedAfter.includes("Solved: 1"), `Expected solved count after run to be 1, received: ${solvedAfter}`);
 
     const nextDividendText = (await page.locator(".dividend-line").first().innerText()).replace(/\s+/g, "");
-    assert.notEqual(nextDividendText, "432", "Expected the board to chain into a different follow-up problem.");
+    assert.notEqual(nextDividendText, "4320", "Expected the board to chain into a different follow-up problem.");
 
     await page.waitForSelector('[data-ui-surface="earned-reward"] .reward-reveal-image', {
       timeout: 12_000,
@@ -537,8 +552,11 @@ test("visual workflow: solving a full problem advances to the next question and 
       .locator('[data-ui-surface="earned-reward"] .reward-reveal-image')
       .first()
       .getAttribute("src");
+    const decodedRewardImageSource =
+      typeof rewardImageSource === "string" ? decodeURIComponent(rewardImageSource) : "";
     assert.ok(
-      typeof rewardImageSource === "string" && rewardImageSource.startsWith("/rewards/"),
+      typeof rewardImageSource === "string" &&
+        (rewardImageSource.startsWith("/rewards/") || decodedRewardImageSource.includes("/rewards/")),
       `Expected revealed reward image source to resolve from /rewards, received: ${String(rewardImageSource)}`,
     );
 

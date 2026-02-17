@@ -27,14 +27,26 @@ async function loadTypeScriptModule(relativePath) {
 const rewardsGeminiModule = loadTypeScriptModule("src/features/rewards/lib/gemini.ts");
 
 test("createGeminiImageRequestConfig returns model + trimmed API key", async () => {
-  const { createGeminiImageRequestConfig, GEMINI_IMAGE_MODEL } = await rewardsGeminiModule;
+  const { createGeminiImageRequestConfig, GEMINI_IMAGE_MODEL_DEFAULT } =
+    await rewardsGeminiModule;
 
   const config = createGeminiImageRequestConfig({
     GEMINI_API_KEY: "  secret-value  ",
   });
 
   assert.equal(config.apiKey, "secret-value");
-  assert.equal(config.model, GEMINI_IMAGE_MODEL);
+  assert.equal(config.model, GEMINI_IMAGE_MODEL_DEFAULT);
+});
+
+test("createGeminiImageRequestConfig honors GEMINI_IMAGE_MODEL when provided", async () => {
+  const { createGeminiImageRequestConfig } = await rewardsGeminiModule;
+
+  const config = createGeminiImageRequestConfig({
+    GEMINI_API_KEY: "secret-value",
+    GEMINI_IMAGE_MODEL: "gemini-3-pro-image-preview",
+  });
+
+  assert.equal(config.model, "gemini-3-pro-image-preview");
 });
 
 test("getGeminiApiKey throws when GEMINI_API_KEY is missing", async () => {

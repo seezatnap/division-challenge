@@ -19,6 +19,20 @@ test("home page includes Jurassic surfaces for game, gallery, and save/load UI",
   }
 
   assert.ok(source.includes("Jurassic Command Deck"), "Expected themed Jurassic heading content");
+  assert.equal(
+    source.includes("Earth-tone surfaces, jungle overlays, and amber-glow focus states now span the live game board"),
+    false,
+    "Expected UX-marketing hero copy to be removed",
+  );
+  assert.equal(
+    source.includes("Feature Module Map"),
+    false,
+    "Expected footer-style feature-map UX copy to be removed",
+  );
+  assert.ok(
+    source.includes('data-ui-action="next-problem"'),
+    "Expected NEXT problem action button wiring in the game surface",
+  );
 });
 
 test("root layout wires themed typography variables", async () => {

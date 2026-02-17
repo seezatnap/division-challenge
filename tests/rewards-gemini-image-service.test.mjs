@@ -146,6 +146,9 @@ test("generateGeminiDinosaurImage builds prompt, invokes model, and returns pars
   assert.deepEqual(recordedRequests, [
     {
       model: "gemini-2.0-flash-exp",
+      config: {
+        responseModalities: ["IMAGE"],
+      },
       contents: [
         {
           role: "user",

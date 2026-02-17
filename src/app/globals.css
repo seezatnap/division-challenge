@@ -287,6 +287,7 @@ body {
   --division-cell-width: 2.2rem;
   --division-cell-gap: 0.45rem;
   --division-op-column-width: 0.75rem;
+  --division-op-inline-gap: 0.06rem;
   --division-bracket-inline-start: 0.65rem;
   --division-bracket-stroke-width: 0.18rem;
   --division-grid-width: calc(
@@ -567,6 +568,16 @@ body {
   min-width: 0;
 }
 
+.work-row[data-step-kind="multiply-result"] .work-row-value-shell::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.12rem;
+  border-bottom: 0.12rem solid rgba(45, 36, 25, 0.58);
+  pointer-events: none;
+}
+
 .inline-entry-work-row {
   justify-content: center;
   text-align: center;
@@ -703,13 +714,19 @@ body {
 .work-row-op {
   position: absolute;
   top: 50%;
-  right: calc(100% + 0.36rem);
+  right: calc(100% + var(--division-op-inline-gap));
   transform: translateY(-50%);
   width: var(--division-op-column-width);
   text-align: center;
   font-family: var(--font-jurassic-mono), "Courier New", monospace;
   font-size: 1.04rem;
   color: color-mix(in srgb, var(--jp-bark) 86%, black);
+}
+
+.next-problem-action-row {
+  margin-top: 0.8rem;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .work-row[data-step-kind="bring-down"] .work-row-op {
@@ -923,6 +940,21 @@ body {
   padding: 0.62rem;
 }
 
+.gallery-card-trigger {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gallery-card-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--jp-amber) 72%, white);
+  outline-offset: 2px;
+  border-radius: 0.65rem;
+}
+
 .gallery-thumb {
   overflow: hidden;
   position: relative;
@@ -952,6 +984,87 @@ body {
   margin-top: 0.25rem;
   font-size: 0.75rem;
   color: color-mix(in srgb, var(--jp-jungle) 68%, var(--jp-bark));
+}
+
+.jp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(27, 23, 17, 0.58);
+  backdrop-filter: blur(2px);
+}
+
+.jp-modal-backdrop-reveal {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(247, 212, 141, 0.24), rgba(27, 23, 17, 0.76)),
+    rgba(27, 23, 17, 0.72);
+}
+
+.jp-modal {
+  width: min(42rem, 96vw);
+  max-height: min(90vh, 46rem);
+  overflow: auto;
+  border: 1px solid rgba(211, 160, 58, 0.42);
+  border-radius: 1rem;
+  background:
+    linear-gradient(165deg, rgba(247, 239, 216, 0.97), rgba(231, 217, 184, 0.94)),
+    radial-gradient(circle at 76% 24%, rgba(113, 137, 81, 0.22), transparent 58%);
+  box-shadow:
+    0 1rem 2.2rem rgba(17, 13, 9, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  padding: 1rem;
+  animation: jp-modal-enter 200ms ease-out;
+}
+
+.gallery-detail-modal {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.gallery-detail-title,
+.reward-modal-title {
+  margin-top: 0.1rem;
+}
+
+.gallery-detail-meta,
+.reward-modal-subtitle {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--jp-jungle) 72%, var(--jp-bark));
+}
+
+.gallery-detail-image,
+.reward-modal-image {
+  width: 100%;
+  max-height: min(54vh, 22rem);
+  object-fit: cover;
+  border-radius: 0.78rem;
+  border: 1px solid rgba(45, 36, 25, 0.25);
+}
+
+.reward-reveal-modal {
+  display: grid;
+  gap: 0.8rem;
+  justify-items: start;
+  border-color: rgba(244, 212, 141, 0.66);
+  box-shadow:
+    0 1.2rem 2.5rem rgba(17, 13, 9, 0.5),
+    0 0 2.2rem rgba(244, 212, 141, 0.23),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+@keyframes jp-modal-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .earned-reward-panel {

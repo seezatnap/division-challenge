@@ -1,12 +1,13 @@
 export const GEMINI_API_KEY_ENV_VAR = "GEMINI_API_KEY";
-export const GEMINI_IMAGE_MODEL = "gemini-2.0-flash-exp";
+export const GEMINI_IMAGE_MODEL_ENV_VAR = "GEMINI_IMAGE_MODEL";
+export const GEMINI_IMAGE_MODEL_DEFAULT = "gemini-2.5-flash-image-preview";
 
 const GEMINI_API_KEY_ERROR =
   "Missing GEMINI_API_KEY. Set GEMINI_API_KEY in .env.local before requesting Gemini rewards.";
 
 export interface GeminiImageRequestConfig {
   readonly apiKey: string;
-  readonly model: typeof GEMINI_IMAGE_MODEL;
+  readonly model: string;
 }
 
 type RuntimeEnvironment = Readonly<Record<string, string | undefined>>;
@@ -24,9 +25,14 @@ export function getGeminiApiKey(env: RuntimeEnvironment = process.env): string {
 export function createGeminiImageRequestConfig(
   env: RuntimeEnvironment = process.env,
 ): GeminiImageRequestConfig {
+  const configuredModel = env[GEMINI_IMAGE_MODEL_ENV_VAR]?.trim();
+
   return {
     apiKey: getGeminiApiKey(env),
-    model: GEMINI_IMAGE_MODEL,
+    model:
+      typeof configuredModel === "string" && configuredModel.length > 0
+        ? configuredModel
+        : GEMINI_IMAGE_MODEL_DEFAULT,
   };
 }
 
