@@ -55,7 +55,7 @@
 - [x] (#30) Add reward pipeline tests for milestone triggering, deterministic dinosaur selection, prefetch behavior, dedupe checks, and in-flight polling/reveal [5 pts] (blocked by #18, #19, #20) (B)
 - [x] (#31) Add persistence tests covering FS API permissions, save/load schema integrity, fallback import/export, and save-race protection logic [5 pts] (blocked by #23, #24, #25) (A)
 - [x] (#32) Run end-to-end smoke tests for full player journey (new game, solve loop, reward unlock, gallery refresh, save/load restore) and capture regressions against v1 known issues [5 pts] (blocked by #21, #27, #30, #31) (A)
-- [ ] (#33) Write developer runbook/README updates for setup, `GEMINI_API_KEY`, file storage behavior, fallback behavior, and test execution workflow [5 pts] (blocked by #32)
+- [A] (#33) Write developer runbook/README updates for setup, `GEMINI_API_KEY`, file storage behavior, fallback behavior, and test execution workflow [5 pts] (blocked by #32)
 
 ## Follow-up tasks (from sprint review)
 - [x] (#34) Migrate the rewards image generation integration off deprecated `@google/generative-ai` to the supported Google Gen AI SDK, and update parsing/error handling for the new client response shape. (blocked by #16) (C)
@@ -79,4 +79,4 @@
 - [x] (#42) Fix persistence merge behavior so `saveSessionToFileSystem` does not overwrite a new active session’s `progress.session` with older higher-solved stats when session IDs differ, and add a regression test for save-after-load (new session) payload correctness. (blocked by #25) (A)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#43) Make `tests/player-journey-smoke.test.mjs` deterministic by replacing the fixed 20-turn `setImmediate` wait with explicit synchronization on near-milestone prefetch completion before asserting `prefetchStatuses` (the smoke test intermittently fails with `prefetchStatuses` still empty). (blocked by #32)
+- [A] (#43) Make `tests/player-journey-smoke.test.mjs` deterministic by replacing the fixed 20-turn `setImmediate` wait with explicit synchronization on near-milestone prefetch completion before asserting `prefetchStatuses` (the smoke test intermittently fails with `prefetchStatuses` still empty). (blocked by #32)
