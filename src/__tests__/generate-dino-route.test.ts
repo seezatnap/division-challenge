@@ -6,28 +6,21 @@
  * Tests for the POST /api/generate-dino route handler.
  *
  * Uses Node test environment for Web API globals (Request, Response).
- * The Gemini image service is mocked to avoid real API calls.
+ * The dino-image-cache module is mocked to avoid real filesystem/API calls.
  */
 
 import { POST } from "@/app/api/generate-dino/route";
 import { NextRequest } from "next/server";
 
 // ---------------------------------------------------------------------------
-// Mock the image generation service
+// Mock the cache-aware generation service
 // ---------------------------------------------------------------------------
 
-const mockGenerateDinoImage = jest.fn();
+const mockGenerateDinoImageCached = jest.fn();
 
-jest.mock("@/features/rewards/gemini-image-service", () => ({
-  generateDinoImage: (...args: unknown[]) => mockGenerateDinoImage(...args),
-  extensionForMimeType: (mime: string) => {
-    const map: Record<string, string> = {
-      "image/png": "png",
-      "image/jpeg": "jpg",
-      "image/webp": "webp",
-    };
-    return map[mime] ?? "png";
-  },
+jest.mock("@/features/rewards/dino-image-cache", () => ({
+  generateDinoImageCached: (...args: unknown[]) =>
+    mockGenerateDinoImageCached(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -59,13 +52,11 @@ describe("POST /api/generate-dino", () => {
     jest.clearAllMocks();
   });
 
-  it("returns 200 with image data on successful generation", async () => {
-    mockGenerateDinoImage.mockResolvedValue({
+  it("returns 200 with imagePath and fromCache on successful generation", async () => {
+    mockGenerateDinoImageCached.mockResolvedValue({
       success: true,
-      image: {
-        base64Data: "abc123",
-        mimeType: "image/png",
-      },
+      imagePath: "dinos/t-rex.png",
+      fromCache: false,
     });
 
     const response = await POST(makeRequest({ dinosaurName: "T-Rex" }));
@@ -73,15 +64,32 @@ describe("POST /api/generate-dino", () => {
 
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
-    expect(data.image.base64Data).toBe("abc123");
-    expect(data.image.mimeType).toBe("image/png");
-    expect(data.image.extension).toBe("png");
+    expect(data.imagePath).toBe("dinos/t-rex.png");
+    expect(data.fromCache).toBe(false);
   });
 
-  it("passes dinosaurName and sceneHint to the service", async () => {
-    mockGenerateDinoImage.mockResolvedValue({
+  it("returns fromCache: true when image was cached", async () => {
+    mockGenerateDinoImageCached.mockResolvedValue({
       success: true,
-      image: { base64Data: "d", mimeType: "image/png" },
+      imagePath: "dinos/velociraptor.png",
+      fromCache: true,
+    });
+
+    const response = await POST(
+      makeRequest({ dinosaurName: "Velociraptor" }),
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.fromCache).toBe(true);
+  });
+
+  it("passes dinosaurName and sceneHint to the cache service", async () => {
+    mockGenerateDinoImageCached.mockResolvedValue({
+      success: true,
+      imagePath: "dinos/velociraptor.png",
+      fromCache: false,
     });
 
     await POST(
@@ -91,21 +99,22 @@ describe("POST /api/generate-dino", () => {
       }),
     );
 
-    expect(mockGenerateDinoImage).toHaveBeenCalledWith({
+    expect(mockGenerateDinoImageCached).toHaveBeenCalledWith({
       dinosaurName: "Velociraptor",
       sceneHint: "in tall grass",
     });
   });
 
   it("trims whitespace from dinosaurName", async () => {
-    mockGenerateDinoImage.mockResolvedValue({
+    mockGenerateDinoImageCached.mockResolvedValue({
       success: true,
-      image: { base64Data: "d", mimeType: "image/png" },
+      imagePath: "dinos/triceratops.png",
+      fromCache: false,
     });
 
     await POST(makeRequest({ dinosaurName: "  Triceratops  " }));
 
-    expect(mockGenerateDinoImage).toHaveBeenCalledWith(
+    expect(mockGenerateDinoImageCached).toHaveBeenCalledWith(
       expect.objectContaining({ dinosaurName: "Triceratops" }),
     );
   });
@@ -146,7 +155,7 @@ describe("POST /api/generate-dino", () => {
   });
 
   it("returns 502 when generation fails", async () => {
-    mockGenerateDinoImage.mockResolvedValue({
+    mockGenerateDinoImageCached.mockResolvedValue({
       success: false,
       error: "API rate limit exceeded",
     });
@@ -159,19 +168,5 @@ describe("POST /api/generate-dino", () => {
     expect(response.status).toBe(502);
     expect(data.success).toBe(false);
     expect(data.error).toContain("API rate limit exceeded");
-  });
-
-  it("includes extension in successful response", async () => {
-    mockGenerateDinoImage.mockResolvedValue({
-      success: true,
-      image: { base64Data: "d", mimeType: "image/jpeg" },
-    });
-
-    const response = await POST(
-      makeRequest({ dinosaurName: "Stegosaurus" }),
-    );
-    const data = await response.json();
-
-    expect(data.image.extension).toBe("jpg");
   });
 });

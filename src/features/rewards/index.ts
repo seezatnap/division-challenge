@@ -44,6 +44,24 @@ export {
 export type { DinosaurEntry } from "./dinosaurs";
 
 export {
+  dinoSlug,
+  getDinoImageDir,
+  ensureDinoImageDir,
+  findCachedImage,
+  saveDinoImage,
+  generateDinoImageCached,
+} from "./dino-image-cache";
+export type {
+  CachedImageHit,
+  CachedImageMiss,
+  CacheCheckResult,
+  SavedImageInfo,
+  CachedGenerationResult,
+  CachedGenerationError,
+  CachedGenerationOutcome,
+} from "./dino-image-cache";
+
+export {
   RewardGenerationStatus,
   type UnlockedReward,
   type RewardGenerationState,
