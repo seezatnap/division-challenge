@@ -1,0 +1,270 @@
+"use client";
+
+import React, { useState, useCallback } from "react";
+import type { GameSession, GameStartPhase, SaveFile } from "@/types";
+import {
+  createNewSession,
+  restoreSessionFromSave,
+  validatePlayerName,
+  saveFileNameFromPlayer,
+} from "./session-init";
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+export interface GameStartFlowProps {
+  /** Called when the session is fully initialized and play can begin. */
+  onSessionReady: (session: GameSession) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse and minimally validate a save file from raw text.
+ * Returns the parsed SaveFile or null if invalid.
+ */
+function parseSaveFile(text: string): SaveFile | null {
+  try {
+    const parsed = JSON.parse(text) as SaveFile;
+    if (!parsed.playerName || typeof parsed.totalProblemsSolved !== "number") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Open a file via a hidden `<input type="file">` element (fallback for
+ * browsers without the File System Access API).
+ */
+function openFileViaInput(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+
+    input.onchange = () => {
+      resolve(input.files?.[0] ?? null);
+    };
+
+    // If the user cancels, we never get an event — resolve after a timeout.
+    // In practice the component stays interactive so this is just cleanup.
+    input.click();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function GameStartFlow({ onSessionReady }: GameStartFlowProps) {
+  const [phase, setPhase] = useState<GameStartPhase>("name-entry");
+  const [playerName, setPlayerName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // ── Name submission ────────────────────────────────────────────────
+  const handleNameSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const error = validatePlayerName(playerName);
+      if (error) {
+        setNameError(error);
+        return;
+      }
+      setNameError(null);
+      setPhase("load-or-new");
+    },
+    [playerName],
+  );
+
+  // ── Start new game ─────────────────────────────────────────────────
+  const handleStartNew = useCallback(() => {
+    const session = createNewSession(playerName.trim());
+    setPhase("ready");
+    onSessionReady(session);
+  }, [playerName, onSessionReady]);
+
+  // ── Load save file ─────────────────────────────────────────────────
+  const handleLoadSave = useCallback(async () => {
+    setLoadError(null);
+
+    let text: string | null = null;
+
+    if ("showOpenFilePicker" in window) {
+      try {
+        const [fileHandle] = await (
+          window as Window & {
+            showOpenFilePicker: (
+              opts: unknown,
+            ) => Promise<FileSystemFileHandle[]>;
+          }
+        ).showOpenFilePicker({
+          types: [
+            {
+              description: "Dino Division Save File",
+              accept: { "application/json": [".json"] },
+            },
+          ],
+          multiple: false,
+        });
+        const file = await fileHandle.getFile();
+        text = await file.text();
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return; // User cancelled
+        }
+        setLoadError("Could not load save file. Please try again.");
+        return;
+      }
+    } else {
+      // Fallback: hidden file input
+      const file = await openFileViaInput();
+      if (!file) return;
+      try {
+        text = await file.text();
+      } catch {
+        setLoadError("Could not read save file. Please try again.");
+        return;
+      }
+    }
+
+    if (!text) return;
+
+    const parsed = parseSaveFile(text);
+    if (!parsed) {
+      setLoadError("This file doesn't look like a valid save file.");
+      return;
+    }
+
+    const session = restoreSessionFromSave(parsed);
+    setPlayerName(parsed.playerName);
+    setPhase("ready");
+    onSessionReady(session);
+  }, [onSessionReady]);
+
+  // ── Back to name entry ─────────────────────────────────────────────
+  const handleBack = useCallback(() => {
+    setPhase("name-entry");
+    setLoadError(null);
+  }, []);
+
+  // ── Phase: name-entry ──────────────────────────────────────────────
+  if (phase === "name-entry") {
+    return (
+      <div className="dino-fade-up flex flex-col items-center">
+        <div className="dino-card w-full max-w-md p-6 sm:p-8">
+          <h2 className="dino-heading mb-2 text-center text-2xl sm:text-3xl">
+            Welcome, Explorer!
+          </h2>
+          <p className="mb-6 text-center text-sm text-earth-mid">
+            Enter your name to begin your dinosaur division adventure.
+          </p>
+
+          <form onSubmit={handleNameSubmit} noValidate>
+            <label
+              htmlFor="player-name"
+              className="mb-1 block text-sm font-medium text-earth-dark"
+            >
+              Player Name
+            </label>
+            <input
+              id="player-name"
+              type="text"
+              autoFocus
+              autoComplete="off"
+              value={playerName}
+              onChange={(e) => {
+                setPlayerName(e.target.value);
+                if (nameError) setNameError(null);
+              }}
+              placeholder="e.g. Rex"
+              className="mb-1 w-full rounded-lg border border-earth-pale bg-bone px-4 py-2.5 text-earth-dark placeholder:text-earth-light focus:border-amber-glow focus:outline-none focus:ring-2 focus:ring-amber-glow/50"
+              aria-describedby={nameError ? "name-error" : undefined}
+              aria-invalid={nameError ? "true" : undefined}
+            />
+            {nameError && (
+              <p
+                id="name-error"
+                className="mb-3 text-sm text-volcanic-red"
+                role="alert"
+              >
+                {nameError}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="dino-btn dino-btn-primary mt-4 w-full"
+            >
+              Continue
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Phase: load-or-new ─────────────────────────────────────────────
+  if (phase === "load-or-new") {
+    const expectedFileName = saveFileNameFromPlayer(playerName);
+
+    return (
+      <div className="dino-fade-up flex flex-col items-center">
+        <div className="dino-card w-full max-w-md p-6 sm:p-8">
+          <h2 className="dino-heading mb-2 text-center text-2xl sm:text-3xl">
+            Welcome, {playerName.trim()}!
+          </h2>
+          <p className="mb-6 text-center text-sm text-earth-mid">
+            Start a new adventure or continue where you left off.
+          </p>
+
+          <div className="flex flex-col gap-3">
+            <button
+              className="dino-btn dino-btn-primary w-full"
+              onClick={handleStartNew}
+            >
+              Start New Game
+            </button>
+
+            <button
+              className="dino-btn dino-btn-secondary w-full"
+              onClick={handleLoadSave}
+            >
+              Load Existing Save
+            </button>
+          </div>
+
+          {loadError && (
+            <p
+              className="mt-3 text-center text-sm text-volcanic-red"
+              role="alert"
+            >
+              {loadError}
+            </p>
+          )}
+
+          <p className="mt-4 text-center text-xs text-earth-light">
+            Looking for{" "}
+            <span className="font-mono">{expectedFileName}</span>
+          </p>
+
+          <button
+            className="mt-4 w-full text-center text-sm text-jungle-light underline-offset-2 hover:underline"
+            onClick={handleBack}
+          >
+            &larr; Change name
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Phase: ready (session initialized — parent takes over) ─────────
+  return null;
+}

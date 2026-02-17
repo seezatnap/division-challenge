@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import Home from "@/app/page";
 
 describe("Home page", () => {
@@ -10,7 +10,7 @@ describe("Home page", () => {
   it("renders the subtitle", () => {
     render(<Home />);
     expect(
-      screen.getByText("Long-division practice, Jurassic style.")
+      screen.getByText("Long-division practice, Jurassic style."),
     ).toBeInTheDocument();
   });
 
@@ -20,17 +20,28 @@ describe("Home page", () => {
     expect(heading.className).toContain("dino-heading");
   });
 
-  it("renders action buttons", () => {
+  it("shows the game-start flow (name entry) initially", () => {
     render(<Home />);
-    expect(screen.getByText("Start Practice")).toBeInTheDocument();
-    expect(screen.getByText("Load Save")).toBeInTheDocument();
+    expect(screen.getByText("Welcome, Explorer!")).toBeInTheDocument();
+    expect(screen.getByLabelText("Player Name")).toBeInTheDocument();
   });
 
-  it("applies themed button classes", () => {
+  it("transitions to the game view after starting a new game", () => {
     render(<Home />);
-    const primaryBtn = screen.getByText("Start Practice");
-    expect(primaryBtn.className).toContain("dino-btn-primary");
-    const secondaryBtn = screen.getByText("Load Save");
-    expect(secondaryBtn.className).toContain("dino-btn-secondary");
+
+    // Enter name
+    fireEvent.change(screen.getByLabelText("Player Name"), {
+      target: { value: "Rex" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+
+    // Start new game
+    fireEvent.click(screen.getByText("Start New Game"));
+
+    // Should show ready state
+    expect(screen.getByText("Ready to play, Rex!")).toBeInTheDocument();
+    expect(
+      screen.getByText("Solve problems, earn dinosaurs!"),
+    ).toBeInTheDocument();
   });
 });
