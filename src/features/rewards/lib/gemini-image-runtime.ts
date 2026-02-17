@@ -4,8 +4,10 @@ import {
   buildJurassicParkCinematicPrompt,
   createGeminiImageRequestConfig,
 } from "./gemini";
+import { resolveGeminiRewardImageWithFilesystemCache } from "./gemini-image-cache";
 import {
   generateGeminiDinosaurImage,
+  parseGeminiImageGenerationRequest,
   type GeminiGeneratedImage,
   type GeminiImageServiceDependencies,
 } from "./gemini-image-service";
@@ -16,9 +18,14 @@ const defaultGeminiImageServiceDependencies: GeminiImageServiceDependencies = {
   createClient: (apiKey: string) => new GoogleGenAI({ apiKey }),
 };
 
-export function generateGeminiRewardImage(
+export async function generateGeminiRewardImage(
   payload: unknown,
   dependencies: GeminiImageServiceDependencies = defaultGeminiImageServiceDependencies,
 ): Promise<GeminiGeneratedImage> {
-  return generateGeminiDinosaurImage(payload, dependencies);
+  const request = parseGeminiImageGenerationRequest(payload);
+
+  return resolveGeminiRewardImageWithFilesystemCache(
+    request,
+    (parsedRequest) => generateGeminiDinosaurImage(parsedRequest, dependencies),
+  );
 }
