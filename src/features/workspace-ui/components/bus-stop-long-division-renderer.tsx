@@ -31,6 +31,7 @@ import {
 
 const LOCK_IN_ANIMATION_DURATION_MS = 280;
 const BRING_DOWN_ANIMATION_DURATION_MS = 420;
+const WORK_ROW_REVEAL_ANIMATION_DURATION_MS = 340;
 const NON_DIGIT_KEY_PATTERN = /^\D$/;
 const EMPTY_DRAFT_ENTRY_VALUES: WorkspaceDraftEntryValues = {};
 
@@ -48,6 +49,7 @@ type InlineEntryLane = "quotient" | "work-row";
 interface WorkspaceInlineEntryProps {
   stepId: string;
   lane: InlineEntryLane;
+  stepKind: LongDivisionStep["kind"];
   targetId: string | null;
   value: string;
   isFilled: boolean;
@@ -87,6 +89,7 @@ function renderInlineEntryText(value: string): string {
 function WorkspaceInlineEntry({
   stepId,
   lane,
+  stepKind,
   targetId,
   value,
   isFilled,
@@ -112,7 +115,10 @@ function WorkspaceInlineEntry({
       data-entry-inline="true"
       data-entry-lane={lane}
       data-entry-live={isInteractive ? "true" : "false"}
+      data-entry-lock-pulse={isLockingIn ? stepKind : "none"}
+      data-entry-step-kind={stepKind}
       data-entry-state={isFilled ? "locked" : "pending"}
+      data-glow-cadence={isActive ? stepKind : "none"}
       data-entry-target-id={targetId ?? ""}
       onInput={isEditable ? (event) => onInput?.(stepId, event) : undefined}
       onKeyDown={isEditable ? (event) => onKeyDown?.(stepId, event) : undefined}
@@ -165,6 +171,7 @@ export function BusStopLongDivisionRenderer({
   const lockingStepIds =
     lockInAnimationState.stepIdentity === stepIdentity ? lockInAnimationState.stepIds : {};
   const lockTimeoutByStepIdRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const rowRevealTimeoutByStepIdRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const bringDownAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const [bringDownAnimationState, setBringDownAnimationState] = useState<{
@@ -176,6 +183,15 @@ export function BusStopLongDivisionRenderer({
   });
   const bringDownAnimationStepId =
     bringDownAnimationState.stepIdentity === stepIdentity ? bringDownAnimationState.stepId : null;
+  const [rowRevealAnimationState, setRowRevealAnimationState] = useState<{
+    stepIdentity: string;
+    stepIds: Record<string, true>;
+  }>({
+    stepIdentity,
+    stepIds: {},
+  });
+  const rowRevealStepIds =
+    rowRevealAnimationState.stepIdentity === stepIdentity ? rowRevealAnimationState.stepIds : {};
 
   const effectiveRevealedStepCount = liveTypingEnabled
     ? liveTypingState.revealedStepCount
@@ -207,6 +223,14 @@ export function BusStopLongDivisionRenderer({
   const activeBringDownAnimationSource = bringDownAnimationStepId
     ? bringDownAnimationSourceByStepId[bringDownAnimationStepId] ?? null
     : null;
+  const activeStepKind = useMemo<LongDivisionStep["kind"] | "none">(() => {
+    if (!renderModel.activeStepId) {
+      return "none";
+    }
+
+    const activeStep = steps.find((step) => step.id === renderModel.activeStepId);
+    return activeStep?.kind ?? "none";
+  }, [renderModel.activeStepId, steps]);
 
   const clearBringDownAnimationTimeout = useCallback(() => {
     if (!bringDownAnimationTimeoutRef.current) {
@@ -215,6 +239,14 @@ export function BusStopLongDivisionRenderer({
 
     clearTimeout(bringDownAnimationTimeoutRef.current);
     bringDownAnimationTimeoutRef.current = null;
+  }, []);
+
+  const clearRowRevealAnimationTimeouts = useCallback(() => {
+    const timeoutHandles = rowRevealTimeoutByStepIdRef.current;
+    for (const timeoutHandle of timeoutHandles.values()) {
+      clearTimeout(timeoutHandle);
+    }
+    timeoutHandles.clear();
   }, []);
 
   useEffect(() => {
@@ -229,9 +261,10 @@ export function BusStopLongDivisionRenderer({
         clearTimeout(timeoutHandle);
       }
       timeoutHandles.clear();
+      clearRowRevealAnimationTimeouts();
       clearBringDownAnimationTimeout();
     };
-  }, [clearBringDownAnimationTimeout]);
+  }, [clearBringDownAnimationTimeout, clearRowRevealAnimationTimeouts]);
 
   useEffect(() => {
     if (!liveTypingEnabled || !renderModel.activeTargetId) {
@@ -257,7 +290,8 @@ export function BusStopLongDivisionRenderer({
 
   useEffect(() => {
     clearBringDownAnimationTimeout();
-  }, [clearBringDownAnimationTimeout, stepIdentity]);
+    clearRowRevealAnimationTimeouts();
+  }, [clearBringDownAnimationTimeout, clearRowRevealAnimationTimeouts, stepIdentity]);
 
   const clearBringDownAnimationState = useCallback(() => {
     setBringDownAnimationState((currentState) => {
@@ -317,6 +351,51 @@ export function BusStopLongDivisionRenderer({
     lockTimeoutByStepIdRef.current.set(timeoutKey, timeoutHandle);
   }, [stepIdentity]);
 
+  const queueWorkRowRevealAnimation = useCallback((stepId: string) => {
+    const timeoutKey = `${stepIdentity}:${stepId}`;
+
+    setRowRevealAnimationState((currentState) => {
+      const currentStepIds =
+        currentState.stepIdentity === stepIdentity ? currentState.stepIds : {};
+
+      return {
+        stepIdentity,
+        stepIds: {
+          ...currentStepIds,
+          [stepId]: true,
+        },
+      };
+    });
+
+    const existingTimeout = rowRevealTimeoutByStepIdRef.current.get(timeoutKey);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    const timeoutHandle = setTimeout(() => {
+      setRowRevealAnimationState((currentState) => {
+        const currentStepIds =
+          currentState.stepIdentity === stepIdentity ? currentState.stepIds : {};
+        if (!currentStepIds[stepId]) {
+          return {
+            stepIdentity,
+            stepIds: currentStepIds,
+          };
+        }
+
+        const nextStepIds = { ...currentStepIds };
+        delete nextStepIds[stepId];
+        return {
+          stepIdentity,
+          stepIds: nextStepIds,
+        };
+      });
+      rowRevealTimeoutByStepIdRef.current.delete(timeoutKey);
+    }, WORK_ROW_REVEAL_ANIMATION_DURATION_MS);
+
+    rowRevealTimeoutByStepIdRef.current.set(timeoutKey, timeoutHandle);
+  }, [stepIdentity]);
+
   const applyCommittedTransition = useCallback(
     (transition: LiveWorkspaceEntryInputTransition) => {
       liveTypingStateRef.current = transition.state;
@@ -371,6 +450,7 @@ export function BusStopLongDivisionRenderer({
 
   const commitLiveWorkspaceTransition = useCallback(
     (transition: LiveWorkspaceEntryInputTransition) => {
+      const previousRevealedStepCount = liveTypingStateRef.current.revealedStepCount;
       applyCommittedTransition(transition);
 
       if (!liveTypingEnabled || !transition.didAdvance || !transition.validation) {
@@ -381,6 +461,11 @@ export function BusStopLongDivisionRenderer({
 
       const focusStepIndex = transition.validation.focusStepIndex;
       const nextStep = typeof focusStepIndex === "number" ? steps[focusStepIndex] : null;
+      const didRevealNextStep = transition.state.revealedStepCount > previousRevealedStepCount;
+
+      if (didRevealNextStep && nextStep && nextStep.kind !== "quotient-digit") {
+        queueWorkRowRevealAnimation(nextStep.id);
+      }
 
       if (nextStep?.kind === "bring-down") {
         queueBringDownAnimationForStep(nextStep.id);
@@ -396,6 +481,7 @@ export function BusStopLongDivisionRenderer({
       clearBringDownAnimationTimeout,
       liveTypingEnabled,
       queueBringDownAnimationForStep,
+      queueWorkRowRevealAnimation,
       steps,
     ],
   );
@@ -464,6 +550,7 @@ export function BusStopLongDivisionRenderer({
     <article
       aria-label="Long-division workspace"
       className="workspace-paper bus-stop-renderer"
+      data-active-step-kind={activeStepKind}
       data-bring-down-animation={bringDownAnimationStepId ? "running" : "idle"}
       data-ui-component="bus-stop-renderer"
       data-workspace-live-typing={liveTypingEnabled ? "enabled" : "disabled"}
@@ -488,6 +575,7 @@ export function BusStopLongDivisionRenderer({
                 onInput={liveTypingEnabled ? handleInlineEntryInput : undefined}
                 onKeyDown={liveTypingEnabled ? handleInlineEntryKeyDown : undefined}
                 onPaste={liveTypingEnabled ? handleInlineEntryPaste : undefined}
+                stepKind="quotient-digit"
                 stepId={cell.stepId}
                 targetId={cell.targetId}
                 value={resolveInlineWorkspaceEntryValue({
@@ -531,42 +619,52 @@ export function BusStopLongDivisionRenderer({
                   <span className="work-row-value">...</span>
                 </li>
               ) : (
-                renderModel.workRows.map((row) => (
-                  <li className="work-row" data-step-kind={row.kind} key={row.stepId}>
-                    <span aria-hidden="true" className="work-row-op">
-                      {row.displayPrefix || "\u00a0"}
-                    </span>
-                    <div
-                      className="work-row-value-shell"
-                      data-bring-down-animation={bringDownAnimationStepId === row.stepId ? "running" : "idle"}
+                renderModel.workRows.map((row) => {
+                  const isRowTransitioning = Boolean(rowRevealStepIds[row.stepId]);
+
+                  return (
+                    <li
+                      className={`work-row${isRowTransitioning ? " work-row-enter" : ""}`}
+                      data-row-transition={isRowTransitioning ? "enter" : "idle"}
+                      data-step-kind={row.kind}
+                      key={row.stepId}
                     >
-                      <WorkspaceInlineEntry
-                        isActive={row.isActive}
-                        isAutoEntry={row.kind === "bring-down" && liveTypingEnabled}
-                        isFilled={row.isFilled}
-                        isInteractive={liveTypingEnabled}
-                        isLockingIn={Boolean(lockingStepIds[row.stepId])}
-                        lane="work-row"
-                        onInput={liveTypingEnabled ? handleInlineEntryInput : undefined}
-                        onKeyDown={liveTypingEnabled ? handleInlineEntryKeyDown : undefined}
-                        onPaste={liveTypingEnabled ? handleInlineEntryPaste : undefined}
-                        stepId={row.stepId}
-                        targetId={row.targetId}
-                        value={resolveInlineWorkspaceEntryValue({
-                          stepId: row.stepId,
-                          lockedValue: row.value,
-                          isFilled: row.isFilled,
-                          draftEntryValues,
-                        })}
-                      />
-                      {bringDownAnimationStepId === row.stepId ? (
-                        <span aria-hidden="true" className="bring-down-digit-slide">
-                          {activeBringDownAnimationSource?.digit ?? "\u00a0"}
-                        </span>
-                      ) : null}
-                    </div>
-                  </li>
-                ))
+                      <span aria-hidden="true" className="work-row-op">
+                        {row.displayPrefix || "\u00a0"}
+                      </span>
+                      <div
+                        className="work-row-value-shell"
+                        data-bring-down-animation={bringDownAnimationStepId === row.stepId ? "running" : "idle"}
+                      >
+                        <WorkspaceInlineEntry
+                          isActive={row.isActive}
+                          isAutoEntry={row.kind === "bring-down" && liveTypingEnabled}
+                          isFilled={row.isFilled}
+                          isInteractive={liveTypingEnabled}
+                          isLockingIn={Boolean(lockingStepIds[row.stepId])}
+                          lane="work-row"
+                          onInput={liveTypingEnabled ? handleInlineEntryInput : undefined}
+                          onKeyDown={liveTypingEnabled ? handleInlineEntryKeyDown : undefined}
+                          onPaste={liveTypingEnabled ? handleInlineEntryPaste : undefined}
+                          stepId={row.stepId}
+                          stepKind={row.kind}
+                          targetId={row.targetId}
+                          value={resolveInlineWorkspaceEntryValue({
+                            stepId: row.stepId,
+                            lockedValue: row.value,
+                            isFilled: row.isFilled,
+                            draftEntryValues,
+                          })}
+                        />
+                        {bringDownAnimationStepId === row.stepId ? (
+                          <span aria-hidden="true" className="bring-down-digit-slide">
+                            {activeBringDownAnimationSource?.digit ?? "\u00a0"}
+                          </span>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })
               )}
             </ol>
           </div>
