@@ -13,12 +13,12 @@
 - [x] (#6) Implement difficulty progression rules driven by cumulative solved counts (lifetime-aware) and expose current difficulty level to problem generation [5 pts] (blocked by #2) (A)
 - [x] (#7) Implement a pure long-division solver that emits the exact ordered workflow (quotient digit, multiply, subtract, bring-down) with expected values for each step [5 pts] (blocked by #2, #5) (A)
 - [x] (#8) Build step-validation/retry logic so correct answers advance immediately, incorrect answers keep focus on the same step, and hint hooks are returned for dino-themed feedback [5 pts] (blocked by #7) (A)
-- [A] (#9) Implement game-loop state orchestration for starting/completing problems, updating session/lifetime counters, and chaining to the next problem without form-submit flows [5 pts] (blocked by #5, #6, #8)
+- [x] (#9) Implement game-loop state orchestration for starting/completing problems, updating session/lifetime counters, and chaining to the next problem without form-submit flows [5 pts] (blocked by #5, #6, #8) (A)
 
 ## Visual Workspace UI
 
 - [x] (#10) Build the bus-stop long-division renderer with divisor left of bracket, dividend inside, quotient above, and dynamic work rows below (paper-like notation, not forms) [5 pts] (blocked by #2, #7) (A)
-- [B] (#11) Implement inline entry elements embedded in the workspace (styled to blend into notation) and remove any standalone form field/dropdown interaction model [5 pts] (blocked by #10)
+- [x] (#11) Implement inline entry elements embedded in the workspace (styled to blend into notation) and remove any standalone form field/dropdown interaction model [5 pts] (blocked by #10) (B)
 - [ ] (#12) Implement a single-active-cell glow manager (amber/gold pulse) that ensures exactly one target is highlighted at any time according to solver order [5 pts] (blocked by #7, #11)
 - [ ] (#13) Wire real-time typing so values appear as typed, lock in with micro-animation on correct entry, and auto-advance glow to the next target [5 pts] (blocked by #8, #12)
 - [ ] (#14) Implement the bring-down animation that visibly slides the next dividend digit into the working number and synchronizes state transitions [5 pts] (blocked by #10, #12)
@@ -50,7 +50,7 @@
 
 ## Testing & Release Readiness
 
-- [A] (#28) Add unit tests for problem generation tiers, remainder handling, progression rules, solver step sequencing, and validation/retry behavior [5 pts] (blocked by #5, #6, #7, #8)
+- [x] (#28) Add unit tests for problem generation tiers, remainder handling, progression rules, solver step sequencing, and validation/retry behavior [5 pts] (blocked by #5, #6, #7, #8) (A)
 - [ ] (#29) Add UI integration tests for in-place typing, single-glow enforcement, correct/incorrect step transitions, and bring-down animation state progression [5 pts] (blocked by #13, #14, #15)
 - [ ] (#30) Add reward pipeline tests for milestone triggering, deterministic dinosaur selection, prefetch behavior, dedupe checks, and in-flight polling/reveal [5 pts] (blocked by #18, #19, #20)
 - [ ] (#31) Add persistence tests covering FS API permissions, save/load schema integrity, fallback import/export, and save-race protection logic [5 pts] (blocked by #23, #24, #25)
