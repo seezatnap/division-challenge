@@ -12,3 +12,9 @@ export { getGeminiConfig, GEMINI_MODEL } from "./gemini-config";
 export type { GeminiConfig } from "./gemini-config";
 export { buildDinoPrompt } from "./prompt-builder";
 export type { DinoPromptOptions } from "./prompt-builder";
+
+export {
+  RewardGenerationStatus,
+  type UnlockedReward,
+  type RewardGenerationState,
+} from "@/types";

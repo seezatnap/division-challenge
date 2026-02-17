@@ -6,4 +6,4 @@
  * - Empty-state messaging for new players
  * - Live refresh after new unlocks
  */
-export {};
+export { type UnlockedReward } from "@/types";
