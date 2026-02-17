@@ -8,3 +8,4 @@ export const persistenceModule: FeatureModuleDescriptor = {
 };
 
 export * from "./game-start-flow";
+export * from "./file-system-save-load";
