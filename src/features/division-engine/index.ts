@@ -38,3 +38,12 @@ export {
 } from "./difficulty-progression";
 
 export { solveDivisionProblem } from "./solver";
+
+export {
+  validateStep,
+  createStepValidator,
+  type StepHintContext,
+  type StepValidationResult,
+  type StepValidatorState,
+  type StepValidator,
+} from "./step-validator";
