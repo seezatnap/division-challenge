@@ -709,6 +709,145 @@ body {
   color: color-mix(in srgb, var(--jp-jungle) 68%, var(--jp-bark));
 }
 
+.earned-reward-panel {
+  margin-top: 0.85rem;
+  border: 1px solid rgba(70, 96, 56, 0.26);
+  border-radius: 0.95rem;
+  background: linear-gradient(170deg, rgba(255, 255, 255, 0.72), rgba(113, 137, 81, 0.14));
+  padding: 0.75rem;
+}
+
+.earned-reward-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.reward-egg-loader {
+  margin-top: 0.75rem;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.reward-egg-shell {
+  position: relative;
+  width: 3.9rem;
+  height: 4.5rem;
+  filter: drop-shadow(0 0.3rem 0.45rem rgba(45, 36, 25, 0.18));
+  animation: reward-egg-wobble 860ms ease-in-out infinite;
+}
+
+.reward-egg-shell-top,
+.reward-egg-shell-bottom {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  border: 1px solid rgba(45, 36, 25, 0.28);
+  background: radial-gradient(circle at 50% 30%, rgba(255, 248, 225, 0.95), rgba(231, 217, 184, 0.92));
+}
+
+.reward-egg-shell-top {
+  top: 0;
+  height: 55%;
+  border-radius: 2.2rem 2.2rem 1.3rem 1.3rem;
+}
+
+.reward-egg-shell-bottom {
+  bottom: 0;
+  height: 56%;
+  border-radius: 1.3rem 1.3rem 2.3rem 2.3rem;
+}
+
+.reward-egg-shell-crack {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 2.4rem;
+  height: 0.16rem;
+  border-radius: 999px;
+  background: rgba(105, 73, 26, 0.75);
+  transform: translateX(-50%);
+  animation: reward-hatch-crack 1.15s ease-in-out infinite;
+}
+
+@keyframes reward-egg-wobble {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+
+  25% {
+    transform: rotate(-5deg) translateY(-1px);
+  }
+
+  50% {
+    transform: rotate(0deg) translateY(0);
+  }
+
+  75% {
+    transform: rotate(5deg) translateY(-1px);
+  }
+}
+
+@keyframes reward-hatch-crack {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateX(-50%) scaleX(0.35);
+  }
+
+  55% {
+    opacity: 0.95;
+    transform: translateX(-50%) scaleX(1);
+  }
+}
+
+.reward-loader-title {
+  font-family: var(--font-jurassic-display), "Times New Roman", serif;
+  font-size: 1.02rem;
+  color: var(--jp-bark);
+}
+
+.reward-loader-copy {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--jp-jungle) 70%, var(--jp-bark));
+}
+
+.reward-reveal-figure {
+  margin-top: 0.75rem;
+}
+
+.reward-reveal-image {
+  width: 100%;
+  max-height: 11rem;
+  object-fit: cover;
+  border-radius: 0.76rem;
+  border: 1px solid rgba(45, 36, 25, 0.2);
+  animation: reward-reveal-in 320ms ease-out 1;
+}
+
+.reward-reveal-caption {
+  margin-top: 0.45rem;
+  font-size: 0.76rem;
+  color: color-mix(in srgb, var(--jp-jungle) 74%, var(--jp-bark));
+}
+
+@keyframes reward-reveal-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .save-actions {
   margin-top: 0.9rem;
   display: flex;
