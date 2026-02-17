@@ -10,3 +10,14 @@
  */
 
 export { type ActiveInputTarget, type InputValidationResult } from "@/types";
+
+export { LongDivisionRenderer } from "./LongDivisionRenderer";
+export type { LongDivisionRendererProps } from "./LongDivisionRenderer";
+
+export {
+  computeLayout,
+  type GridCell,
+  type CellRole,
+  type SeparatorLine,
+  type WorkspaceLayout,
+} from "./layout-engine";
