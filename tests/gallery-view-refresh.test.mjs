@@ -117,7 +117,7 @@ test("home page uses the reusable DinoGalleryPanel with unlocked reward data", a
   const source = await readRepoFile("src/app/page.tsx");
 
   assert.ok(
-    source.includes("<DinoGalleryPanel unlockedRewards={loadableSavePreview.unlockedDinosaurs} />"),
+    source.includes("<DinoGalleryPanel unlockedRewards={gameSession.unlockedRewards} />"),
     "Expected home page to render DinoGalleryPanel with unlocked reward data",
   );
 });

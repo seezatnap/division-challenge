@@ -11,7 +11,7 @@ const CACHE_METADATA_SUFFIX = ".metadata.json";
 const DEFAULT_CACHE_MODEL = "filesystem-cache";
 const inFlightRewardImageGenerations = new Map<string, Promise<GeminiGeneratedImage>>();
 
-const SUPPORTED_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif"] as const;
+const SUPPORTED_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "svg"] as const;
 type SupportedImageExtension = (typeof SUPPORTED_IMAGE_EXTENSIONS)[number];
 
 const MIME_TYPE_BY_EXTENSION: Readonly<Record<SupportedImageExtension, string>> = {
@@ -20,6 +20,7 @@ const MIME_TYPE_BY_EXTENSION: Readonly<Record<SupportedImageExtension, string>> 
   jpeg: "image/jpeg",
   webp: "image/webp",
   gif: "image/gif",
+  svg: "image/svg+xml",
 };
 
 const MIME_TYPE_TO_EXTENSION: Readonly<Record<string, SupportedImageExtension>> = {
@@ -28,6 +29,7 @@ const MIME_TYPE_TO_EXTENSION: Readonly<Record<string, SupportedImageExtension>> 
   "image/jpeg": "jpg",
   "image/webp": "webp",
   "image/gif": "gif",
+  "image/svg+xml": "svg",
 };
 
 interface RewardImageCacheMetadata {

@@ -54,7 +54,7 @@ test("home page renders the earned reward reveal surface", async () => {
   for (const fragment of [
     'data-ui-surface="earned-reward"',
     "<EarnedRewardRevealPanel",
-    "milestoneSolvedCount={15}",
+    "milestoneSolvedCount={activeRewardReveal.milestoneSolvedCount}",
   ]) {
     assert.ok(source.includes(fragment), `Expected home page fragment: ${fragment}`);
   }

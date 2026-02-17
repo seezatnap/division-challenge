@@ -3,6 +3,7 @@ import type {
   LongDivisionStepValidationOutcome,
   LongDivisionStepValidationResult,
 } from "@/features/division-engine/lib/step-validation";
+import type { LongDivisionStepKind } from "@/features/contracts";
 
 export type DinoFeedbackDisplayOutcome = LongDivisionStepValidationOutcome | "ready";
 
@@ -20,6 +21,17 @@ interface DinoFeedbackTemplate {
   readonly statusLabel: string;
   readonly text: string;
   readonly note: string;
+}
+
+export interface DinoCoachStepGuidanceContext {
+  readonly stepId: string | null;
+  readonly stepKind: LongDivisionStepKind | "none";
+  readonly divisorText: string;
+  readonly workingValueText: string | null;
+  readonly quotientDigitText: string | null;
+  readonly multiplyValueText: string | null;
+  readonly subtractionValueText: string | null;
+  readonly bringDownDigitText: string | null;
 }
 
 const FEEDBACK_TEMPLATE_BY_MESSAGE_KEY: Record<string, DinoFeedbackTemplate> = {
@@ -107,6 +119,77 @@ function getFeedbackTemplate(
   tone: DinoStepFeedbackTone,
 ): DinoFeedbackTemplate {
   return FEEDBACK_TEMPLATE_BY_MESSAGE_KEY[messageKey] ?? FEEDBACK_FALLBACK_TEMPLATE_BY_TONE[tone];
+}
+
+function resolveCurrentStepStatusLabel(stepKind: LongDivisionStepKind | "none"): string {
+  switch (stepKind) {
+    case "quotient-digit":
+      return "Choose Quotient Digit";
+    case "multiply-result":
+      return "Multiply The Divisor";
+    case "subtraction-result":
+      return "Subtract The Rows";
+    case "bring-down":
+      return "Bring Down The Digit";
+    default:
+      return "Dino-Mite Finish";
+  }
+}
+
+function resolveCurrentStepText(context: DinoCoachStepGuidanceContext): string {
+  const workingValueText = context.workingValueText ?? "the current working number";
+  const divisorText = context.divisorText;
+
+  switch (context.stepKind) {
+    case "quotient-digit":
+      return `How many times does ${divisorText} go into ${workingValueText}?`;
+    case "multiply-result":
+      return `Multiply ${divisorText} by ${context.quotientDigitText ?? "your quotient digit"}.`;
+    case "subtraction-result":
+      return `Subtract ${context.multiplyValueText ?? "the multiply row"} from ${workingValueText}.`;
+    case "bring-down":
+      return `Bring down ${context.bringDownDigitText ?? "the next digit"} to make ${workingValueText}.`;
+    default:
+      return FEEDBACK_TEMPLATE_BY_MESSAGE_KEY["dino.feedback.complete.problem"].text;
+  }
+}
+
+function resolveCurrentStepNote(context: DinoCoachStepGuidanceContext): string {
+  const workingValueText = context.workingValueText ?? "the active working value";
+
+  switch (context.stepKind) {
+    case "quotient-digit":
+      return `Enter one quotient digit above ${workingValueText}.`;
+    case "multiply-result":
+      return "Write the product on the multiply row before subtracting.";
+    case "subtraction-result":
+      return "Type the remainder in the subtraction row to continue.";
+    case "bring-down":
+      return "Type the new working number in the bring-down row.";
+    default:
+      return FEEDBACK_TEMPLATE_BY_MESSAGE_KEY["dino.feedback.complete.problem"].note;
+  }
+}
+
+export function resolveCurrentStepCoachMessage(
+  context: DinoCoachStepGuidanceContext,
+): DinoFeedbackMessage {
+  if (!isRecord(context)) {
+    throw new TypeError("context must be an object.");
+  }
+
+  const stepKind = context.stepKind as LongDivisionStepKind | "none";
+  const isProblemComplete = stepKind === "none";
+
+  return {
+    id: `dino-coach:step:${context.stepId ?? "complete"}`,
+    tone: isProblemComplete ? "celebration" : "encouragement",
+    outcome: isProblemComplete ? "complete" : "ready",
+    messageKey: `dino.coach.current-step.${stepKind}`,
+    statusLabel: resolveCurrentStepStatusLabel(stepKind),
+    text: resolveCurrentStepText(context),
+    note: resolveCurrentStepNote(context),
+  };
 }
 
 export function resolveDinoFeedbackMessage(

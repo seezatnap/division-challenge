@@ -79,6 +79,11 @@ function resolveStepIndexById(steps: readonly LongDivisionStep[], stepId: string
   return stepIndex;
 }
 
+function resolveExpectedDigitCount(step: LongDivisionStep): number {
+  const expectedDigits = sanitizeInlineWorkspaceEntryValue(step.expectedValue);
+  return Math.max(expectedDigits.length, 1);
+}
+
 export function sanitizeInlineWorkspaceEntryValue(rawValue: string): string {
   if (typeof rawValue !== "string") {
     throw new TypeError("rawValue must be a string.");
@@ -129,7 +134,8 @@ export function applyLiveWorkspaceEntryInput({
 
   const activeStepIndex = clampRevealedStepCount(steps.length, state.revealedStepCount);
   const stepIndex = resolveStepIndexById(steps, stepId);
-  const sanitizedValue = sanitizeInlineWorkspaceEntryValue(rawValue);
+  const expectedDigitCount = resolveExpectedDigitCount(steps[stepIndex]);
+  const sanitizedValue = sanitizeInlineWorkspaceEntryValue(rawValue).slice(0, expectedDigitCount);
   const nextDraftEntryValues = { ...state.draftEntryValues };
 
   if (sanitizedValue.length > 0) {
@@ -152,6 +158,19 @@ export function applyLiveWorkspaceEntryInput({
   }
 
   if (sanitizedValue.length === 0) {
+    return {
+      state: {
+        revealedStepCount: activeStepIndex,
+        draftEntryValues: nextDraftEntryValues,
+      },
+      sanitizedValue,
+      validation: null,
+      lockedStepId: null,
+      didAdvance: false,
+    };
+  }
+
+  if (sanitizedValue.length < expectedDigitCount) {
     return {
       state: {
         revealedStepCount: activeStepIndex,

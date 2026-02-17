@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import type { DinoDivisionSaveFile } from "@/features/contracts";
 import {
@@ -21,6 +21,11 @@ interface GameStartFlowPanelProps {
   loadableSave?: DinoDivisionSaveFile | null;
 }
 
+interface RuntimeFeatureSupport {
+  hasFileSystemAccessApi: boolean;
+  hasJsonSaveFallback: boolean;
+}
+
 function formatStartModeLabel(mode: GameStartMode): string {
   return mode === "load-existing-save" ? "Loaded existing save" : "Started new expedition";
 }
@@ -35,12 +40,19 @@ export function GameStartFlowPanel({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [runtimeFeatureSupport, setRuntimeFeatureSupport] = useState<RuntimeFeatureSupport>({
+    hasFileSystemAccessApi: false,
+    hasJsonSaveFallback: false,
+  });
 
-  const hasFileSystemAccessApi =
-    typeof window !== "undefined" && supportsFileSystemAccessApi(window);
-  const hasJsonSaveFallback =
-    typeof window !== "undefined" &&
-    supportsJsonSaveImportExportFallback(window);
+  useEffect(() => {
+    setRuntimeFeatureSupport({
+      hasFileSystemAccessApi: supportsFileSystemAccessApi(window),
+      hasJsonSaveFallback: supportsJsonSaveImportExportFallback(window),
+    });
+  }, []);
+
+  const { hasFileSystemAccessApi, hasJsonSaveFallback } = runtimeFeatureSupport;
   const hasLoadableSave =
     loadableSave !== null || hasFileSystemAccessApi || hasJsonSaveFallback;
 

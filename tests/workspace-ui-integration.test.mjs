@@ -127,7 +127,7 @@ test("integration: in-place typing keeps draft values inline and locks in on cor
     steps: progressiveSteps,
     state: incorrectTransition.state,
     stepId: firstStep.id,
-    rawValue: "03",
+    rawValue: "3",
     validateStep: validateLongDivisionStepAnswer,
   });
   assert.equal(correctedTransition.didAdvance, true);

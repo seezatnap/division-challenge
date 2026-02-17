@@ -70,18 +70,39 @@ test("buildBusStopRenderModel reveals quotient cells and work rows by visible st
 
   assert.equal(partialModel.divisorText, "12");
   assert.equal(partialModel.dividendText, "432");
+  assert.equal(partialModel.columnCount, 3);
   assert.deepEqual(
     partialModel.quotientCells.map((cell) => cell.value),
     ["3", ""],
   );
   assert.deepEqual(
+    partialModel.quotientCells.map((cell) => cell.columnIndex),
+    [1, 2],
+  );
+  assert.deepEqual(
     partialModel.workRows.map((row) => `${row.kind}:${row.value}`),
     ["multiply-result:36", "subtraction-result:7", "bring-down:72"],
+  );
+  assert.deepEqual(
+    partialModel.workRows.map((row) => row.columnIndex),
+    [1, 1, 2],
+  );
+  assert.deepEqual(
+    partialModel.workRows.map((row) => row.expectedDigitCount),
+    [2, 1, 2],
   );
   assert.equal(partialModel.activeStepId, sampleSteps[4].id);
   assert.equal(partialModel.activeTargetId, "target-4");
   assert.equal(countActiveEntries(partialModel), 1);
   assert.equal(partialModel.quotientCells[1].isActive, true);
+  assert.equal(partialModel.activeStepFocus.stepId, sampleSteps[4].id);
+  assert.equal(partialModel.activeStepFocus.stepKind, "quotient-digit");
+  assert.equal(partialModel.activeStepFocus.divisorText, "12");
+  assert.equal(partialModel.activeStepFocus.workingValueText, "72");
+  assert.equal(partialModel.activeStepFocus.workingDividendWindow?.startColumnIndex, 1);
+  assert.equal(partialModel.activeStepFocus.workingDividendWindow?.endColumnIndex, 2);
+  assert.equal(partialModel.activeStepFocus.shouldHighlightDivisor, true);
+  assert.equal(partialModel.activeStepFocus.shouldHighlightWorkingDividend, true);
 });
 
 test("buildBusStopRenderModel keeps the active work-row target visible as an inline pending cell", async () => {
@@ -136,10 +157,20 @@ test("buildBusStopRenderModel clamps revealed step count and marks multiply rows
     hiddenModel.quotientCells.map((cell) => cell.value),
     ["", ""],
   );
+  assert.deepEqual(
+    hiddenModel.quotientCells.map((cell) => cell.columnIndex),
+    [1, 2],
+  );
   assert.equal(hiddenModel.workRows.length, 0);
   assert.equal(hiddenModel.activeStepId, "step-0-quotient-digit");
   assert.equal(hiddenModel.activeTargetId, "target-0");
   assert.equal(countActiveEntries(hiddenModel), 1);
+  assert.equal(hiddenModel.activeStepFocus.stepKind, "quotient-digit");
+  assert.equal(hiddenModel.activeStepFocus.workingValueText, "43");
+  assert.equal(hiddenModel.activeStepFocus.workingDividendWindow?.startColumnIndex, 0);
+  assert.equal(hiddenModel.activeStepFocus.workingDividendWindow?.endColumnIndex, 1);
+  assert.equal(hiddenModel.activeStepFocus.shouldHighlightDivisor, true);
+  assert.equal(hiddenModel.activeStepFocus.shouldHighlightWorkingDividend, true);
 });
 
 test("buildBusStopRenderModel enforces a single active glow cell even when target ids collide", async () => {
@@ -180,7 +211,7 @@ test("bus-stop renderer component uses inline workspace entries and avoids stand
     'data-ui-component="bus-stop-renderer"',
     'data-active-step-kind={activeStepKind}',
     'className="quotient-track"',
-    'className="divisor-cell"',
+    'className={`divisor-cell${activeStepFocus.shouldHighlightDivisor ? " context-value-glow" : ""}`}',
     'className="bracket-stack"',
     'className="work-rows"',
     "WorkspaceInlineEntry",
@@ -204,6 +235,10 @@ test("bus-stop renderer component uses inline workspace entries and avoids stand
     "work-row-enter",
     "inline-entry-lock-in",
     "glow-amber",
+    "context-value-glow",
+    'data-step-focus-kind={isStepFocusedDigit ? activeStepFocus.stepKind : "none"}',
+    "onActiveStepFocusChange",
+    "lastActiveStepFocusIdentityRef",
     "contentEditable={isEditable}",
     "suppressContentEditableWarning={isEditable}",
   ]) {
@@ -233,23 +268,23 @@ test("home page renders the workspace through the reusable bus-stop renderer", a
     assert.ok(homePageSource.includes(fragment), `Expected home-page workspace fragment: ${fragment}`);
   }
 
-  for (const fragment of ["BusStopLongDivisionRenderer", "enableLiveTyping", "onStepValidation"]) {
+  for (const fragment of ["BusStopLongDivisionRenderer", "enableLiveTyping", "onActiveStepFocusChange"]) {
     assert.ok(workspacePanelSource.includes(fragment), `Expected workspace-panel fragment: ${fragment}`);
   }
 });
 
-test("home page wires dino feedback messaging to validation outcomes", async () => {
+test("home page wires dino coach guidance to the active step context", async () => {
   const source = await readRepoFile("src/features/workspace-ui/components/live-division-workspace-panel.tsx");
 
   for (const fragment of [
+    "resolveCurrentStepCoachMessage",
+    "handleActiveStepFocusChange",
     "DEFAULT_DINO_FEEDBACK_MESSAGE",
-    "resolveDinoFeedbackMessage",
-    "handleWorkspaceStepValidation",
-    "onStepValidation={handleWorkspaceStepValidation}",
+    "onActiveStepFocusChange={handleActiveStepFocusChange}",
     'data-feedback-tone={activeCoachMessage.tone}',
     'data-feedback-outcome={activeCoachMessage.outcome}',
-    "data-feedback-key={message.messageKey}",
-    "{message.text}",
+    "data-feedback-key={entry.message.messageKey}",
+    "{entry.message.text}",
     "{activeCoachMessage.note}",
   ]) {
     assert.ok(source.includes(fragment), `Expected feedback wiring fragment: ${fragment}`);

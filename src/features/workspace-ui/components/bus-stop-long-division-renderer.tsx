@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ClipboardEvent,
   type FormEvent,
   type KeyboardEvent,
@@ -18,6 +19,7 @@ import {
 } from "@/features/division-engine/lib/step-validation";
 import {
   applyLiveWorkspaceEntryInput,
+  type BusStopActiveStepFocus,
   buildBringDownAnimationSourceByStepId,
   buildBusStopRenderModel,
   createLiveWorkspaceTypingState,
@@ -42,6 +44,7 @@ export interface BusStopLongDivisionRendererProps {
   revealedStepCount?: number;
   enableLiveTyping?: boolean;
   onStepValidation?: (validation: LongDivisionStepValidationResult) => void;
+  onActiveStepFocusChange?: (focus: BusStopActiveStepFocus) => void;
 }
 
 type InlineEntryLane = "quotient" | "work-row";
@@ -51,15 +54,29 @@ interface WorkspaceInlineEntryProps {
   lane: InlineEntryLane;
   stepKind: LongDivisionStep["kind"];
   targetId: string | null;
+  digitIndex?: number;
   value: string;
   isFilled: boolean;
   isActive: boolean;
   isInteractive: boolean;
   isAutoEntry: boolean;
   isLockingIn: boolean;
-  onInput?: (stepId: string, event: FormEvent<HTMLSpanElement>) => void;
-  onKeyDown?: (stepId: string, event: KeyboardEvent<HTMLSpanElement>) => void;
-  onPaste?: (stepId: string, event: ClipboardEvent<HTMLSpanElement>) => void;
+  style?: CSSProperties;
+  onInput?: (event: FormEvent<HTMLSpanElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLSpanElement>) => void;
+  onPaste?: (event: ClipboardEvent<HTMLSpanElement>) => void;
+}
+
+interface InlineDigitCellContext {
+  stepId: string;
+  expectedDigits: readonly string[];
+  activeDigitIndex: number;
+}
+
+interface ActiveEditableEntryLocator {
+  stepId: string;
+  targetId: string;
+  digitIndex: number;
 }
 
 function buildInlineEntryClassName({
@@ -86,17 +103,31 @@ function renderInlineEntryText(value: string): string {
   return value.length > 0 ? value : "\u00a0";
 }
 
+function resolveExpectedStepDigits(expectedValue: string): string[] {
+  return Array.from(sanitizeInlineWorkspaceEntryValue(expectedValue));
+}
+
+function resolveActiveDigitIndex(currentValue: string, expectedDigitCount: number): number {
+  if (expectedDigitCount <= 1) {
+    return 0;
+  }
+
+  return Math.min(currentValue.length, expectedDigitCount - 1);
+}
+
 function WorkspaceInlineEntry({
   stepId,
   lane,
   stepKind,
   targetId,
+  digitIndex,
   value,
   isFilled,
   isActive,
   isInteractive,
   isAutoEntry,
   isLockingIn,
+  style,
   onInput,
   onKeyDown,
   onPaste,
@@ -117,14 +148,17 @@ function WorkspaceInlineEntry({
       data-entry-live={isInteractive ? "true" : "false"}
       data-entry-lock-pulse={isLockingIn ? stepKind : "none"}
       data-entry-step-kind={stepKind}
+      data-entry-step-id={stepId}
       data-entry-state={isFilled ? "locked" : "pending"}
       data-glow-cadence={isActive ? stepKind : "none"}
       data-entry-target-id={targetId ?? ""}
-      onInput={isEditable ? (event) => onInput?.(stepId, event) : undefined}
-      onKeyDown={isEditable ? (event) => onKeyDown?.(stepId, event) : undefined}
-      onPaste={isEditable ? (event) => onPaste?.(stepId, event) : undefined}
+      data-entry-digit-index={typeof digitIndex === "number" ? String(digitIndex) : ""}
+      onInput={isEditable ? onInput : undefined}
+      onKeyDown={isEditable ? onKeyDown : undefined}
+      onPaste={isEditable ? onPaste : undefined}
       role={isEditable ? "textbox" : undefined}
       spellCheck={false}
+      style={style}
       suppressContentEditableWarning={isEditable}
       tabIndex={isEditable ? 0 : undefined}
     >
@@ -140,6 +174,7 @@ export function BusStopLongDivisionRenderer({
   revealedStepCount,
   enableLiveTyping,
   onStepValidation,
+  onActiveStepFocusChange,
 }: BusStopLongDivisionRendererProps) {
   const liveTypingEnabled = enableLiveTyping ?? typeof revealedStepCount === "undefined";
   const stepIdentity = useMemo(() => steps.map((step) => step.id).join("|"), [steps]);
@@ -173,6 +208,7 @@ export function BusStopLongDivisionRenderer({
   const lockTimeoutByStepIdRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const rowRevealTimeoutByStepIdRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const bringDownAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastActiveStepFocusIdentityRef = useRef<string | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const [bringDownAnimationState, setBringDownAnimationState] = useState<{
     stepIdentity: string;
@@ -211,6 +247,12 @@ export function BusStopLongDivisionRenderer({
     [divisor, dividend, steps, effectiveRevealedStepCount],
   );
   const dividendDigits = useMemo(() => Array.from(renderModel.dividendText), [renderModel.dividendText]);
+  const notationGridStyle = useMemo<CSSProperties>(
+    () => ({
+      "--division-column-count": renderModel.columnCount,
+    }),
+    [renderModel.columnCount],
+  );
   const bringDownAnimationSourceByStepId = useMemo(
     () =>
       buildBringDownAnimationSourceByStepId({
@@ -231,6 +273,88 @@ export function BusStopLongDivisionRenderer({
     const activeStep = steps.find((step) => step.id === renderModel.activeStepId);
     return activeStep?.kind ?? "none";
   }, [renderModel.activeStepId, steps]);
+  const activeStepFocus = renderModel.activeStepFocus;
+  const activeStepFocusIdentity = useMemo(
+    () =>
+      [
+        activeStepFocus.stepId ?? "",
+        activeStepFocus.stepKind,
+        activeStepFocus.workingValueText ?? "",
+        activeStepFocus.workingDividendWindow?.startColumnIndex ?? "",
+        activeStepFocus.workingDividendWindow?.endColumnIndex ?? "",
+        activeStepFocus.quotientDigitText ?? "",
+        activeStepFocus.multiplyValueText ?? "",
+        activeStepFocus.subtractionValueText ?? "",
+        activeStepFocus.bringDownDigitText ?? "",
+        activeStepFocus.shouldHighlightDivisor ? "1" : "0",
+        activeStepFocus.shouldHighlightWorkingDividend ? "1" : "0",
+      ].join("|"),
+    [activeStepFocus],
+  );
+  const stepById = useMemo(() => {
+    const nextStepById = new Map<string, LongDivisionStep>();
+    for (const step of steps) {
+      nextStepById.set(step.id, step);
+    }
+
+    return nextStepById;
+  }, [steps]);
+  const activeEditableEntryLocator = useMemo<ActiveEditableEntryLocator | null>(() => {
+    if (!liveTypingEnabled || !renderModel.activeStepId || !renderModel.activeTargetId) {
+      return null;
+    }
+
+    const activeQuotientCell = renderModel.quotientCells.find((cell) => cell.isActive);
+    if (activeQuotientCell?.targetId) {
+      return {
+        stepId: activeQuotientCell.stepId,
+        targetId: activeQuotientCell.targetId,
+        digitIndex: 0,
+      };
+    }
+
+    const activeWorkRow = renderModel.workRows.find((row) => row.isActive);
+    if (!activeWorkRow || !activeWorkRow.targetId || activeWorkRow.kind === "bring-down") {
+      return null;
+    }
+
+    const resolvedRowValue = resolveInlineWorkspaceEntryValue({
+      stepId: activeWorkRow.stepId,
+      lockedValue: activeWorkRow.value,
+      isFilled: activeWorkRow.isFilled,
+      draftEntryValues,
+    });
+    const expectedDigits = resolveExpectedStepDigits(
+      stepById.get(activeWorkRow.stepId)?.expectedValue ?? activeWorkRow.value,
+    );
+    const resolvedDigitCount = Math.max(
+      activeWorkRow.expectedDigitCount,
+      expectedDigits.length,
+      resolvedRowValue.length,
+      1,
+    );
+
+    return {
+      stepId: activeWorkRow.stepId,
+      targetId: activeWorkRow.targetId,
+      digitIndex: resolveActiveDigitIndex(resolvedRowValue, resolvedDigitCount),
+    };
+  }, [
+    liveTypingEnabled,
+    renderModel.activeStepId,
+    renderModel.activeTargetId,
+    renderModel.quotientCells,
+    renderModel.workRows,
+    draftEntryValues,
+    stepById,
+  ]);
+  const activeEditableEntryIdentity = useMemo(
+    () =>
+      activeEditableEntryLocator
+        ? `${activeEditableEntryLocator.stepId}|${activeEditableEntryLocator.targetId}|${activeEditableEntryLocator.digitIndex}`
+        : "",
+    [activeEditableEntryLocator],
+  );
 
   const clearBringDownAnimationTimeout = useCallback(() => {
     if (!bringDownAnimationTimeoutRef.current) {
@@ -267,7 +391,7 @@ export function BusStopLongDivisionRenderer({
   }, [clearBringDownAnimationTimeout, clearRowRevealAnimationTimeouts]);
 
   useEffect(() => {
-    if (!liveTypingEnabled || !renderModel.activeTargetId) {
+    if (!liveTypingEnabled || !activeEditableEntryLocator) {
       return;
     }
 
@@ -276,9 +400,17 @@ export function BusStopLongDivisionRenderer({
       return;
     }
 
-    const activeEntry = workspaceElement.querySelector<HTMLElement>(
-      `[data-entry-target-id="${renderModel.activeTargetId}"][contenteditable="true"]`,
-    );
+    const activeEntrySelector = [
+      `[data-entry-step-id="${activeEditableEntryLocator.stepId}"]`,
+      `[data-entry-digit-index="${activeEditableEntryLocator.digitIndex}"]`,
+      '[contenteditable="true"]',
+    ].join("");
+
+    const activeEntry =
+      workspaceElement.querySelector<HTMLElement>(activeEntrySelector) ??
+      workspaceElement.querySelector<HTMLElement>(
+        `[data-entry-target-id="${activeEditableEntryLocator.targetId}"][contenteditable="true"]`,
+      );
     if (!activeEntry) {
       return;
     }
@@ -286,7 +418,20 @@ export function BusStopLongDivisionRenderer({
     if (document.activeElement !== activeEntry) {
       activeEntry.focus();
     }
-  }, [liveTypingEnabled, renderModel.activeTargetId]);
+  }, [liveTypingEnabled, activeEditableEntryIdentity, activeEditableEntryLocator]);
+
+  useEffect(() => {
+    if (!onActiveStepFocusChange) {
+      return;
+    }
+
+    if (lastActiveStepFocusIdentityRef.current === activeStepFocusIdentity) {
+      return;
+    }
+
+    lastActiveStepFocusIdentityRef.current = activeStepFocusIdentity;
+    onActiveStepFocusChange(activeStepFocus);
+  }, [activeStepFocus, activeStepFocusIdentity, onActiveStepFocusChange]);
 
   useEffect(() => {
     clearBringDownAnimationTimeout();
@@ -505,24 +650,51 @@ export function BusStopLongDivisionRenderer({
     [commitLiveWorkspaceTransition, liveTypingEnabled, steps],
   );
 
-  const handleInlineEntryInput = useCallback(
-    (stepId: string, event: FormEvent<HTMLSpanElement>) => {
-      const currentText = event.currentTarget.textContent ?? "";
-      const sanitizedValue = sanitizeInlineWorkspaceEntryValue(currentText);
-
-      if (currentText !== sanitizedValue) {
-        event.currentTarget.textContent = sanitizedValue;
-      }
-
-      applyInlineEntryTransition(stepId, sanitizedValue);
+  const applyStepDigitPrefixTransition = useCallback(
+    (stepId: string, expectedDigits: readonly string[], prefixLength: number) => {
+      const boundedPrefixLength = Math.min(
+        Math.max(Math.trunc(prefixLength), 0),
+        expectedDigits.length,
+      );
+      const nextValue = expectedDigits.slice(0, boundedPrefixLength).join("");
+      applyInlineEntryTransition(stepId, nextValue);
     },
     [applyInlineEntryTransition],
   );
 
-  const handleInlineEntryKeyDown = useCallback(
-    (_stepId: string, event: KeyboardEvent<HTMLSpanElement>) => {
+  const handleInlineDigitInput = useCallback(
+    ({ stepId, expectedDigits, activeDigitIndex }: InlineDigitCellContext, event: FormEvent<HTMLSpanElement>) => {
+      if (expectedDigits.length === 0) {
+        event.currentTarget.textContent = "";
+        return;
+      }
+
+      const currentText = event.currentTarget.textContent ?? "";
+      const nextDigit = sanitizeInlineWorkspaceEntryValue(currentText).at(-1) ?? "";
+      const expectedDigit = expectedDigits[activeDigitIndex] ?? "";
+      event.currentTarget.textContent = "";
+
+      if (nextDigit.length === 0 || nextDigit !== expectedDigit) {
+        return;
+      }
+
+      applyStepDigitPrefixTransition(stepId, expectedDigits, activeDigitIndex + 1);
+    },
+    [applyStepDigitPrefixTransition],
+  );
+
+  const handleInlineDigitKeyDown = useCallback(
+    ({ stepId, expectedDigits, activeDigitIndex }: InlineDigitCellContext, event: KeyboardEvent<HTMLSpanElement>) => {
       if (event.key === "Enter") {
         event.preventDefault();
+        return;
+      }
+
+      if (event.key === "Backspace") {
+        event.preventDefault();
+        if (activeDigitIndex > 0) {
+          applyStepDigitPrefixTransition(stepId, expectedDigits, activeDigitIndex - 1);
+        }
         return;
       }
 
@@ -530,20 +702,48 @@ export function BusStopLongDivisionRenderer({
         event.preventDefault();
       }
     },
-    [],
+    [applyStepDigitPrefixTransition],
   );
 
-  const handleInlineEntryPaste = useCallback(
-    (stepId: string, event: ClipboardEvent<HTMLSpanElement>) => {
+  const handleInlineDigitPaste = useCallback(
+    ({ stepId, expectedDigits, activeDigitIndex }: InlineDigitCellContext, event: ClipboardEvent<HTMLSpanElement>) => {
       event.preventDefault();
 
-      const pastedValue = sanitizeInlineWorkspaceEntryValue(
+      if (expectedDigits.length === 0) {
+        event.currentTarget.textContent = "";
+        return;
+      }
+
+      const pastedDigits = sanitizeInlineWorkspaceEntryValue(
         event.clipboardData.getData("text"),
       );
-      event.currentTarget.textContent = pastedValue;
-      applyInlineEntryTransition(stepId, pastedValue);
+      event.currentTarget.textContent = "";
+
+      let acceptedDigitCount = 0;
+      for (
+        let pastedIndex = 0;
+        pastedIndex < pastedDigits.length && activeDigitIndex + acceptedDigitCount < expectedDigits.length;
+        pastedIndex += 1
+      ) {
+        const expectedDigit = expectedDigits[activeDigitIndex + acceptedDigitCount];
+        if (pastedDigits[pastedIndex] !== expectedDigit) {
+          break;
+        }
+
+        acceptedDigitCount += 1;
+      }
+
+      if (acceptedDigitCount === 0) {
+        return;
+      }
+
+      applyStepDigitPrefixTransition(
+        stepId,
+        expectedDigits,
+        activeDigitIndex + acceptedDigitCount,
+      );
     },
-    [applyInlineEntryTransition],
+    [applyStepDigitPrefixTransition],
   );
 
   return (
@@ -557,51 +757,94 @@ export function BusStopLongDivisionRenderer({
       ref={workspaceRef}
     >
       <p className="workspace-label">Quotient</p>
-      <div className="bus-stop-notation">
+      <div className="bus-stop-notation" style={notationGridStyle}>
         <div className="quotient-row">
           <span aria-hidden="true" className="quotient-row-spacer">
             {renderModel.divisorText}
           </span>
           <div className="quotient-track">
-            {renderModel.quotientCells.map((cell) => (
-              <WorkspaceInlineEntry
-                isActive={cell.isActive}
-                isAutoEntry={false}
-                isFilled={cell.isFilled}
-                isInteractive={liveTypingEnabled}
-                isLockingIn={Boolean(lockingStepIds[cell.stepId])}
-                key={cell.stepId}
-                lane="quotient"
-                onInput={liveTypingEnabled ? handleInlineEntryInput : undefined}
-                onKeyDown={liveTypingEnabled ? handleInlineEntryKeyDown : undefined}
-                onPaste={liveTypingEnabled ? handleInlineEntryPaste : undefined}
-                stepKind="quotient-digit"
-                stepId={cell.stepId}
-                targetId={cell.targetId}
-                value={resolveInlineWorkspaceEntryValue({
-                  stepId: cell.stepId,
-                  lockedValue: cell.value,
-                  isFilled: cell.isFilled,
-                  draftEntryValues,
-                })}
-              />
-            ))}
+            {renderModel.quotientCells.map((cell) => {
+              const resolvedCellValue = resolveInlineWorkspaceEntryValue({
+                stepId: cell.stepId,
+                lockedValue: cell.value,
+                isFilled: cell.isFilled,
+                draftEntryValues,
+              });
+              const expectedDigits = resolveExpectedStepDigits(
+                stepById.get(cell.stepId)?.expectedValue ?? cell.value,
+              );
+              const activeDigitIndex = resolveActiveDigitIndex(
+                resolvedCellValue,
+                Math.max(expectedDigits.length, 1),
+              );
+              const digitInputContext: InlineDigitCellContext = {
+                stepId: cell.stepId,
+                expectedDigits,
+                activeDigitIndex,
+              };
+
+              return (
+                <WorkspaceInlineEntry
+                  digitIndex={0}
+                  isActive={cell.isActive && activeDigitIndex === 0}
+                  isAutoEntry={false}
+                  isFilled={cell.isFilled}
+                  isInteractive={liveTypingEnabled && cell.isActive && activeDigitIndex === 0}
+                  isLockingIn={Boolean(lockingStepIds[cell.stepId])}
+                  key={cell.stepId}
+                  lane="quotient"
+                  onInput={
+                    liveTypingEnabled
+                      ? (event) => handleInlineDigitInput(digitInputContext, event)
+                      : undefined
+                  }
+                  onKeyDown={
+                    liveTypingEnabled
+                      ? (event) => handleInlineDigitKeyDown(digitInputContext, event)
+                      : undefined
+                  }
+                  onPaste={
+                    liveTypingEnabled
+                      ? (event) => handleInlineDigitPaste(digitInputContext, event)
+                      : undefined
+                  }
+                  stepKind="quotient-digit"
+                  stepId={cell.stepId}
+                  style={{ gridColumnStart: cell.columnIndex + 1 }}
+                  targetId={cell.targetId}
+                  value={resolvedCellValue.slice(0, 1)}
+                />
+              );
+            })}
           </div>
         </div>
 
         <div className="bus-stop-core">
-          <p className="divisor-cell">{renderModel.divisorText}</p>
+          <p
+            className={`divisor-cell${activeStepFocus.shouldHighlightDivisor ? " context-value-glow" : ""}`}
+            data-step-focus={activeStepFocus.shouldHighlightDivisor ? "active" : "idle"}
+            data-step-focus-kind={activeStepFocus.shouldHighlightDivisor ? activeStepFocus.stepKind : "none"}
+          >
+            {renderModel.divisorText}
+          </p>
           <div className="bracket-stack">
             <p className="dividend-line" data-bring-down-source-step-id={bringDownAnimationStepId ?? ""}>
               {dividendDigits.map((digit, digitIndex) => {
                 const isBringDownSourceDigit =
                   activeBringDownAnimationSource?.sourceDividendDigitIndex === digitIndex;
+                const isStepFocusedDigit =
+                  activeStepFocus.shouldHighlightWorkingDividend &&
+                  activeStepFocus.workingDividendWindow !== null &&
+                  digitIndex >= activeStepFocus.workingDividendWindow.startColumnIndex &&
+                  digitIndex <= activeStepFocus.workingDividendWindow.endColumnIndex;
 
                 return (
                   <span
-                    className={`dividend-digit${isBringDownSourceDigit ? " dividend-digit-bring-down-origin" : ""}`}
+                    className={`dividend-digit${isBringDownSourceDigit ? " dividend-digit-bring-down-origin" : ""}${isStepFocusedDigit ? " context-value-glow" : ""}`}
                     data-bring-down-origin={isBringDownSourceDigit ? "active" : "idle"}
                     data-dividend-digit-index={digitIndex}
+                    data-step-focus={isStepFocusedDigit ? "active" : "idle"}
+                    data-step-focus-kind={isStepFocusedDigit ? activeStepFocus.stepKind : "none"}
                     key={`dividend-digit-${digitIndex}`}
                   >
                     {digit}
@@ -621,6 +864,36 @@ export function BusStopLongDivisionRenderer({
               ) : (
                 renderModel.workRows.map((row) => {
                   const isRowTransitioning = Boolean(rowRevealStepIds[row.stepId]);
+                  const resolvedRowValue = resolveInlineWorkspaceEntryValue({
+                    stepId: row.stepId,
+                    lockedValue: row.value,
+                    isFilled: row.isFilled,
+                    draftEntryValues,
+                  });
+                  const expectedDigits = resolveExpectedStepDigits(
+                    stepById.get(row.stepId)?.expectedValue ?? row.value,
+                  );
+                  const resolvedDigitCount = Math.max(
+                    row.expectedDigitCount,
+                    expectedDigits.length,
+                    resolvedRowValue.length,
+                    1,
+                  );
+                  const rowDigits = Array.from(resolvedRowValue);
+                  const activeDigitIndex = resolveActiveDigitIndex(
+                    resolvedRowValue,
+                    resolvedDigitCount,
+                  );
+                  const isAutoEntryRow = row.kind === "bring-down" && liveTypingEnabled;
+                  const workValueEndColumn = row.columnIndex + 1;
+                  const workValueStartColumn = Math.max(
+                    workValueEndColumn - resolvedDigitCount + 1,
+                    1,
+                  );
+                  const workRowValueShellStyle: CSSProperties = {
+                    "--work-value-start-column": workValueStartColumn,
+                    "--work-value-column-span": resolvedDigitCount,
+                  };
 
                   return (
                     <li
@@ -635,27 +908,51 @@ export function BusStopLongDivisionRenderer({
                       <div
                         className="work-row-value-shell"
                         data-bring-down-animation={bringDownAnimationStepId === row.stepId ? "running" : "idle"}
+                        style={workRowValueShellStyle}
                       >
-                        <WorkspaceInlineEntry
-                          isActive={row.isActive}
-                          isAutoEntry={row.kind === "bring-down" && liveTypingEnabled}
-                          isFilled={row.isFilled}
-                          isInteractive={liveTypingEnabled}
-                          isLockingIn={Boolean(lockingStepIds[row.stepId])}
-                          lane="work-row"
-                          onInput={liveTypingEnabled ? handleInlineEntryInput : undefined}
-                          onKeyDown={liveTypingEnabled ? handleInlineEntryKeyDown : undefined}
-                          onPaste={liveTypingEnabled ? handleInlineEntryPaste : undefined}
-                          stepId={row.stepId}
-                          stepKind={row.kind}
-                          targetId={row.targetId}
-                          value={resolveInlineWorkspaceEntryValue({
+                        {Array.from({ length: resolvedDigitCount }, (_, digitIndex) => {
+                          const digitInputContext: InlineDigitCellContext = {
                             stepId: row.stepId,
-                            lockedValue: row.value,
-                            isFilled: row.isFilled,
-                            draftEntryValues,
-                          })}
-                        />
+                            expectedDigits,
+                            activeDigitIndex,
+                          };
+                          const isResolvedDigitFilled = digitIndex < rowDigits.length;
+                          const isFocusedPendingDigit =
+                            row.isActive && !row.isFilled && digitIndex === activeDigitIndex;
+
+                          return (
+                            <WorkspaceInlineEntry
+                              digitIndex={digitIndex}
+                              isActive={row.isActive && digitIndex === activeDigitIndex}
+                              isAutoEntry={isAutoEntryRow}
+                              isFilled={row.isFilled || isResolvedDigitFilled}
+                              isInteractive={liveTypingEnabled && isFocusedPendingDigit}
+                              isLockingIn={Boolean(lockingStepIds[row.stepId])}
+                              key={`${row.stepId}:digit:${digitIndex}`}
+                              lane="work-row"
+                              onInput={
+                                liveTypingEnabled
+                                  ? (event) => handleInlineDigitInput(digitInputContext, event)
+                                  : undefined
+                              }
+                              onKeyDown={
+                                liveTypingEnabled
+                                  ? (event) => handleInlineDigitKeyDown(digitInputContext, event)
+                                  : undefined
+                              }
+                              onPaste={
+                                liveTypingEnabled
+                                  ? (event) => handleInlineDigitPaste(digitInputContext, event)
+                                  : undefined
+                              }
+                              stepId={row.stepId}
+                              stepKind={row.kind}
+                              style={{ gridColumnStart: digitIndex + 1 }}
+                              targetId={row.targetId}
+                              value={rowDigits[digitIndex] ?? ""}
+                            />
+                          );
+                        })}
                         {bringDownAnimationStepId === row.stepId ? (
                           <span aria-hidden="true" className="bring-down-digit-slide">
                             {activeBringDownAnimationSource?.digit ?? "\u00a0"}

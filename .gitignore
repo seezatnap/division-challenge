@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/.npm-cache/
+/.playwright-browsers/
 
 # next.js
 /.next/

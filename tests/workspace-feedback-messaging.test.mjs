@@ -152,3 +152,41 @@ test("resolver validates malformed validation payloads", async () => {
     /hintHook/,
   );
 });
+
+test("current-step coach resolver generates quotient guidance from active focus values", async () => {
+  const { resolveCurrentStepCoachMessage } = await feedbackMessagingModule;
+  const message = resolveCurrentStepCoachMessage({
+    stepId: "workspace-preview-problem:step:0:quotient-digit",
+    stepKind: "quotient-digit",
+    divisorText: "12",
+    workingValueText: "43",
+    quotientDigitText: "3",
+    multiplyValueText: null,
+    subtractionValueText: null,
+    bringDownDigitText: null,
+  });
+
+  assert.equal(message.outcome, "ready");
+  assert.equal(message.tone, "encouragement");
+  assert.equal(message.statusLabel, "Choose Quotient Digit");
+  assert.equal(message.text, "How many times does 12 go into 43?");
+  assert.match(message.note, /quotient digit/i);
+});
+
+test("current-step coach resolver returns celebration guidance once the active step is complete", async () => {
+  const { resolveCurrentStepCoachMessage } = await feedbackMessagingModule;
+  const message = resolveCurrentStepCoachMessage({
+    stepId: null,
+    stepKind: "none",
+    divisorText: "12",
+    workingValueText: null,
+    quotientDigitText: null,
+    multiplyValueText: null,
+    subtractionValueText: null,
+    bringDownDigitText: null,
+  });
+
+  assert.equal(message.outcome, "complete");
+  assert.equal(message.tone, "celebration");
+  assert.equal(message.statusLabel, "Dino-Mite Finish");
+});

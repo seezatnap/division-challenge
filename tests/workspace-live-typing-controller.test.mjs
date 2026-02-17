@@ -123,7 +123,7 @@ test("correct active-cell typing locks the value and auto-advances to the next t
     steps: sampleSteps,
     state,
     stepId: sampleSteps[0].id,
-    rawValue: "03",
+    rawValue: "3",
     validateStep: validateLongDivisionStepAnswer,
   });
 
@@ -132,6 +132,30 @@ test("correct active-cell typing locks the value and auto-advances to the next t
   assert.equal(transition.validation?.outcome, "correct");
   assert.equal(transition.state.revealedStepCount, 1);
   assert.equal(transition.state.draftEntryValues[sampleSteps[0].id], undefined);
+});
+
+test("partial multi-digit typing stores draft text without validating until all digits are entered", async () => {
+  const [{ applyLiveWorkspaceEntryInput, createLiveWorkspaceTypingState }, { validateLongDivisionStepAnswer }] =
+    await Promise.all([controllerModule, stepValidationModule]);
+
+  const state = createLiveWorkspaceTypingState({
+    stepCount: sampleSteps.length,
+    revealedStepCount: 1,
+  });
+
+  const transition = applyLiveWorkspaceEntryInput({
+    steps: sampleSteps,
+    state,
+    stepId: sampleSteps[1].id,
+    rawValue: "3",
+    validateStep: validateLongDivisionStepAnswer,
+  });
+
+  assert.equal(transition.didAdvance, false);
+  assert.equal(transition.validation, null);
+  assert.equal(transition.sanitizedValue, "3");
+  assert.equal(transition.state.revealedStepCount, 1);
+  assert.equal(transition.state.draftEntryValues[sampleSteps[1].id], "3");
 });
 
 test("final correct entry reveals all steps and emits completion validation", async () => {

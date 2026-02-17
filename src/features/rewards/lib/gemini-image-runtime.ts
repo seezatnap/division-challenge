@@ -4,8 +4,10 @@ import {
   buildJurassicParkCinematicPrompt,
   createGeminiImageRequestConfig,
 } from "./gemini";
+import { createFallbackRewardImage } from "./fallback-reward-image";
 import { resolveGeminiRewardImageWithFilesystemCache } from "./gemini-image-cache";
 import {
+  GeminiImageGenerationError,
   generateGeminiDinosaurImage,
   parseGeminiImageGenerationRequest,
   type GeminiGeneratedImage,
@@ -18,6 +20,21 @@ const defaultGeminiImageServiceDependencies: GeminiImageServiceDependencies = {
   createClient: (apiKey: string) => new GoogleGenAI({ apiKey }),
 };
 
+function shouldUseFallbackRewardImage(error: unknown): boolean {
+  if (!(error instanceof GeminiImageGenerationError)) {
+    return false;
+  }
+
+  return (
+    error.code === "GEMINI_CONFIG_ERROR" ||
+    error.code === "GEMINI_PROMPT_ERROR" ||
+    error.code === "GEMINI_REQUEST_FAILED" ||
+    error.code === "GEMINI_RESPONSE_INVALID" ||
+    error.code === "GEMINI_IMAGE_MISSING" ||
+    error.code === "GEMINI_IMAGE_DATA_INVALID"
+  );
+}
+
 export async function generateGeminiRewardImage(
   payload: unknown,
   dependencies: GeminiImageServiceDependencies = defaultGeminiImageServiceDependencies,
@@ -26,6 +43,16 @@ export async function generateGeminiRewardImage(
 
   return resolveGeminiRewardImageWithFilesystemCache(
     request,
-    (parsedRequest) => generateGeminiDinosaurImage(parsedRequest, dependencies),
+    async (parsedRequest) => {
+      try {
+        return await generateGeminiDinosaurImage(parsedRequest, dependencies);
+      } catch (error) {
+        if (!shouldUseFallbackRewardImage(error)) {
+          throw error;
+        }
+
+        return createFallbackRewardImage(parsedRequest.dinosaurName);
+      }
+    },
   );
 }

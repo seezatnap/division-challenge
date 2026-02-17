@@ -4,41 +4,54 @@ import { useCallback, useState } from "react";
 
 import type { LongDivisionStep } from "@/features/contracts";
 import type { LongDivisionStepValidationResult } from "@/features/division-engine/lib/step-validation";
+import type { BusStopActiveStepFocus } from "@/features/workspace-ui/lib";
 import {
   DEFAULT_DINO_FEEDBACK_MESSAGE,
-  resolveDinoFeedbackMessage,
+  resolveCurrentStepCoachMessage,
   type DinoFeedbackMessage,
 } from "@/features/workspace-ui/lib/dino-feedback-messaging";
 
 import { BusStopLongDivisionRenderer } from "./bus-stop-long-division-renderer";
 
-const MAX_COACH_MESSAGE_COUNT = 3;
-
 export interface LiveDivisionWorkspacePanelProps {
   readonly divisor: number;
   readonly dividend: number;
   readonly steps: readonly LongDivisionStep[];
+  readonly onStepValidation?: (validation: LongDivisionStepValidationResult) => void;
+}
+
+interface CoachMessageEntry {
+  readonly message: DinoFeedbackMessage;
 }
 
 export function LiveDivisionWorkspacePanel({
   divisor,
   dividend,
   steps,
+  onStepValidation,
 }: LiveDivisionWorkspacePanelProps) {
-  const [coachMessages, setCoachMessages] = useState<DinoFeedbackMessage[]>([
-    DEFAULT_DINO_FEEDBACK_MESSAGE,
-  ]);
-  const activeCoachMessage = coachMessages[0] ?? DEFAULT_DINO_FEEDBACK_MESSAGE;
+  const [coachMessageEntry, setCoachMessageEntry] = useState<CoachMessageEntry>(() => ({
+    message: DEFAULT_DINO_FEEDBACK_MESSAGE,
+  }));
+  const activeCoachMessage = coachMessageEntry.message;
 
-  const handleWorkspaceStepValidation = useCallback(
+  const handleActiveStepFocusChange = useCallback((focus: BusStopActiveStepFocus) => {
+    setCoachMessageEntry({
+      message: resolveCurrentStepCoachMessage(focus),
+    });
+  }, []);
+  const handleStepValidation = useCallback(
     (validation: LongDivisionStepValidationResult) => {
-      const nextMessage = resolveDinoFeedbackMessage(validation);
-      setCoachMessages((currentMessages) =>
-        [nextMessage, ...currentMessages].slice(0, MAX_COACH_MESSAGE_COUNT),
-      );
+      onStepValidation?.(validation);
     },
-    [],
+    [onStepValidation],
   );
+
+  const coachMessages = [
+    {
+      message: activeCoachMessage,
+    },
+  ];
 
   return (
     <div className="game-grid">
@@ -46,7 +59,8 @@ export function LiveDivisionWorkspacePanel({
         dividend={dividend}
         divisor={divisor}
         enableLiveTyping
-        onStepValidation={handleWorkspaceStepValidation}
+        onActiveStepFocusChange={handleActiveStepFocusChange}
+        onStepValidation={handleStepValidation}
         revealedStepCount={0}
         steps={steps}
       />
@@ -59,14 +73,14 @@ export function LiveDivisionWorkspacePanel({
         <h3 className="hint-title">Dino Coach</h3>
         <p className="hint-status">{activeCoachMessage.statusLabel}</p>
         <ul className="coach-list">
-          {coachMessages.map((message) => (
+          {coachMessages.map((entry) => (
             <li
               className="coach-item"
-              data-feedback-key={message.messageKey}
-              data-feedback-tone={message.tone}
-              key={message.id}
+              data-feedback-key={entry.message.messageKey}
+              data-feedback-tone={entry.message.tone}
+              key={entry.message.id}
             >
-              {message.text}
+              {entry.message.text}
             </li>
           ))}
         </ul>
