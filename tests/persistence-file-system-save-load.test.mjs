@@ -226,6 +226,102 @@ test("saveSessionToFileSystem requests permission and writes JSON to a player-na
   assert.equal(parsedSave.updatedAt, "2026-02-17T12:00:00.000Z");
 });
 
+test("saveSessionToFileSystem and loadSaveFromFileSystem reject when permissions are denied", async () => {
+  const { createDinoDivisionSavePayload, loadSaveFromFileSystem, saveSessionToFileSystem } =
+    await persistenceModule;
+  const permissionLog = [];
+  let saveCreateWritableCalls = 0;
+
+  const saveHandle = {
+    name: "rex-save.json",
+    async queryPermission({ mode }) {
+      permissionLog.push(`save-query:${mode}`);
+      return "prompt";
+    },
+    async requestPermission({ mode }) {
+      permissionLog.push(`save-request:${mode}`);
+      return "denied";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return "";
+        },
+      };
+    },
+    async createWritable() {
+      saveCreateWritableCalls += 1;
+      return {
+        async write() {},
+        async close() {},
+      };
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      saveSessionToFileSystem({
+        session: createInMemorySession(),
+        handle: saveHandle,
+      }),
+    /Permission denied: unable to save game progress/,
+  );
+  assert.equal(saveCreateWritableCalls, 0);
+
+  const jsonPayload = JSON.stringify(
+    createDinoDivisionSavePayload(
+      createInMemorySession(),
+      () => new Date("2026-02-17T12:01:00.000Z"),
+    ),
+  );
+  const loadHandle = {
+    name: "rex-save.json",
+    async queryPermission({ mode }) {
+      permissionLog.push(`load-query:${mode}`);
+      return "prompt";
+    },
+    async requestPermission({ mode }) {
+      permissionLog.push(`load-request:${mode}`);
+      return "denied";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return jsonPayload;
+        },
+      };
+    },
+    async createWritable() {
+      return {
+        async write() {},
+        async close() {},
+      };
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      loadSaveFromFileSystem({
+        fileSystem: {
+          async showOpenFilePicker() {
+            return [loadHandle];
+          },
+          async showSaveFilePicker() {
+            return loadHandle;
+          },
+        },
+      }),
+    /Permission denied: unable to load a save file/,
+  );
+
+  assert.deepEqual(permissionLog, [
+    "save-query:readwrite",
+    "save-request:readwrite",
+    "load-query:read",
+    "load-request:read",
+  ]);
+});
+
 test("saveSessionToFileSystem queues concurrent writes for the same file handle", async () => {
   const { saveSessionToFileSystem } = await persistenceModule;
 
@@ -433,6 +529,108 @@ test("saveSessionToFileSystem uses atomic write flow and aborts failed writes wi
   assert.equal(committedJson, existingJson);
 });
 
+test("saveSessionToFileSystem write queue remains isolated per handle and recovers after failures", async () => {
+  const { saveSessionToFileSystem } = await persistenceModule;
+
+  const handleOneGate = createDeferred();
+  let handleOneWriteStarted = false;
+  let handleOneCommittedJson = "";
+  const handleOne = {
+    name: "rex-save.json",
+    async queryPermission() {
+      return "granted";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return handleOneCommittedJson;
+        },
+      };
+    },
+    async createWritable() {
+      let stagedJson = "";
+      return {
+        async write(content) {
+          handleOneWriteStarted = true;
+          stagedJson = content;
+          await handleOneGate.promise;
+        },
+        async close() {
+          handleOneCommittedJson = stagedJson;
+        },
+      };
+    },
+  };
+
+  let handleTwoCommittedJson = "";
+  let handleTwoCreateWritableCalls = 0;
+  const handleTwo = {
+    name: "rex-save-two.json",
+    async queryPermission() {
+      return "granted";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return handleTwoCommittedJson;
+        },
+      };
+    },
+    async createWritable() {
+      handleTwoCreateWritableCalls += 1;
+      const callNumber = handleTwoCreateWritableCalls;
+      let stagedJson = "";
+      return {
+        async write(content) {
+          if (callNumber === 1) {
+            throw new Error("handle-two first write failed");
+          }
+          stagedJson = content;
+        },
+        async close() {
+          handleTwoCommittedJson = stagedJson;
+        },
+        async abort() {},
+      };
+    },
+  };
+
+  const blockedSaveOnHandleOne = saveSessionToFileSystem({
+    session: createInMemorySession(),
+    handle: handleOne,
+    clock: () => new Date("2026-02-17T12:22:00.000Z"),
+  });
+
+  const failingSaveOnHandleTwo = saveSessionToFileSystem({
+    session: createInMemorySession(),
+    handle: handleTwo,
+    clock: () => new Date("2026-02-17T12:22:10.000Z"),
+  });
+
+  await assert.rejects(
+    () => failingSaveOnHandleTwo,
+    /handle-two first write failed/,
+  );
+  assert.equal(handleOneWriteStarted, true);
+
+  const recoveredSaveOnHandleTwo = await saveSessionToFileSystem({
+    session: createSessionWithLifetimeProgress({
+      totalProblemsSolved: 28,
+      totalProblemsAttempted: 33,
+    }),
+    handle: handleTwo,
+    clock: () => new Date("2026-02-17T12:22:20.000Z"),
+  });
+
+  assert.ok(recoveredSaveOnHandleTwo);
+  assert.equal(recoveredSaveOnHandleTwo.saveFile.totalProblemsSolved, 28);
+  assert.equal(handleTwoCreateWritableCalls, 2);
+
+  handleOneGate.resolve();
+  await blockedSaveOnHandleOne;
+  assert.match(handleOneCommittedJson, /"playerName": "Rex"/);
+});
+
 test("loadSaveFromFileSystem requests read permission and validates the payload", async () => {
   const { createDinoDivisionSavePayload, loadSaveFromFileSystem } = await persistenceModule;
 
@@ -490,12 +688,98 @@ test("loadSaveFromFileSystem requests read permission and validates the payload"
   assert.deepEqual(permissionLog, ["query:read", "request:read"]);
 });
 
+test("loadSaveFromFileSystem skips requestPermission when read permission is already granted", async () => {
+  const { createDinoDivisionSavePayload, loadSaveFromFileSystem } = await persistenceModule;
+
+  const jsonPayload = JSON.stringify(
+    createDinoDivisionSavePayload(
+      createInMemorySession(),
+      () => new Date("2026-02-17T12:31:00.000Z"),
+    ),
+  );
+  let requestPermissionCalls = 0;
+
+  const handle = {
+    name: "rex-save.json",
+    async queryPermission() {
+      return "granted";
+    },
+    async requestPermission() {
+      requestPermissionCalls += 1;
+      return "granted";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return jsonPayload;
+        },
+      };
+    },
+    async createWritable() {
+      return {
+        async write() {},
+        async close() {},
+      };
+    },
+  };
+
+  const loadResult = await loadSaveFromFileSystem({
+    fileSystem: {
+      async showOpenFilePicker() {
+        return [handle];
+      },
+      async showSaveFilePicker() {
+        return handle;
+      },
+    },
+  });
+
+  assert.ok(loadResult);
+  assert.equal(loadResult.saveFile.playerName, "Rex");
+  assert.equal(requestPermissionCalls, 0);
+});
+
 test("parseDinoDivisionSaveFile rejects payloads missing required fields", async () => {
   const { parseDinoDivisionSaveFile } = await persistenceModule;
 
   assert.throws(
     () => parseDinoDivisionSaveFile(JSON.stringify({ playerName: "Rex" })),
     /Missing required save field "schemaVersion"/,
+  );
+});
+
+test("parseDinoDivisionSaveFile preserves schema-integrity on save/load round-trips", async () => {
+  const { createDinoDivisionSavePayload, parseDinoDivisionSaveFile } = await persistenceModule;
+
+  const payload = createDinoDivisionSavePayload(
+    createSessionWithLifetimeProgress({
+      totalProblemsSolved: 31,
+      totalProblemsAttempted: 40,
+      currentDifficultyLevel: 5,
+    }),
+    () => new Date("2026-02-17T12:40:00.000Z"),
+  );
+
+  const roundTrippedPayload = parseDinoDivisionSaveFile(JSON.stringify(payload));
+
+  assert.deepEqual(roundTrippedPayload, payload);
+});
+
+test("parseDinoDivisionSaveFile rejects unsupported schema versions", async () => {
+  const { createDinoDivisionSavePayload, parseDinoDivisionSaveFile } = await persistenceModule;
+
+  const saveFile = createDinoDivisionSavePayload(
+    createInMemorySession(),
+    () => new Date("2026-02-17T12:41:00.000Z"),
+  );
+  const unsupportedSchemaPayload = JSON.stringify({
+    ...saveFile,
+    schemaVersion: 2,
+  });
+
+  assert.throws(
+    () => parseDinoDivisionSaveFile(unsupportedSchemaPayload),
+    /Unsupported schemaVersion 2. Expected 1/,
   );
 });
 
@@ -560,6 +844,71 @@ test("exportSessionToJsonDownload reuses save schema and player-named JSON outpu
   assert.equal(parsedSave.updatedAt, "2026-02-17T13:00:00.000Z");
 });
 
+test("exportSessionToJsonDownload supports browser fallback runtime import/export flow", async () => {
+  const { exportSessionToJsonDownload } = await persistenceModule;
+  const fallbackEvents = [];
+
+  class MockBlob {
+    constructor(parts, options = {}) {
+      this.parts = parts;
+      this.options = options;
+    }
+  }
+
+  const anchor = {
+    href: "",
+    download: "",
+    click() {
+      fallbackEvents.push("anchor-click");
+    },
+    remove() {
+      fallbackEvents.push("anchor-remove");
+    },
+  };
+  const fallbackRuntime = {
+    Blob: MockBlob,
+    URL: {
+      createObjectURL(blob) {
+        fallbackEvents.push(["create-object-url", blob.options?.type, blob.parts?.length ?? 0]);
+        return "blob:rex-save";
+      },
+      revokeObjectURL(url) {
+        fallbackEvents.push(["revoke-object-url", url]);
+      },
+    },
+    document: {
+      createElement(tagName) {
+        fallbackEvents.push(["create-element", tagName]);
+        return anchor;
+      },
+      body: {
+        appendChild(node) {
+          fallbackEvents.push(["append-child", node === anchor]);
+          return node;
+        },
+      },
+    },
+  };
+
+  const exportResult = await exportSessionToJsonDownload({
+    session: createInMemorySession(),
+    clock: () => new Date("2026-02-17T13:20:00.000Z"),
+    fallbackRuntime,
+  });
+
+  assert.equal(anchor.download, "rex-save.json");
+  assert.equal(anchor.href, "blob:rex-save");
+  assert.equal(exportResult.fileName, "rex-save.json");
+  assert.deepEqual(fallbackEvents, [
+    ["create-object-url", "application/json", 1],
+    ["create-element", "a"],
+    ["append-child", true],
+    "anchor-click",
+    "anchor-remove",
+    ["revoke-object-url", "blob:rex-save"],
+  ]);
+});
+
 test("loadSaveFromJsonFile parses and validates fallback imports with the same schema rules", async () => {
   const { createDinoDivisionSavePayload, loadSaveFromJsonFile } = await persistenceModule;
   const jsonPayload = JSON.stringify(
@@ -596,5 +945,18 @@ test("loadSaveFromJsonFile returns null on canceled imports and rejects invalid 
         },
       }),
     /Missing required save field "schemaVersion"/,
+  );
+});
+
+test("exportSessionToJsonDownload rejects when browser fallback runtime is unavailable", async () => {
+  const { exportSessionToJsonDownload } = await persistenceModule;
+
+  await assert.rejects(
+    () =>
+      exportSessionToJsonDownload({
+        session: createInMemorySession(),
+        fallbackRuntime: {},
+      }),
+    /JSON save fallback is not available in this environment/,
   );
 });
