@@ -14,6 +14,20 @@ export type { GeminiConfig } from "./gemini-config";
 export { buildDinoPrompt } from "./prompt-builder";
 export type { DinoPromptOptions } from "./prompt-builder";
 export {
+  generateDinoImage,
+  parseImageFromResponse,
+  imageToBuffer,
+  extensionForMimeType,
+  GeminiResponseParseError,
+  GeminiApiError,
+} from "./gemini-image-service";
+export type {
+  GeneratedImage,
+  ImageGenerationResult,
+  ImageGenerationError,
+  ImageGenerationOutcome,
+} from "./gemini-image-service";
+export {
   DINOSAUR_ROSTER,
   TOTAL_DINOSAURS,
   PROBLEMS_PER_MILESTONE,
