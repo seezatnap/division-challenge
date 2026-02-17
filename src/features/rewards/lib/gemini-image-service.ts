@@ -46,12 +46,15 @@ export interface GeminiServiceRequestConfig {
   model: string;
 }
 
-export interface GeminiGenerativeModel {
-  generateContent(request: unknown): Promise<unknown>;
+export interface GeminiGenerateContentRequest {
+  model: string;
+  contents: [{ role: "user"; parts: [{ text: string }] }];
 }
 
 export interface GeminiApiClient {
-  getGenerativeModel(options: { model: string }): GeminiGenerativeModel;
+  models: {
+    generateContent(request: GeminiGenerateContentRequest): Promise<unknown>;
+  };
 }
 
 export interface GeminiImageServiceDependencies {
@@ -110,26 +113,70 @@ function normalizeBase64ImageData(value: string): string {
 }
 
 function getResponseTextPreview(response: JsonObject): string | null {
-  if (typeof response.text !== "function") {
-    return null;
-  }
+  let textValue: unknown = response.text;
 
-  try {
-    const textValue = response.text();
-    const trimmedText = getTrimmedNonEmptyString(textValue);
-
-    if (!trimmedText) {
+  if (typeof response.text === "function") {
+    try {
+      textValue = response.text();
+    } catch {
       return null;
     }
+  }
 
-    if (trimmedText.length <= MAX_TEXT_PREVIEW_LENGTH) {
-      return trimmedText;
-    }
+  const trimmedText = getTrimmedNonEmptyString(textValue);
 
-    return `${trimmedText.slice(0, MAX_TEXT_PREVIEW_LENGTH - 3)}...`;
-  } catch {
+  if (!trimmedText) {
     return null;
   }
+
+  if (trimmedText.length <= MAX_TEXT_PREVIEW_LENGTH) {
+    return trimmedText;
+  }
+
+  return `${trimmedText.slice(0, MAX_TEXT_PREVIEW_LENGTH - 3)}...`;
+}
+
+function getPromptFeedbackSummary(response: JsonObject): string {
+  if (!isRecord(response.promptFeedback)) {
+    return "";
+  }
+
+  const blockReason = getTrimmedNonEmptyString(response.promptFeedback.blockReason);
+  const blockReasonMessage = getTrimmedNonEmptyString(response.promptFeedback.blockReasonMessage);
+  const summaryParts: string[] = [];
+
+  if (blockReason) {
+    summaryParts.push(`Block reason: ${blockReason}.`);
+  }
+
+  if (blockReasonMessage) {
+    summaryParts.push(`Block reason message: ${blockReasonMessage}.`);
+  }
+
+  return summaryParts.length > 0 ? ` ${summaryParts.join(" ")}` : "";
+}
+
+function extractInlineImageDataFromResponseData(response: JsonObject): GeminiInlineImageData | null {
+  let dataValue: unknown = response.data;
+
+  if (typeof response.data === "function") {
+    try {
+      dataValue = response.data();
+    } catch {
+      return null;
+    }
+  }
+
+  const inlineImageData = getTrimmedNonEmptyString(dataValue);
+
+  if (!inlineImageData) {
+    return null;
+  }
+
+  return {
+    imageBase64: normalizeBase64ImageData(inlineImageData),
+    mimeType: DEFAULT_GEMINI_IMAGE_MIME_TYPE,
+  };
 }
 
 function extractInlineImageDataFromPart(part: unknown): GeminiInlineImageData | null {
@@ -178,9 +225,10 @@ export function parseGeminiImageGenerationRequest(payload: unknown): GeminiImage
   return { dinosaurName };
 }
 
-export function buildGeminiGenerateContentRequest(prompt: string): {
-  contents: [{ role: "user"; parts: [{ text: string }] }];
-} {
+export function buildGeminiGenerateContentRequest(
+  model: string,
+  prompt: string,
+): GeminiGenerateContentRequest {
   const normalizedPrompt = getTrimmedNonEmptyString(prompt);
 
   if (!normalizedPrompt) {
@@ -192,6 +240,7 @@ export function buildGeminiGenerateContentRequest(prompt: string): {
   }
 
   return {
+    model,
     contents: [
       {
         role: "user",
@@ -210,17 +259,18 @@ export function extractInlineImageDataFromGeminiResponse(response: unknown): Gem
     );
   }
 
-  if (!Array.isArray(response.candidates) || response.candidates.length === 0) {
+  if (response.candidates !== undefined && !Array.isArray(response.candidates)) {
     throw new GeminiImageGenerationError(
       "GEMINI_RESPONSE_INVALID",
-      "Gemini response did not include candidates.",
+      "Gemini response candidates were not an array.",
       502,
     );
   }
 
+  const candidates = Array.isArray(response.candidates) ? response.candidates : [];
   const finishReasons = new Set<string>();
 
-  for (const candidate of response.candidates) {
+  for (const candidate of candidates) {
     if (!isRecord(candidate)) {
       continue;
     }
@@ -243,8 +293,15 @@ export function extractInlineImageDataFromGeminiResponse(response: unknown): Gem
     }
   }
 
+  const fallbackImageData = extractInlineImageDataFromResponseData(response);
+
+  if (fallbackImageData) {
+    return fallbackImageData;
+  }
+
   const finishReasonSummary =
     finishReasons.size > 0 ? ` Finish reasons: ${Array.from(finishReasons).join(", ")}.` : "";
+  const promptFeedbackSummary = getPromptFeedbackSummary(response);
   const responseTextPreview = getResponseTextPreview(response);
   const textSummary = responseTextPreview
     ? ` Response text preview: "${responseTextPreview}".`
@@ -252,7 +309,7 @@ export function extractInlineImageDataFromGeminiResponse(response: unknown): Gem
 
   throw new GeminiImageGenerationError(
     "GEMINI_IMAGE_MISSING",
-    `Gemini response did not include inline image bytes.${finishReasonSummary}${textSummary}`,
+    `Gemini response did not include inline image bytes.${finishReasonSummary}${promptFeedbackSummary}${textSummary}`,
     502,
   );
 }
@@ -267,15 +324,7 @@ async function resolveGeminiResponsePayload(generateContentResult: unknown): Pro
   }
 
   if (!("response" in generateContentResult)) {
-    if (Array.isArray(generateContentResult.candidates)) {
-      return generateContentResult;
-    }
-
-    throw new GeminiImageGenerationError(
-      "GEMINI_RESPONSE_INVALID",
-      "Gemini generateContent result did not include a response payload.",
-      502,
-    );
+    return generateContentResult;
   }
 
   try {
@@ -331,13 +380,12 @@ export async function generateGeminiDinosaurImage(
     );
   }
 
-  const generateContentRequest = buildGeminiGenerateContentRequest(prompt);
+  const generateContentRequest = buildGeminiGenerateContentRequest(model, prompt);
   const client = dependencies.createClient(apiKey);
-  const modelClient = client.getGenerativeModel({ model });
 
   let generateContentResult: unknown;
   try {
-    generateContentResult = await modelClient.generateContent(generateContentRequest);
+    generateContentResult = await client.models.generateContent(generateContentRequest);
   } catch (cause) {
     throw new GeminiImageGenerationError(
       "GEMINI_REQUEST_FAILED",
