@@ -1,26 +1,246 @@
 @import "tailwindcss";
 
+/* ─── Jurassic Design System — Custom Properties ─────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Jungle greens */
+  --jungle-deep: #1a3a1a;
+  --jungle-dark: #2d5a27;
+  --jungle-mid: #3d7a35;
+  --jungle-light: #5a9e4f;
+  --jungle-pale: #a8d5a0;
+
+  /* Amber/gold warm tones */
+  --amber-glow: #d4a017;
+  --amber-light: #f0c94d;
+  --amber-pale: #fbe89a;
+  --amber-dark: #8b6914;
+
+  /* Earth browns */
+  --earth-dark: #2c1810;
+  --earth-mid: #5c3a28;
+  --earth-light: #8b6849;
+  --earth-pale: #c4a882;
+
+  /* Volcanic accents */
+  --volcanic-red: #8b2500;
+  --lava-orange: #cc5500;
+
+  /* Fossil neutrals */
+  --fossil-light: #f5f0e8;
+  --fossil-mid: #e0d5c5;
+  --fossil-dark: #6b5b4a;
+  --bone: #faf7f0;
+
+  /* Semantic tokens */
+  --background: var(--jungle-deep);
+  --foreground: var(--fossil-light);
+  --surface: var(--bone);
+  --surface-border: rgba(92, 58, 40, 0.3);
+  --text-primary: #1a1a0f;
+  --text-secondary: #5c4a3a;
+  --text-muted: #8b7a68;
+  --text-on-dark: var(--fossil-light);
+  --text-on-glow: var(--earth-dark);
+
+  /* Glow effect */
+  --glow-color: var(--amber-glow);
+  --glow-shadow: 0 0 12px rgba(212, 160, 23, 0.5);
 }
+
+/* ─── Tailwind Theme Extension ───────────────────────────────────────── */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-jungle-deep: var(--jungle-deep);
+  --color-jungle-dark: var(--jungle-dark);
+  --color-jungle-mid: var(--jungle-mid);
+  --color-jungle-light: var(--jungle-light);
+  --color-jungle-pale: var(--jungle-pale);
+  --color-amber-glow: var(--amber-glow);
+  --color-amber-light: var(--amber-light);
+  --color-amber-pale: var(--amber-pale);
+  --color-amber-dark: var(--amber-dark);
+  --color-earth-dark: var(--earth-dark);
+  --color-earth-mid: var(--earth-mid);
+  --color-earth-light: var(--earth-light);
+  --color-earth-pale: var(--earth-pale);
+  --color-volcanic-red: var(--volcanic-red);
+  --color-lava-orange: var(--lava-orange);
+  --color-fossil-light: var(--fossil-light);
+  --color-fossil-mid: var(--fossil-mid);
+  --color-fossil-dark: var(--fossil-dark);
+  --color-bone: var(--bone);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ─── Base Styles ────────────────────────────────────────────────────── */
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ─── Jurassic Glow Animation ────────────────────────────────────────── */
+
+@keyframes dino-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(212, 160, 23, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(212, 160, 23, 0.7), 0 0 40px rgba(212, 160, 23, 0.2);
+  }
+}
+
+@keyframes dino-lock-in {
+  0% {
+    transform: scale(1);
+    background-color: transparent;
+  }
+  50% {
+    transform: scale(1.15);
+    background-color: rgba(212, 160, 23, 0.25);
+  }
+  100% {
+    transform: scale(1);
+    background-color: transparent;
+  }
+}
+
+@keyframes dino-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dino-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dino-hatch {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  10% {
+    transform: rotate(-3deg) scale(1.02);
+  }
+  20% {
+    transform: rotate(3deg) scale(1.02);
+  }
+  30% {
+    transform: rotate(-2deg) scale(1.01);
+  }
+  40% {
+    transform: rotate(2deg) scale(1.01);
+  }
+  50% {
+    transform: rotate(0deg) scale(1);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+/* ─── Utility Classes ────────────────────────────────────────────────── */
+
+.dino-glow {
+  animation: dino-glow 2s ease-in-out infinite;
+  border-color: var(--amber-glow);
+}
+
+.dino-lock-in {
+  animation: dino-lock-in 0.3s ease-out;
+}
+
+.dino-fade-up {
+  animation: dino-fade-up 0.4s ease-out;
+}
+
+.dino-slide-down {
+  animation: dino-slide-down 0.4s ease-out;
+}
+
+.dino-hatch {
+  animation: dino-hatch 1.5s ease-in-out infinite;
+}
+
+/* Jurassic card surface */
+.dino-card {
+  background: rgba(250, 247, 240, 0.95);
+  border: 1px solid rgba(92, 58, 40, 0.3);
+  border-radius: 0.75rem;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+/* Amber gradient heading text */
+.dino-heading {
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  background: linear-gradient(to right, var(--amber-glow), var(--amber-dark));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Themed button */
+.dino-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.dino-btn-primary {
+  background: linear-gradient(to bottom right, var(--amber-glow), var(--amber-dark));
+  color: var(--earth-dark);
+  border: 1px solid var(--amber-dark);
+}
+
+.dino-btn-primary:hover {
+  background: linear-gradient(to bottom right, var(--amber-light), var(--amber-glow));
+  box-shadow: 0 0 12px rgba(212, 160, 23, 0.4);
+}
+
+.dino-btn-secondary {
+  background: rgba(90, 158, 79, 0.15);
+  color: var(--jungle-pale);
+  border: 1px solid rgba(90, 158, 79, 0.3);
+}
+
+.dino-btn-secondary:hover {
+  background: rgba(90, 158, 79, 0.25);
+  color: var(--amber-light);
+}
+
+/* ─── Responsive Tweaks ──────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .dino-card {
+    border-radius: 0.5rem;
+  }
 }
