@@ -74,3 +74,6 @@
 ## Follow-up tasks (from sprint review)
 - [ ] (#40) Replace the hardcoded `https://dino-division.local` URL in `fetchEarnedRewardImageStatus` with same-origin handling for relative endpoints, and add a regression test that verifies the default `/api/rewards/image-status` request stays on the current origin.
 - [ ] (#41) Make `EarnedRewardRevealPanel` reset its internal reveal state when `dinosaurName`, `initialStatus`, or `initialImagePath` changes so new rewards don’t reuse stale phase/image data, and add a prop-change regression test.
+
+## Follow-up tasks (from sprint review)
+- [ ] (#42) Fix persistence merge behavior so `saveSessionToFileSystem` does not overwrite a new active session’s `progress.session` with older higher-solved stats when session IDs differ, and add a regression test for save-after-load (new session) payload correctness. (blocked by #25)
