@@ -213,14 +213,38 @@ test("bus-stop renderer component uses inline workspace entries and avoids stand
 });
 
 test("home page renders the workspace through the reusable bus-stop renderer", async () => {
-  const source = await readRepoFile("src/app/page.tsx");
+  const homePageSource = await readRepoFile("src/app/page.tsx");
+  const workspacePanelSource = await readRepoFile(
+    "src/features/workspace-ui/components/live-division-workspace-panel.tsx",
+  );
 
   for (const fragment of [
-    "BusStopLongDivisionRenderer",
+    "LiveDivisionWorkspacePanel",
     "workspacePreviewSolution",
     "solveLongDivision(workspacePreviewProblem)",
-    "enableLiveTyping",
   ]) {
-    assert.ok(source.includes(fragment), `Expected home-page workspace fragment: ${fragment}`);
+    assert.ok(homePageSource.includes(fragment), `Expected home-page workspace fragment: ${fragment}`);
+  }
+
+  for (const fragment of ["BusStopLongDivisionRenderer", "enableLiveTyping", "onStepValidation"]) {
+    assert.ok(workspacePanelSource.includes(fragment), `Expected workspace-panel fragment: ${fragment}`);
+  }
+});
+
+test("home page wires dino feedback messaging to validation outcomes", async () => {
+  const source = await readRepoFile("src/features/workspace-ui/components/live-division-workspace-panel.tsx");
+
+  for (const fragment of [
+    "DEFAULT_DINO_FEEDBACK_MESSAGE",
+    "resolveDinoFeedbackMessage",
+    "handleWorkspaceStepValidation",
+    "onStepValidation={handleWorkspaceStepValidation}",
+    'data-feedback-tone={activeCoachMessage.tone}',
+    'data-feedback-outcome={activeCoachMessage.outcome}',
+    "data-feedback-key={message.messageKey}",
+    "{message.text}",
+    "{activeCoachMessage.note}",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected feedback wiring fragment: ${fragment}`);
   }
 });
