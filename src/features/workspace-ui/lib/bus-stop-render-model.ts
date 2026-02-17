@@ -14,6 +14,7 @@ export interface BusStopWorkRow {
   targetId: string | null;
   kind: BusStopWorkRowKind;
   value: string;
+  isFilled: boolean;
   displayPrefix: "-" | "";
 }
 
@@ -27,6 +28,7 @@ export interface BuildBusStopRenderModelInput {
 export interface BusStopRenderModel {
   divisorText: string;
   dividendText: string;
+  activeTargetId: string | null;
   quotientCells: readonly BusStopQuotientCell[];
   workRows: readonly BusStopWorkRow[];
 }
@@ -55,26 +57,27 @@ export function buildBusStopRenderModel({
   revealedStepCount,
 }: BuildBusStopRenderModelInput): BusStopRenderModel {
   const boundedRevealedStepCount = clampRevealedStepCount(steps.length, revealedStepCount);
-  const visibleSteps = steps.slice(0, boundedRevealedStepCount);
 
   const quotientCells: BusStopQuotientCell[] = [];
   const workRows: BusStopWorkRow[] = [];
 
   for (let stepIndex = 0; stepIndex < steps.length; stepIndex += 1) {
     const step = steps[stepIndex];
+    const isFilled = stepIndex < boundedRevealedStepCount;
+    const isActiveStep = stepIndex === boundedRevealedStepCount;
 
     if (step.kind === "quotient-digit") {
       quotientCells.push({
         stepId: step.id,
         targetId: step.inputTargetId,
-        value: stepIndex < boundedRevealedStepCount ? step.expectedValue : "",
-        isFilled: stepIndex < boundedRevealedStepCount,
+        value: isFilled ? step.expectedValue : "",
+        isFilled,
       });
-    }
-  }
 
-  for (const step of visibleSteps) {
-    if (!isWorkRowStep(step)) {
+      continue;
+    }
+
+    if (!isWorkRowStep(step) || (!isFilled && !isActiveStep)) {
       continue;
     }
 
@@ -82,7 +85,8 @@ export function buildBusStopRenderModel({
       stepId: step.id,
       targetId: step.inputTargetId,
       kind: step.kind,
-      value: step.expectedValue,
+      value: isFilled ? step.expectedValue : "",
+      isFilled,
       displayPrefix: step.kind === "multiply-result" ? "-" : "",
     });
   }
@@ -90,6 +94,7 @@ export function buildBusStopRenderModel({
   return {
     divisorText: String(divisor),
     dividendText: String(dividend),
+    activeTargetId: steps[boundedRevealedStepCount]?.inputTargetId ?? null,
     quotientCells,
     workRows,
   };
