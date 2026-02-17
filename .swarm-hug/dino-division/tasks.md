@@ -31,7 +31,7 @@
 
 ## Testing & Release Readiness
 
-- [ ] (#15) Add automated tests for problem generation, step validation, progression/reward thresholds, dinosaur list integrity, save-file schema handling, plus an integration smoke test for solve->reward->gallery flow with mocked Gemini; include a concise developer QA/runbook for env and browser support checks [5 pts] (blocked by #12, #13, #14)
+- [x] (#15) Add automated tests for problem generation, step validation, progression/reward thresholds, dinosaur list integrity, save-file schema handling, plus an integration smoke test for solve->reward->gallery flow with mocked Gemini; include a concise developer QA/runbook for env and browser support checks [5 pts] (blocked by #12, #13, #14) (A)
 
 ## Follow-up tasks (from sprint review)
 - [x] (#16) Update `isDivisionProblem` in `lib/domain.ts` to reject mathematically inconsistent problems (`dividend !== divisor * quotient + remainder`) and add a regression test in `tests/domain.test.ts`. (B)
@@ -47,3 +47,6 @@
 - [x] (#20) Fix session-history solve counting so `sessionHistory[].problemsSolved` remains cumulative across difficulty-tier remounts (currently it can plateau at 5); add a regression test that simulates solves across 5/10/15 milestones. (B)
 - [x] (#21) Make `Save Progress` wait for pending/in-flight reward milestone processing (or disable saving while rewards are processing) so newly unlocked dinosaurs and updated totals are not omitted from the saved JSON; add a regression test for this race. (A)
 - [x] (#22) Retry failed reward milestones without requiring a future milestone trigger (including after reload when `totalProblemsSolved` already crossed a reward boundary), so a failed reward at 5 solved is not deferred indefinitely. (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#23) Update the `lint` script in `package.json` to lint project files (for example, `eslint .`) so the QA gate in `docs/qa-runbook.md` performs real lint validation instead of exiting via ESLint help output.
