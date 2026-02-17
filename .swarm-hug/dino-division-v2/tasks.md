@@ -22,7 +22,7 @@
 - [x] (#12) Implement a single-active-cell glow manager (amber/gold pulse) that ensures exactly one target is highlighted at any time according to solver order [5 pts] (blocked by #7, #11) (A)
 - [x] (#13) Wire real-time typing so values appear as typed, lock in with micro-animation on correct entry, and auto-advance glow to the next target [5 pts] (blocked by #8, #12) (A)
 - [x] (#14) Implement the bring-down animation that visibly slides the next dividend digit into the working number and synchronizes state transitions [5 pts] (blocked by #10, #12) (A)
-- [ ] (#15) Implement dino-themed feedback messaging for success/failure states (e.g., encouragement + playful retry hints) tied to validation outcomes [5 pts] (blocked by #13)
+- [x] (#15) Implement dino-themed feedback messaging for success/failure states (e.g., encouragement + playful retry hints) tied to validation outcomes [5 pts] (blocked by #13) (A)
 
 ## Reward Pipeline (Gemini + Prefetch)
 
@@ -30,7 +30,7 @@
 - [x] (#17) Implement filesystem image caching/existence checks so dinosaur art generation is skipped when the asset already exists (no duplicate generation) [5 pts] (blocked by #16) (B)
 - [x] (#18) Implement reward milestone logic (every 5 solved) with deterministic dinosaur assignment and safeguards for milestone ordering/retry issues observed in v1 [5 pts] (blocked by #3, #9, #17) (A)
 - [x] (#19) Implement near-milestone prefetch triggers (problem 3/4 of each set of 5) that check cache first and start background generation only when needed [5 pts] (blocked by #17, #18) (B)
-- [ ] (#20) Implement earned-reward loading UX with egg-hatching animation, status polling for in-flight generation, and automatic reveal once image is ready [5 pts] (blocked by #18, #19)
+- [x] (#20) Implement earned-reward loading UX with egg-hatching animation, status polling for in-flight generation, and automatic reveal once image is ready [5 pts] (blocked by #18, #19) (A)
 
 ## Gallery & Player Flow
 
@@ -68,5 +68,9 @@
 - [x] (#37) Update `resolveRewardMilestones` to discard any pre-existing rewards beyond `highestEarnedRewardNumber` (based on `totalProblemsSolved`) and add regression tests for states where solved count is lower than the unlocked reward prefix. (B)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#38) Wrap the fire-and-forget `triggerNearMilestoneRewardPrefetch` call in `startNextProblemFromState` with rejection handling so prefetch failures cannot surface as unhandled promise rejections.
+- [x] (#38) Wrap the fire-and-forget `triggerNearMilestoneRewardPrefetch` call in `startNextProblemFromState` with rejection handling so prefetch failures cannot surface as unhandled promise rejections. (B)
 - [ ] (#39) Update `triggerNearMilestoneRewardPrefetch` to map `"already-cached"` results from `prefetchGeminiRewardImageWithFilesystemCache` to `"skipped-already-cached"` (instead of `"prefetch-already-in-flight"`), and add a regression test for that race path.
+
+## Follow-up tasks (from sprint review)
+- [ ] (#40) Replace the hardcoded `https://dino-division.local` URL in `fetchEarnedRewardImageStatus` with same-origin handling for relative endpoints, and add a regression test that verifies the default `/api/rewards/image-status` request stays on the current origin.
+- [ ] (#41) Make `EarnedRewardRevealPanel` reset its internal reveal state when `dinosaurName`, `initialStatus`, or `initialImagePath` changes so new rewards don’t reuse stale phase/image data, and add a prop-change regression test.

@@ -6,7 +6,8 @@ import {
   type DivisionProblem,
 } from "@/features/contracts";
 import { GameStartFlowPanel } from "@/features/persistence";
-import { BusStopLongDivisionRenderer } from "@/features/workspace-ui";
+import { EarnedRewardRevealPanel } from "@/features/rewards";
+import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui";
 
 const galleryPreview = [
   {
@@ -80,12 +81,6 @@ const loadableSavePreview: DinoDivisionSaveFile = {
   updatedAt: "2026-02-17T09:15:00.000Z",
 };
 
-const coachMessages = [
-  "Roarsome lock-in! Keep the amber glow moving.",
-  "Clever girl... your subtraction line is perfect.",
-  "The T-Rex says: multiply one more time!",
-];
-
 const workspacePreviewProblem: DivisionProblem = {
   id: "workspace-preview-problem",
   dividend: 432,
@@ -130,27 +125,11 @@ export default function Home() {
               <p className="status-chip">Live target: quotient digit</p>
             </div>
 
-            <div className="game-grid">
-              <BusStopLongDivisionRenderer
-                dividend={workspacePreviewProblem.dividend}
-                divisor={workspacePreviewProblem.divisor}
-                enableLiveTyping
-                revealedStepCount={0}
-                steps={workspacePreviewSolution.steps}
-              />
-
-              <aside className="hint-stack">
-                <h3 className="hint-title">Dino Coach</h3>
-                <ul className="coach-list">
-                  {coachMessages.map((message) => (
-                    <li key={message} className="coach-item">
-                      {message}
-                    </li>
-                  ))}
-                </ul>
-                <p className="hint-note">Numbers lock in instantly, then the glow slides to the next required cell.</p>
-              </aside>
-            </div>
+            <LiveDivisionWorkspacePanel
+              dividend={workspacePreviewProblem.dividend}
+              divisor={workspacePreviewProblem.divisor}
+              steps={workspacePreviewSolution.steps}
+            />
           </section>
 
           <div className="side-stack">
@@ -177,6 +156,29 @@ export default function Home() {
                   </article>
                 ))}
               </div>
+            </section>
+
+            <section
+              aria-labelledby="earned-reward-surface-heading"
+              className="jurassic-panel motif-canopy"
+              data-ui-surface="earned-reward"
+            >
+              <div className="surface-header">
+                <div>
+                  <p className="surface-kicker">Reward Hatch</p>
+                  <h2 className="surface-title" id="earned-reward-surface-heading">
+                    Newly Earned Dino
+                  </h2>
+                </div>
+              </div>
+
+              <EarnedRewardRevealPanel
+                dinosaurName="Stegosaurus"
+                initialStatus="generating"
+                maxPollAttempts={2}
+                milestoneSolvedCount={15}
+                pollIntervalMs={200}
+              />
             </section>
 
             <section

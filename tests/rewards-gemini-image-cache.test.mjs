@@ -266,3 +266,80 @@ test("readCachedGeminiRewardImage loads pre-existing filesystem assets even when
   const cacheDirectoryEntries = await readdir(cacheDirectory);
   assert.deepEqual(cacheDirectoryEntries, [`${slug}.jpeg`]);
 });
+
+test("getGeminiRewardImageGenerationStatus reports missing when no cached image or in-flight generation exists", async () => {
+  const { getGeminiRewardImageGenerationStatus } = await geminiImageCacheModule;
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+
+  const status = await getGeminiRewardImageGenerationStatus("Allosaurus", {
+    outputDirectory: cacheDirectory,
+  });
+
+  assert.deepEqual(status, {
+    dinosaurName: "Allosaurus",
+    status: "missing",
+    imagePath: null,
+  });
+});
+
+test("getGeminiRewardImageGenerationStatus reports generating during in-flight prefetch and ready once image is persisted", async () => {
+  const {
+    getGeminiRewardImageGenerationStatus,
+    prefetchGeminiRewardImageWithFilesystemCache,
+    resolveGeminiRewardImageWithFilesystemCache,
+  } = await geminiImageCacheModule;
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+  const generatedImage = createGeminiImage("Stigimoloch");
+  let resolveGenerationGate = () => {};
+  let resolveGenerationStarted = () => {};
+
+  const generationGate = new Promise((resolve) => {
+    resolveGenerationGate = resolve;
+  });
+  const generationStarted = new Promise((resolve) => {
+    resolveGenerationStarted = resolve;
+  });
+
+  const prefetchStatus = await prefetchGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: "Stigimoloch" },
+    async () => {
+      resolveGenerationStarted();
+      await generationGate;
+      return generatedImage;
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  assert.equal(prefetchStatus, "started");
+  await generationStarted;
+
+  const generatingStatus = await getGeminiRewardImageGenerationStatus("Stigimoloch", {
+    outputDirectory: cacheDirectory,
+  });
+
+  assert.deepEqual(generatingStatus, {
+    dinosaurName: "Stigimoloch",
+    status: "generating",
+    imagePath: null,
+  });
+
+  resolveGenerationGate();
+  await resolveGeminiRewardImageWithFilesystemCache(
+    { dinosaurName: "Stigimoloch" },
+    async () => {
+      assert.fail("resolved image should reuse the prefetch in-flight generation");
+      return createGeminiImage("Stigimoloch");
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  const readyStatus = await getGeminiRewardImageGenerationStatus("Stigimoloch", {
+    outputDirectory: cacheDirectory,
+  });
+
+  assert.deepEqual(readyStatus, {
+    dinosaurName: "Stigimoloch",
+    status: "ready",
+    imagePath: "/rewards/stigimoloch.png",
+  });
+});

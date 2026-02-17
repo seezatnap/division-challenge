@@ -188,6 +188,39 @@ test("startNextProblem triggers near-milestone prefetch only for problems 3 and 
   assert.deepEqual(prefetchCalls, [2, 3, 7, 8]);
 });
 
+test("startNextProblem swallows rejected near-milestone prefetch promises", async () => {
+  const unhandledRejections = [];
+  const onUnhandledRejection = (reason) => {
+    unhandledRejections.push(reason);
+  };
+
+  process.on("unhandledRejection", onUnhandledRejection);
+
+  try {
+    const orchestrator = await createOrchestrator({
+      triggerNearMilestoneRewardPrefetch: () => Promise.reject(new Error("prefetch failed")),
+    });
+
+    orchestrator.startNextProblem(
+      createBaseState({
+        progress: {
+          lifetime: {
+            totalProblemsSolved: 2,
+            totalProblemsAttempted: 2,
+          },
+        },
+      }),
+    );
+
+    await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    process.off("unhandledRejection", onUnhandledRejection);
+  }
+
+  assert.equal(unhandledRejections.length, 0);
+});
+
 test("incorrect inline input keeps focus on the current active step", async () => {
   const orchestrator = await createOrchestrator();
   const started = orchestrator.startNextProblem(createBaseState());
