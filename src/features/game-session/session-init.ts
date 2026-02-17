@@ -23,12 +23,14 @@ export function createNewSession(playerName: string): GameSession {
       },
     },
     unlockedRewards: [],
+    priorSessionHistory: [],
   };
 }
 
 /**
  * Restore a game session from a parsed save file.
- * Starts a new session timer but carries over all lifetime stats.
+ * Starts a new session timer but carries over all lifetime stats
+ * and prior session history.
  */
 export function restoreSessionFromSave(saveFile: SaveFile): GameSession {
   return {
@@ -49,6 +51,7 @@ export function restoreSessionFromSave(saveFile: SaveFile): GameSession {
       },
     },
     unlockedRewards: [...saveFile.unlockedRewards],
+    priorSessionHistory: [...saveFile.sessionHistory],
   };
 }
 

@@ -67,6 +67,7 @@ export function buildSaveFile(session: GameSession): SaveFile {
     sessionsPlayed: session.progress.lifetime.sessionsPlayed + 1,
     unlockedRewards: [...session.unlockedRewards],
     sessionHistory: [
+      ...session.priorSessionHistory,
       {
         startedAt: session.progress.session.startedAt,
         endedAt: now,
