@@ -166,6 +166,7 @@ test("smoke: full player journey with v1 reward-ordering/retry and save-race reg
   let prefetchGenerationStarted = false;
   let generateImageCallCount = 0;
   const prefetchStatuses = [];
+  const nearMilestonePrefetchPromisesBySolvedCount = new Map();
   const newlyUnlockedRewards = [];
   let staleGameStateAtSolvedFour = null;
   let retryAttemptCount = 0;
@@ -189,21 +190,30 @@ test("smoke: full player journey with v1 reward-ordering/retry and save-race reg
           ...request,
           now: () => new Date("2026-02-17T10:20:00.000Z"),
         }),
-      triggerNearMilestoneRewardPrefetch: async (request) => {
-        const result = await modules.prefetch.triggerNearMilestoneRewardPrefetch({
-          totalProblemsSolved: request.totalProblemsSolved,
-          generateImage,
-          cacheOptions: {
-            outputDirectory: cacheDirectory,
-          },
-        });
+      triggerNearMilestoneRewardPrefetch: (request) => {
+        const prefetchPromise = (async () => {
+          const result = await modules.prefetch.triggerNearMilestoneRewardPrefetch({
+            totalProblemsSolved: request.totalProblemsSolved,
+            generateImage,
+            cacheOptions: {
+              outputDirectory: cacheDirectory,
+            },
+          });
 
-        prefetchStatuses.push({
-          totalProblemsSolved: request.totalProblemsSolved,
-          status: result.status,
-        });
+          prefetchStatuses.push({
+            totalProblemsSolved: request.totalProblemsSolved,
+            status: result.status,
+          });
 
-        return result;
+          return result;
+        })();
+
+        nearMilestonePrefetchPromisesBySolvedCount.set(
+          request.totalProblemsSolved,
+          prefetchPromise,
+        );
+
+        return prefetchPromise;
       },
     },
     random: createSeededRandom(20260217),
@@ -269,9 +279,11 @@ test("smoke: full player journey with v1 reward-ordering/retry and save-race reg
     }
   }
 
-  for (let attempt = 0; attempt < 20 && prefetchStatuses.length < 2; attempt += 1) {
-    await flushEventLoopTurn();
-  }
+  const prefetchAtSolvedTwo = nearMilestonePrefetchPromisesBySolvedCount.get(2);
+  const prefetchAtSolvedThree = nearMilestonePrefetchPromisesBySolvedCount.get(3);
+  assert.ok(prefetchAtSolvedTwo, "Expected near-milestone prefetch for solved count 2.");
+  assert.ok(prefetchAtSolvedThree, "Expected near-milestone prefetch for solved count 3.");
+  await Promise.all([prefetchAtSolvedTwo, prefetchAtSolvedThree]);
 
   assert.equal(retryAttemptCount, 1);
   assert.equal(state.progress.lifetime.totalProblemsSolved, 5);
