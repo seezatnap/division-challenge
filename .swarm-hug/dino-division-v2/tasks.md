@@ -63,3 +63,6 @@
 
 ## Follow-up tasks (from sprint review)
 - [x] (#36) Prevent concurrent duplicate Gemini generations for the same dinosaur by adding per-dinosaur in-flight deduping in `resolveGeminiRewardImageWithFilesystemCache`, and add a parallel-request regression test that asserts the generator runs only once. (B)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#37) Update `resolveRewardMilestones` to discard any pre-existing rewards beyond `highestEarnedRewardNumber` (based on `totalProblemsSolved`) and add regression tests for states where solved count is lower than the unlocked reward prefix.
