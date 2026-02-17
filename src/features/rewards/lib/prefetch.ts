@@ -166,6 +166,13 @@ export async function triggerNearMilestoneRewardPrefetch(
     cacheOptions,
   );
 
+  if (prefetchStatus === "already-cached") {
+    return {
+      status: "skipped-already-cached",
+      target,
+    };
+  }
+
   return {
     status: prefetchStatus === "started" ? "prefetch-started" : "prefetch-already-in-flight",
     target,

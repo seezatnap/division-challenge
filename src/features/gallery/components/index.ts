@@ -6,3 +6,5 @@ export const galleryModule: FeatureModuleDescriptor = {
   summary: "Unlocked dinosaur browsing surface with empty, loading, and refresh states.",
   rootPath: "src/features/gallery",
 };
+
+export * from "./dino-gallery-panel";
