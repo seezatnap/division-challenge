@@ -319,32 +319,34 @@ function EarnedRewardRevealPanelContent({
           onClick={closeRevealModal}
           role="presentation"
         >
-          <section
-            aria-label={`${dinosaurName} reward reveal`}
-            aria-modal="true"
-            className="jp-modal reward-reveal-modal"
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-            role="dialog"
-          >
-            <p className="surface-kicker">Dino Unlocked</p>
-            <h3 className="surface-title reward-modal-title">{dinosaurName}</h3>
-            <p className="reward-modal-subtitle">
-              Milestone {milestoneSolvedCount} complete.
-            </p>
-            <Image
-              alt={`${dinosaurName} reward image`}
-              className="reward-modal-image"
-              height={540}
-              loading="lazy"
-              src={imagePath}
-              width={960}
-            />
-            <button className="jp-button" onClick={closeRevealModal} type="button">
-              Back To Board
-            </button>
-          </section>
+          <div className="jp-modal-aura jp-modal-aura-reveal">
+            <section
+              aria-label={`${dinosaurName} reward reveal`}
+              aria-modal="true"
+              className="jp-modal reward-reveal-modal"
+              onClick={(event) => {
+                event.stopPropagation();
+              }}
+              role="dialog"
+            >
+              <p className="surface-kicker">Dino Unlocked</p>
+              <h3 className="surface-title reward-modal-title">{dinosaurName}</h3>
+              <p className="reward-modal-subtitle">
+                Milestone {milestoneSolvedCount} complete.
+              </p>
+              <Image
+                alt={`${dinosaurName} reward image`}
+                className="reward-modal-image"
+                height={540}
+                loading="lazy"
+                src={imagePath}
+                width={960}
+              />
+              <button className="jp-button" onClick={closeRevealModal} type="button">
+                Back To Board
+              </button>
+            </section>
+          </div>
         </div>
           ,
           modalHost,

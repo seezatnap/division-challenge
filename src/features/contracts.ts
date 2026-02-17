@@ -82,27 +82,6 @@ export interface UnlockedReward {
   milestoneSolvedCount: number;
 }
 
-export interface SessionHistoryEntry {
-  sessionId: string;
-  startedAt: IsoDateString;
-  endedAt: IsoDateString | null;
-  solvedProblems: number;
-  attemptedProblems: number;
-}
-
-export const SAVE_FILE_SCHEMA_VERSION = 1;
-
-export interface DinoDivisionSaveFile {
-  schemaVersion: typeof SAVE_FILE_SCHEMA_VERSION;
-  playerName: string;
-  totalProblemsSolved: number;
-  currentDifficultyLevel: number;
-  progress: PlayerProgressState;
-  unlockedDinosaurs: UnlockedReward[];
-  sessionHistory: SessionHistoryEntry[];
-  updatedAt: IsoDateString;
-}
-
 export interface DivisionGameState {
   activeProblem: DivisionProblem | null;
   steps: LongDivisionStep[];

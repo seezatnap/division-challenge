@@ -11,10 +11,14 @@ async function readRepoFile(relativePath) {
   return readFile(path.join(repoRoot, relativePath), "utf8");
 }
 
-test("home page includes Jurassic surfaces for game, gallery, and save/load UI", async () => {
+test("home page includes Jurassic surfaces for game, gallery, and player-start UI", async () => {
   const source = await readRepoFile("src/app/page.tsx");
 
-  for (const surface of ['data-ui-surface="game"', 'data-ui-surface="gallery"', 'data-ui-surface="save-load"']) {
+  for (const surface of [
+    'data-ui-surface="game"',
+    'data-ui-surface="gallery"',
+    'data-ui-surface="player-start"',
+  ]) {
     assert.ok(source.includes(surface), `Expected ${surface} to be defined`);
   }
 
@@ -32,6 +36,15 @@ test("home page includes Jurassic surfaces for game, gallery, and save/load UI",
   assert.ok(
     source.includes('data-ui-action="next-problem"'),
     "Expected NEXT problem action button wiring in the game surface",
+  );
+  assert.equal(
+    source.includes("Expedition Files"),
+    false,
+    "Expected expedition-file save/load UX copy to be removed",
+  );
+  assert.ok(
+    source.includes("Profiles are auto-saved in this browser by lowercase player name."),
+    "Expected player-start copy to describe lowercase localStorage profile behavior",
   );
 });
 

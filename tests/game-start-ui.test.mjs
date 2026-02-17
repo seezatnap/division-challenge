@@ -11,31 +11,29 @@ async function readRepoFile(relativePath) {
   return readFile(path.join(repoRoot, relativePath), "utf8");
 }
 
-test("game-start panel prompts for player name and provides both start options", async () => {
-  const componentSource = await readRepoFile("src/features/persistence/components/game-start-flow-panel.tsx");
-  const flowSource = await readRepoFile("src/features/persistence/lib/game-start-flow.ts");
-
-  for (const fragment of [
-    "Player Name",
-    "buildGameStartOptions",
-    "createInMemoryGameSession",
-    "loadSaveFromJsonFile",
-    "exportSessionToJsonDownload",
-    "supportsJsonSaveImportExportFallback",
-  ]) {
-    assert.ok(componentSource.includes(fragment), `Expected game-start fragment: ${fragment}`);
-  }
-
-  for (const fragment of ['label: "Start New"', 'label: "Load Existing Save"']) {
-    assert.ok(flowSource.includes(fragment), `Expected start-option label: ${fragment}`);
-  }
-});
-
-test("home page wires the game-start panel into the save/load surface", async () => {
+test("home page requires player name to start and wires localStorage profile persistence", async () => {
   const pageSource = await readRepoFile("src/app/page.tsx");
 
+  for (const fragment of [
+    'data-ui-surface="player-start"',
+    'data-ui-action="start-session"',
+    "Player Name",
+    "Profiles are auto-saved in this browser by lowercase player name.",
+    "normalizePlayerProfileName",
+    "readPlayerProfileSnapshot",
+    "writePlayerProfileSnapshot",
+    "window.localStorage",
+  ]) {
+    assert.ok(pageSource.includes(fragment), `Expected player-start fragment: ${fragment}`);
+  }
+
   assert.ok(
-    pageSource.includes("<GameStartFlowPanel loadableSave={loadableSavePreview} />"),
-    "Expected save/load surface to render the game-start panel",
+    pageSource.includes('required'),
+    "Expected player-name input to require a non-empty value",
+  );
+  assert.equal(
+    pageSource.includes("Expedition Files"),
+    false,
+    "Expedition Files save/load surface should be removed",
   );
 });

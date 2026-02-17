@@ -189,6 +189,14 @@ async function createHomePage() {
   const page = await context.newPage();
   await page.goto(`${workspaceUrl}/`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle");
+
+  const playerStartSurface = page.locator('[data-ui-surface="player-start"]');
+  if ((await playerStartSurface.count()) > 0) {
+    const uniqueVisualPlayerName = `visual-test-${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+    await page.fill("#game-start-player-name", uniqueVisualPlayerName);
+    await page.click('[data-ui-action="start-session"]');
+  }
+
   await page.waitForSelector('[data-ui-component="bus-stop-renderer"]');
   await wait(600);
   return { context, page };
@@ -517,7 +525,7 @@ test("visual layout mandate: solved solution digits align to dividend digit colu
   }
 });
 
-test("visual workflow: solving a full problem advances to the next question and reveals reward art", { concurrency: false }, async () => {
+test("visual workflow: solving a full problem advances to the next question and keeps reward surface stable", { concurrency: false }, async () => {
   const { context, page } = await createHomePage();
 
   try {
@@ -545,19 +553,18 @@ test("visual workflow: solving a full problem advances to the next question and 
     const nextDividendText = (await page.locator(".dividend-line").first().innerText()).replace(/\s+/g, "");
     assert.notEqual(nextDividendText, "4320", "Expected the board to chain into a different follow-up problem.");
 
-    await page.waitForSelector('[data-ui-surface="earned-reward"] .reward-reveal-image', {
-      timeout: 12_000,
-    });
-    const rewardImageSource = await page
-      .locator('[data-ui-surface="earned-reward"] .reward-reveal-image')
+    const rewardSurfaceText = await page
+      .locator('[data-ui-surface="earned-reward"]')
       .first()
-      .getAttribute("src");
-    const decodedRewardImageSource =
-      typeof rewardImageSource === "string" ? decodeURIComponent(rewardImageSource) : "";
+      .innerText();
     assert.ok(
-      typeof rewardImageSource === "string" &&
-        (rewardImageSource.startsWith("/rewards/") || decodedRewardImageSource.includes("/rewards/")),
-      `Expected revealed reward image source to resolve from /rewards, received: ${String(rewardImageSource)}`,
+      rewardSurfaceText.includes("Milestone 5"),
+      `Expected earned reward surface to remain visible with milestone context, received: ${rewardSurfaceText}`,
+    );
+    assert.equal(
+      rewardSurfaceText.includes("Reward image generation is not running yet."),
+      true,
+      "Expected the first post-solve state to remain in pending reward mode before milestone unlock.",
     );
 
     const statusNotices = await page.locator('p[role="status"]').allTextContents();

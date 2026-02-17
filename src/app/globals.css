@@ -1003,7 +1003,63 @@ body {
     rgba(27, 23, 17, 0.72);
 }
 
+.jp-modal-aura {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.jp-modal-aura::before,
+.jp-modal-aura::after {
+  content: "";
+  position: absolute;
+  inset: -2.1rem -2.4rem;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.jp-modal-aura::before {
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(244, 212, 141, 0) 0deg,
+      rgba(244, 212, 141, 0.34) 72deg,
+      rgba(113, 137, 81, 0.14) 178deg,
+      rgba(244, 212, 141, 0.36) 270deg,
+      rgba(244, 212, 141, 0) 360deg
+    );
+  filter: blur(18px);
+  opacity: 0.82;
+  animation: jp-modal-aura-spin 8s linear infinite;
+}
+
+.jp-modal-aura::after {
+  background:
+    radial-gradient(ellipse at center, rgba(244, 212, 141, 0.34) 0%, rgba(244, 212, 141, 0) 68%),
+    radial-gradient(ellipse at 55% 45%, rgba(113, 137, 81, 0.22) 0%, rgba(113, 137, 81, 0) 72%);
+  filter: blur(15px);
+  opacity: 0.78;
+  animation: jp-modal-aura-spin-reverse 10.5s linear infinite;
+}
+
+.jp-modal-aura-reveal::before {
+  inset: -2.6rem -3rem;
+  opacity: 0.95;
+  filter: blur(21px);
+  animation-duration: 6.4s;
+}
+
+.jp-modal-aura-reveal::after {
+  inset: -2.4rem -2.7rem;
+  opacity: 0.86;
+  filter: blur(18px);
+  animation-duration: 8.2s;
+}
+
 .jp-modal {
+  position: relative;
+  z-index: 1;
   width: min(42rem, 96vw);
   max-height: min(90vh, 46rem);
   overflow: auto;
@@ -1064,6 +1120,34 @@ body {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes jp-modal-aura-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  50% {
+    transform: rotate(180deg) scale(1.04);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes jp-modal-aura-spin-reverse {
+  0% {
+    transform: rotate(360deg) scale(1.02);
+  }
+
+  50% {
+    transform: rotate(180deg) scale(0.96);
+  }
+
+  100% {
+    transform: rotate(0deg) scale(1.02);
   }
 }
 
@@ -1306,6 +1390,11 @@ body {
   gap: 0.62rem;
 }
 
+.player-start-panel {
+  max-width: 34rem;
+  margin-inline: auto;
+}
+
 .game-start-label {
   font-size: 0.78rem;
   font-weight: 700;
@@ -1331,32 +1420,6 @@ body {
   color: color-mix(in srgb, var(--jp-jungle) 72%, var(--jp-bark));
 }
 
-.game-start-options {
-  display: grid;
-  gap: 0.42rem;
-}
-
-.game-start-option {
-  border: 1px solid rgba(45, 36, 25, 0.18);
-  border-radius: 0.62rem;
-  background: rgba(255, 255, 255, 0.38);
-  padding: 0.46rem 0.55rem;
-}
-
-.game-start-option-title {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: color-mix(in srgb, var(--jp-bark) 84%, black);
-}
-
-.game-start-option-copy {
-  display: block;
-  margin-top: 0.16rem;
-  font-size: 0.72rem;
-  color: color-mix(in srgb, var(--jp-jungle) 70%, var(--jp-bark));
-}
-
 .game-start-error {
   border: 1px solid rgba(174, 66, 24, 0.35);
   border-radius: 0.62rem;
@@ -1364,25 +1427,6 @@ body {
   color: rgba(129, 38, 9, 0.95);
   font-size: 0.76rem;
   padding: 0.5rem 0.6rem;
-}
-
-.game-start-session {
-  border: 1px solid rgba(70, 96, 56, 0.28);
-  border-radius: 0.72rem;
-  background: linear-gradient(165deg, rgba(247, 239, 216, 0.75), rgba(113, 137, 81, 0.16));
-  padding: 0.62rem;
-}
-
-.game-start-session-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: color-mix(in srgb, var(--jp-bark) 84%, black);
-}
-
-.game-start-session-meta {
-  margin-top: 0.24rem;
-  font-size: 0.74rem;
-  color: color-mix(in srgb, var(--jp-jungle) 68%, var(--jp-bark));
 }
 
 .jp-button {
@@ -1412,32 +1456,6 @@ body {
 .jp-button-secondary {
   background: linear-gradient(180deg, rgba(70, 96, 56, 0.8), rgba(31, 52, 36, 0.92));
   color: rgba(247, 239, 216, 0.95);
-}
-
-.save-list {
-  margin-top: 0.8rem;
-  display: grid;
-  gap: 0.55rem;
-}
-
-.save-item {
-  border: 1px solid rgba(45, 36, 25, 0.22);
-  border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.48);
-  padding: 0.6rem;
-}
-
-.save-name {
-  font-weight: 700;
-  color: var(--jp-bark);
-  font-size: 0.86rem;
-}
-
-.save-summary,
-.save-updated {
-  font-size: 0.77rem;
-  margin-top: 0.22rem;
-  color: color-mix(in srgb, var(--jp-jungle) 66%, var(--jp-bark));
 }
 
 .module-map {

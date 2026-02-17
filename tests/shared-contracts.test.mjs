@@ -139,20 +139,3 @@ test("player progress contracts expose both session and lifetime progress", asyn
   findInterface(sourceFile, "PlayerSessionProgress");
   findInterface(sourceFile, "PlayerLifetimeProgress");
 });
-
-test("save-file schema includes required persisted fields", async () => {
-  const sourceFile = await loadContractsSource();
-  const saveFileContract = findInterface(sourceFile, "DinoDivisionSaveFile");
-  const propertyNames = interfacePropertyNames(saveFileContract);
-
-  assert.deepEqual(propertyNames, [
-    "schemaVersion",
-    "playerName",
-    "totalProblemsSolved",
-    "currentDifficultyLevel",
-    "progress",
-    "unlockedDinosaurs",
-    "sessionHistory",
-    "updatedAt",
-  ]);
-});
