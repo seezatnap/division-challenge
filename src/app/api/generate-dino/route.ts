@@ -1,23 +1,22 @@
 /**
  * POST /api/generate-dino
  *
- * Triggers dinosaur image generation via Gemini.
+ * Triggers dinosaur image generation via Gemini, with filesystem caching.
+ * If the image already exists on disk the API returns immediately without
+ * calling Gemini (no duplicate generation).
  *
  * Request body:
  *   { dinosaurName: string; sceneHint?: string }
  *
  * Response (success):
- *   { success: true; image: { base64Data: string; mimeType: string } }
+ *   { success: true; imagePath: string; fromCache: boolean }
  *
  * Response (error):
  *   { success: false; error: string }
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  generateDinoImage,
-  extensionForMimeType,
-} from "@/features/rewards/gemini-image-service";
+import { generateDinoImageCached } from "@/features/rewards/dino-image-cache";
 
 interface GenerateDinoRequestBody {
   dinosaurName?: string;
@@ -45,7 +44,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const outcome = await generateDinoImage({
+  const outcome = await generateDinoImageCached({
     dinosaurName,
     sceneHint: body.sceneHint,
   });
@@ -59,10 +58,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    image: {
-      base64Data: outcome.image.base64Data,
-      mimeType: outcome.image.mimeType,
-      extension: extensionForMimeType(outcome.image.mimeType),
-    },
+    imagePath: outcome.imagePath,
+    fromCache: outcome.fromCache,
   });
 }
