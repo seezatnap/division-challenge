@@ -46,6 +46,11 @@ export interface CachedRewardImageFile {
   extension: SupportedImageExtension;
 }
 
+export type GeminiRewardImagePrefetchStatus =
+  | "already-cached"
+  | "already-in-flight"
+  | "started";
+
 type JsonObject = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonObject {
@@ -252,6 +257,61 @@ export async function persistGeminiRewardImageToFilesystemCache(
   return absoluteImagePath;
 }
 
+function startInFlightRewardImageGeneration(
+  dinosaurName: string,
+  generateImage: (request: GeminiImageGenerationRequest) => Promise<GeminiGeneratedImage>,
+  options: FilesystemGeminiImageCacheOptions,
+): Promise<GeminiGeneratedImage> {
+  const inFlightGenerationKey = toInFlightRewardImageGenerationKey(dinosaurName, options);
+  const generationPromise = (async () => {
+    const generatedImage = await generateImage({ dinosaurName });
+    await persistGeminiRewardImageToFilesystemCache(generatedImage, options);
+    return generatedImage;
+  })();
+
+  inFlightRewardImageGenerations.set(inFlightGenerationKey, generationPromise);
+
+  void generationPromise
+    .catch(() => undefined)
+    .finally(() => {
+      if (inFlightRewardImageGenerations.get(inFlightGenerationKey) === generationPromise) {
+        inFlightRewardImageGenerations.delete(inFlightGenerationKey);
+      }
+    });
+
+  return generationPromise;
+}
+
+function getInFlightRewardImageGeneration(
+  dinosaurName: string,
+  options: FilesystemGeminiImageCacheOptions,
+): Promise<GeminiGeneratedImage> | undefined {
+  const inFlightGenerationKey = toInFlightRewardImageGenerationKey(dinosaurName, options);
+  return inFlightRewardImageGenerations.get(inFlightGenerationKey);
+}
+
+export async function prefetchGeminiRewardImageWithFilesystemCache(
+  request: GeminiImageGenerationRequest,
+  generateImage: (request: GeminiImageGenerationRequest) => Promise<GeminiGeneratedImage>,
+  options: FilesystemGeminiImageCacheOptions = {},
+): Promise<GeminiRewardImagePrefetchStatus> {
+  const normalizedDinosaurName = normalizeDinosaurName(request.dinosaurName);
+  const rewardImageExistsOnDisk = await doesRewardImageExistOnDisk(normalizedDinosaurName, options);
+
+  if (rewardImageExistsOnDisk) {
+    return "already-cached";
+  }
+
+  const inFlightGeneration = getInFlightRewardImageGeneration(normalizedDinosaurName, options);
+
+  if (inFlightGeneration) {
+    return "already-in-flight";
+  }
+
+  startInFlightRewardImageGeneration(normalizedDinosaurName, generateImage, options);
+  return "started";
+}
+
 export async function resolveGeminiRewardImageWithFilesystemCache(
   request: GeminiImageGenerationRequest,
   generateImage: (request: GeminiImageGenerationRequest) => Promise<GeminiGeneratedImage>,
@@ -264,26 +324,11 @@ export async function resolveGeminiRewardImageWithFilesystemCache(
     return cachedImage;
   }
 
-  const inFlightGenerationKey = toInFlightRewardImageGenerationKey(normalizedDinosaurName, options);
-  const inFlightGeneration = inFlightRewardImageGenerations.get(inFlightGenerationKey);
+  const inFlightGeneration = getInFlightRewardImageGeneration(normalizedDinosaurName, options);
 
   if (inFlightGeneration) {
     return inFlightGeneration;
   }
 
-  const generationPromise = (async () => {
-    const generatedImage = await generateImage({ dinosaurName: normalizedDinosaurName });
-    await persistGeminiRewardImageToFilesystemCache(generatedImage, options);
-    return generatedImage;
-  })();
-
-  inFlightRewardImageGenerations.set(inFlightGenerationKey, generationPromise);
-
-  try {
-    return await generationPromise;
-  } finally {
-    if (inFlightRewardImageGenerations.get(inFlightGenerationKey) === generationPromise) {
-      inFlightRewardImageGenerations.delete(inFlightGenerationKey);
-    }
-  }
+  return startInFlightRewardImageGeneration(normalizedDinosaurName, generateImage, options);
 }
