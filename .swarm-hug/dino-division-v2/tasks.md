@@ -9,8 +9,8 @@
 
 ## Division Logic & Game State
 
-- [ ] (#5) Build a problem generator that scales from 2-digit ÷ 1-digit up to 4–5 digit ÷ 2–3 digit and supports both remainder and non-remainder cases [5 pts] (blocked by #2)
-- [ ] (#6) Implement difficulty progression rules driven by cumulative solved counts (lifetime-aware) and expose current difficulty level to problem generation [5 pts] (blocked by #2)
+- [A] (#5) Build a problem generator that scales from 2-digit ÷ 1-digit up to 4–5 digit ÷ 2–3 digit and supports both remainder and non-remainder cases [5 pts] (blocked by #2)
+- [A] (#6) Implement difficulty progression rules driven by cumulative solved counts (lifetime-aware) and expose current difficulty level to problem generation [5 pts] (blocked by #2)
 - [ ] (#7) Implement a pure long-division solver that emits the exact ordered workflow (quotient digit, multiply, subtract, bring-down) with expected values for each step [5 pts] (blocked by #2, #5)
 - [ ] (#8) Build step-validation/retry logic so correct answers advance immediately, incorrect answers keep focus on the same step, and hint hooks are returned for dino-themed feedback [5 pts] (blocked by #7)
 - [ ] (#9) Implement game-loop state orchestration for starting/completing problems, updating session/lifetime counters, and chaining to the next problem without form-submit flows [5 pts] (blocked by #5, #6, #8)
@@ -26,7 +26,7 @@
 
 ## Reward Pipeline (Gemini + Prefetch)
 
-- [ ] (#16) Build server-side Gemini image generation endpoints/services using `@google/generative-ai` and `gemini-2.0-flash-exp`, including robust response parsing and error handling [5 pts] (blocked by #4)
+- [B] (#16) Build server-side Gemini image generation endpoints/services using `@google/generative-ai` and `gemini-2.0-flash-exp`, including robust response parsing and error handling [5 pts] (blocked by #4)
 - [ ] (#17) Implement filesystem image caching/existence checks so dinosaur art generation is skipped when the asset already exists (no duplicate generation) [5 pts] (blocked by #16)
 - [ ] (#18) Implement reward milestone logic (every 5 solved) with deterministic dinosaur assignment and safeguards for milestone ordering/retry issues observed in v1 [5 pts] (blocked by #3, #9, #17)
 - [ ] (#19) Implement near-milestone prefetch triggers (problem 3/4 of each set of 5) that check cache first and start background generation only when needed [5 pts] (blocked by #17, #18)
@@ -35,7 +35,7 @@
 ## Gallery & Player Flow
 
 - [ ] (#21) Build the Dino Gallery view/section showing unlocked dinosaur image, name, and date earned, with empty-state messaging for new players and live refresh after unlocks [5 pts] (blocked by #3, #20)
-- [ ] (#22) Build the game-start flow that prompts for player name and offers “load existing save” vs “start new,” then initializes the in-memory game session [5 pts] (blocked by #2)
+- [B] (#22) Build the game-start flow that prompts for player name and offers “load existing save” vs “start new,” then initializes the in-memory game session [5 pts] (blocked by #2)
 
 ## Save/Load Persistence
 
