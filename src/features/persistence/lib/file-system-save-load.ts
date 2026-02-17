@@ -399,20 +399,6 @@ function buildActiveSessionHistoryEntry(
   };
 }
 
-function compareSessionProgress(
-  leftProgress: PlayerSessionProgress,
-  rightProgress: PlayerSessionProgress,
-): number {
-  if (leftProgress.solvedProblems !== rightProgress.solvedProblems) {
-    return leftProgress.solvedProblems - rightProgress.solvedProblems;
-  }
-  if (leftProgress.attemptedProblems !== rightProgress.attemptedProblems) {
-    return leftProgress.attemptedProblems - rightProgress.attemptedProblems;
-  }
-
-  return toIsoTimestamp(leftProgress.startedAt) - toIsoTimestamp(rightProgress.startedAt);
-}
-
 function mergeSessionProgress(
   existingSessionProgress: PlayerSessionProgress,
   incomingSessionProgress: PlayerSessionProgress,
@@ -442,12 +428,10 @@ function mergeSessionProgress(
     };
   }
 
-  return compareSessionProgress(
-    normalizedExistingProgress,
-    normalizedIncomingProgress,
-  ) > 0
-    ? { ...normalizedExistingProgress }
-    : { ...normalizedIncomingProgress };
+  return toIsoTimestamp(normalizedIncomingProgress.startedAt) >=
+    toIsoTimestamp(normalizedExistingProgress.startedAt)
+    ? { ...normalizedIncomingProgress }
+    : { ...normalizedExistingProgress };
 }
 
 function mergeSessionHistoryEntry(
