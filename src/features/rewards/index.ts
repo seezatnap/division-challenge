@@ -8,4 +8,9 @@
  * - Near-milestone prefetch triggers
  * - Egg-hatching loading UX and reveal
  */
-export {};
+
+export {
+  RewardGenerationStatus,
+  type UnlockedReward,
+  type RewardGenerationState,
+} from "@/types";

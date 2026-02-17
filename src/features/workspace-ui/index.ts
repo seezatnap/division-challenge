@@ -8,4 +8,5 @@
  * - Bring-down animation and step transitions
  * - Dino-themed feedback messaging
  */
-export {};
+
+export { type ActiveInputTarget, type InputValidationResult } from "@/types";

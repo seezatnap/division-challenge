@@ -7,4 +7,9 @@
  * - Graceful fallback (JSON export/import)
  * - Concurrency controls for save races
  */
-export {};
+
+export {
+  SAVE_FILE_VERSION,
+  type SessionRecord,
+  type SaveFile,
+} from "@/types";
