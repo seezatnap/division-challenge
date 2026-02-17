@@ -41,7 +41,7 @@
 
 - [x] (#23) Implement File System Access API save/load flows with permission prompts, player-named JSON files (e.g., `rex-save.json`), and full required payload fields [5 pts] (blocked by #2, #22) (B)
 - [x] (#24) Implement graceful fallback for environments without File System Access API (JSON export/import flow) while preserving identical schema and validation [5 pts] (blocked by #23) (B)
-- [C] (#25) Add persistence concurrency controls (queued/atomic writes + merge strategy) to prevent save races during rapid solves and reward unlock events [5 pts] (blocked by #20, #23)
+- [x] (#25) Add persistence concurrency controls (queued/atomic writes + merge strategy) to prevent save races during rapid solves and reward unlock events [5 pts] (blocked by #20, #23) (C)
 
 ## Theming & Motion
 

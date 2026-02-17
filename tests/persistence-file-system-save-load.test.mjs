@@ -78,6 +78,53 @@ function createInMemorySession(overrides = {}) {
   };
 }
 
+function createSessionWithLifetimeProgress({
+  totalProblemsSolved,
+  totalProblemsAttempted = totalProblemsSolved,
+  currentDifficultyLevel = 4,
+  unlockedRewards,
+}) {
+  const baseSession = createInMemorySession();
+  const mergedUnlockedRewards = unlockedRewards ?? baseSession.gameState.unlockedRewards;
+
+  return {
+    ...baseSession,
+    gameState: {
+      ...baseSession.gameState,
+      progress: {
+        session: {
+          ...baseSession.gameState.progress.session,
+          solvedProblems: Math.max(
+            baseSession.gameState.progress.session.solvedProblems,
+            totalProblemsSolved,
+          ),
+          attemptedProblems: Math.max(
+            baseSession.gameState.progress.session.attemptedProblems,
+            totalProblemsAttempted,
+          ),
+        },
+        lifetime: {
+          ...baseSession.gameState.progress.lifetime,
+          totalProblemsSolved,
+          totalProblemsAttempted,
+          currentDifficultyLevel,
+          rewardsUnlocked: mergedUnlockedRewards.length,
+        },
+      },
+      unlockedRewards: mergedUnlockedRewards.map((reward) => ({ ...reward })),
+    },
+  };
+}
+
+function createDeferred() {
+  let resolve;
+  const promise = new Promise((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+
+  return { promise, resolve };
+}
+
 const persistenceModule = loadTypeScriptModule(
   "src/features/persistence/lib/file-system-save-load.ts",
 );
@@ -177,6 +224,213 @@ test("saveSessionToFileSystem requests permission and writes JSON to a player-na
   const parsedSave = JSON.parse(writtenJson);
   assert.equal(parsedSave.playerName, "Rex");
   assert.equal(parsedSave.updatedAt, "2026-02-17T12:00:00.000Z");
+});
+
+test("saveSessionToFileSystem queues concurrent writes for the same file handle", async () => {
+  const { saveSessionToFileSystem } = await persistenceModule;
+
+  const writeOrder = [];
+  const firstWriteGate = createDeferred();
+  let committedJson = "";
+  let writableCalls = 0;
+
+  const handle = {
+    name: "rex-save.json",
+    async queryPermission() {
+      return "granted";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return committedJson;
+        },
+      };
+    },
+    async createWritable() {
+      writableCalls += 1;
+      const writeNumber = writableCalls;
+      let stagedJson = "";
+
+      return {
+        async write(content) {
+          writeOrder.push(`write-start-${writeNumber}`);
+          stagedJson = content;
+
+          if (writeNumber === 1) {
+            await firstWriteGate.promise;
+          }
+
+          writeOrder.push(`write-end-${writeNumber}`);
+        },
+        async close() {
+          writeOrder.push(`close-${writeNumber}`);
+          committedJson = stagedJson;
+        },
+      };
+    },
+  };
+
+  const firstSave = saveSessionToFileSystem({
+    session: createInMemorySession(),
+    handle,
+    clock: () => new Date("2026-02-17T12:05:00.000Z"),
+  });
+  const secondSave = saveSessionToFileSystem({
+    session: createSessionWithLifetimeProgress({
+      totalProblemsSolved: 28,
+      totalProblemsAttempted: 33,
+    }),
+    handle,
+    clock: () => new Date("2026-02-17T12:06:00.000Z"),
+  });
+
+  firstWriteGate.resolve();
+  await Promise.all([firstSave, secondSave]);
+
+  assert.deepEqual(writeOrder, [
+    "write-start-1",
+    "write-end-1",
+    "close-1",
+    "write-start-2",
+    "write-end-2",
+    "close-2",
+  ]);
+});
+
+test("saveSessionToFileSystem merges stale incoming snapshots with latest on-disk progress", async () => {
+  const { createDinoDivisionSavePayload, saveSessionToFileSystem } = await persistenceModule;
+  const baselineRewards = createInMemorySession().gameState.unlockedRewards;
+  const [rewardOne, rewardTwo] = baselineRewards;
+
+  let committedJson = JSON.stringify(
+    createDinoDivisionSavePayload(
+      createSessionWithLifetimeProgress({
+        totalProblemsSolved: 10,
+        totalProblemsAttempted: 12,
+        unlockedRewards: [rewardOne],
+      }),
+      () => new Date("2026-02-17T12:10:00.000Z"),
+    ),
+  );
+
+  const handle = {
+    name: "rex-save.json",
+    async queryPermission() {
+      return "granted";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return committedJson;
+        },
+      };
+    },
+    async createWritable() {
+      let stagedJson = committedJson;
+
+      return {
+        async write(content) {
+          stagedJson = content;
+        },
+        async close() {
+          committedJson = stagedJson;
+        },
+        async abort() {
+          stagedJson = committedJson;
+        },
+      };
+    },
+  };
+
+  const solveProgressSnapshot = createSessionWithLifetimeProgress({
+    totalProblemsSolved: 11,
+    totalProblemsAttempted: 13,
+    unlockedRewards: [rewardOne],
+  });
+  const rewardUnlockSnapshot = createSessionWithLifetimeProgress({
+    totalProblemsSolved: 10,
+    totalProblemsAttempted: 12,
+    unlockedRewards: [rewardOne, rewardTwo],
+  });
+
+  await Promise.all([
+    saveSessionToFileSystem({
+      session: solveProgressSnapshot,
+      handle,
+      clock: () => new Date("2026-02-17T12:11:00.000Z"),
+    }),
+    saveSessionToFileSystem({
+      session: rewardUnlockSnapshot,
+      handle,
+      clock: () => new Date("2026-02-17T12:12:00.000Z"),
+    }),
+  ]);
+
+  const mergedSave = JSON.parse(committedJson);
+  assert.equal(mergedSave.totalProblemsSolved, 11);
+  assert.equal(mergedSave.progress.lifetime.totalProblemsSolved, 11);
+  assert.equal(mergedSave.unlockedDinosaurs.length, 2);
+  assert.equal(mergedSave.progress.lifetime.rewardsUnlocked, 2);
+});
+
+test("saveSessionToFileSystem uses atomic write flow and aborts failed writes without committing", async () => {
+  const { createDinoDivisionSavePayload, saveSessionToFileSystem } = await persistenceModule;
+
+  const existingSave = createDinoDivisionSavePayload(
+    createInMemorySession(),
+    () => new Date("2026-02-17T12:20:00.000Z"),
+  );
+  const existingJson = JSON.stringify(existingSave);
+  let committedJson = existingJson;
+  let abortCalls = 0;
+  let writableOptionsSnapshot = null;
+
+  const handle = {
+    name: "rex-save.json",
+    async queryPermission() {
+      return "granted";
+    },
+    async getFile() {
+      return {
+        async text() {
+          return committedJson;
+        },
+      };
+    },
+    async createWritable(options) {
+      writableOptionsSnapshot = options ?? null;
+
+      return {
+        async write() {
+          throw new Error("disk write failed");
+        },
+        async close() {
+          committedJson = "unexpected-close";
+        },
+        async abort() {
+          abortCalls += 1;
+        },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () =>
+      saveSessionToFileSystem({
+        session: createSessionWithLifetimeProgress({
+          totalProblemsSolved: 35,
+          totalProblemsAttempted: 39,
+          unlockedRewards: createInMemorySession().gameState.unlockedRewards,
+        }),
+        handle,
+        clock: () => new Date("2026-02-17T12:21:00.000Z"),
+      }),
+    /disk write failed/,
+  );
+
+  assert.equal(abortCalls, 1);
+  assert.deepEqual(writableOptionsSnapshot, { keepExistingData: false });
+  assert.equal(committedJson, existingJson);
 });
 
 test("loadSaveFromFileSystem requests read permission and validates the payload", async () => {
