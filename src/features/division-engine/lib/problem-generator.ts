@@ -17,6 +17,16 @@ export interface DivisionProblemGenerationOptions {
   readonly maxAttempts?: number;
 }
 
+export interface DivisionDifficultyProgressionRule {
+  readonly level: DivisionDifficultyTier["level"];
+  readonly minimumSolvedCount: number;
+}
+
+export interface LifetimeAwareDivisionProblemGenerationOptions
+  extends Omit<DivisionProblemGenerationOptions, "difficultyLevel"> {
+  readonly totalProblemsSolved: number;
+}
+
 interface DivisionCandidate {
   readonly dividend: number;
   readonly hasRemainder: boolean;
@@ -65,6 +75,20 @@ export const DIVISION_DIFFICULTY_TIERS = [
     maxDivisorDigits: 3,
   },
 ] as const satisfies readonly DivisionDifficultyTier[];
+
+export const DIVISION_DIFFICULTY_PROGRESSION_RULES = [
+  { level: 1, minimumSolvedCount: 0 },
+  { level: 2, minimumSolvedCount: 5 },
+  { level: 3, minimumSolvedCount: 12 },
+  { level: 4, minimumSolvedCount: 20 },
+  { level: 5, minimumSolvedCount: 35 },
+] as const satisfies readonly DivisionDifficultyProgressionRule[];
+
+function assertNonNegativeInteger(value: number, argumentName: string): void {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError(`${argumentName} must be a non-negative integer.`);
+  }
+}
 
 function assertPositiveInteger(value: number, argumentName: string): void {
   if (!Number.isInteger(value) || value <= 0) {
@@ -130,6 +154,28 @@ export function getDivisionDifficultyTier(difficultyLevel: number): DivisionDiff
   const clampedIndex = Math.min(difficultyLevel - 1, maxTierIndex);
 
   return DIVISION_DIFFICULTY_TIERS[clampedIndex];
+}
+
+export function getDifficultyLevelForSolvedCount(totalProblemsSolved: number): number {
+  assertNonNegativeInteger(totalProblemsSolved, "totalProblemsSolved");
+
+  let resolvedLevel: number = DIVISION_DIFFICULTY_PROGRESSION_RULES[0].level;
+
+  for (const rule of DIVISION_DIFFICULTY_PROGRESSION_RULES) {
+    if (totalProblemsSolved < rule.minimumSolvedCount) {
+      break;
+    }
+
+    resolvedLevel = rule.level;
+  }
+
+  return getDivisionDifficultyTier(resolvedLevel).level;
+}
+
+export function getDivisionDifficultyTierForSolvedCount(
+  totalProblemsSolved: number,
+): DivisionDifficultyTier {
+  return getDivisionDifficultyTier(getDifficultyLevelForSolvedCount(totalProblemsSolved));
 }
 
 function chooseRemainderMode(
@@ -272,4 +318,16 @@ export function generateDivisionProblem(
   throw new Error(
     `Unable to generate a division problem for difficulty level ${difficultyTier.level} after ${maxAttempts} attempts.`,
   );
+}
+
+export function generateDivisionProblemForSolvedCount(
+  options: LifetimeAwareDivisionProblemGenerationOptions,
+): DivisionProblem {
+  const { totalProblemsSolved, ...generationOptions } = options;
+  const difficultyLevel = getDifficultyLevelForSolvedCount(totalProblemsSolved);
+
+  return generateDivisionProblem({
+    ...generationOptions,
+    difficultyLevel,
+  });
 }
