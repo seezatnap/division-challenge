@@ -72,17 +72,18 @@ async function fileExists(filePath) {
   }
 }
 
-async function resolveHeadlessShellExecutablePath() {
-  const browsersDirectory = path.join(repoRoot, ".playwright-browsers");
+async function resolveHeadlessShellExecutablePathFromDirectory(browsersDirectory) {
+  if (!(await fileExists(browsersDirectory))) {
+    return null;
+  }
+
   const browserDirectories = await readdir(browsersDirectory, { withFileTypes: true });
   const headlessShellDirectory = browserDirectories.find(
     (entry) => entry.isDirectory() && entry.name.startsWith("chromium_headless_shell-"),
   );
 
   if (!headlessShellDirectory) {
-    throw new Error(
-      "Chromium headless shell is missing. Run `PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers npx agent-browser install`.",
-    );
+    return null;
   }
 
   const candidatePaths = [
@@ -118,7 +119,35 @@ async function resolveHeadlessShellExecutablePath() {
     }
   }
 
-  throw new Error("Unable to resolve a Chromium headless-shell executable.");
+  return null;
+}
+
+async function resolveHeadlessShellExecutablePath() {
+  const localHeadlessShellPath = await resolveHeadlessShellExecutablePathFromDirectory(
+    path.join(repoRoot, ".playwright-browsers"),
+  );
+  if (localHeadlessShellPath) {
+    return localHeadlessShellPath;
+  }
+
+  const playwrightManagedExecutablePath = (() => {
+    try {
+      return chromium.executablePath();
+    } catch {
+      return null;
+    }
+  })();
+
+  if (
+    playwrightManagedExecutablePath &&
+    (await fileExists(playwrightManagedExecutablePath))
+  ) {
+    return playwrightManagedExecutablePath;
+  }
+
+  throw new Error(
+    "Chromium executable is missing. Run `npx playwright install chromium` or `PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers npx agent-browser install`.",
+  );
 }
 
 async function stopServerProcess() {

@@ -100,17 +100,18 @@ async function fileExists(filePath) {
   }
 }
 
-async function resolveHeadlessShellExecutablePath() {
-  const browsersDirectory = path.join(repoRoot, ".playwright-browsers");
+async function resolveHeadlessShellExecutablePathFromDirectory(browsersDirectory) {
+  if (!(await fileExists(browsersDirectory))) {
+    return null;
+  }
+
   const browserDirectories = await readdir(browsersDirectory, { withFileTypes: true });
   const headlessShellDirectory = browserDirectories.find(
     (entry) => entry.isDirectory() && entry.name.startsWith("chromium_headless_shell-"),
   );
 
   if (!headlessShellDirectory) {
-    throw new Error(
-      "Chromium headless shell is missing. Run `PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers npx agent-browser install`.",
-    );
+    return null;
   }
 
   const candidatePaths = [
@@ -146,7 +147,35 @@ async function resolveHeadlessShellExecutablePath() {
     }
   }
 
-  throw new Error("Unable to resolve a Chromium headless-shell executable.");
+  return null;
+}
+
+async function resolveHeadlessShellExecutablePath() {
+  const localHeadlessShellPath = await resolveHeadlessShellExecutablePathFromDirectory(
+    path.join(repoRoot, ".playwright-browsers"),
+  );
+  if (localHeadlessShellPath) {
+    return localHeadlessShellPath;
+  }
+
+  const playwrightManagedExecutablePath = (() => {
+    try {
+      return chromium.executablePath();
+    } catch {
+      return null;
+    }
+  })();
+
+  if (
+    playwrightManagedExecutablePath &&
+    (await fileExists(playwrightManagedExecutablePath))
+  ) {
+    return playwrightManagedExecutablePath;
+  }
+
+  throw new Error(
+    "Chromium executable is missing. Run `npx playwright install chromium` or `PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers npx agent-browser install`.",
+  );
 }
 
 async function stopServerProcess() {
@@ -424,7 +453,7 @@ test("visual workflow: wrong digit triggers red error feedback and a 1-second re
       `${firstStepSelector}[data-entry-error="locked"]`,
       { timeout: 1_400 },
     );
-    await page.waitForTimeout(120);
+    await expectRetryLockWithoutEditableCell(page, firstStepSelector, 1_500);
     const retryLockedCellBox = await page.locator(firstStepSelector).boundingBox();
     assert.ok(
       retryLockedCellBox,
@@ -438,11 +467,7 @@ test("visual workflow: wrong digit triggers red error feedback and a 1-second re
       Math.abs((retryLockedCellBox?.height ?? 0) - (initialCellBox?.height ?? 0)) <= 2,
       `Expected retry-locked quotient cell height to stay aligned. Initial height: ${initialCellBox?.height}, locked height: ${retryLockedCellBox?.height}`,
     );
-    assert.equal(
-      await page.locator(activeEditableSelector).count(),
-      0,
-      "Expected retry lock to remain active shortly after the wrong-digit feedback pulse.",
-    );
+    await expectRetryLockWithoutEditableCell(page, firstStepSelector, 450);
 
     await expectActiveEditableCell(page, firstStep);
     await expectFocusedEditableCell(page, firstStep);
@@ -485,7 +510,7 @@ test("visual workflow: wrong work-row digit keeps cell dimensions stable during 
     await page.waitForSelector(`${workRowSelector}[data-entry-error="locked"]`, {
       timeout: 1_400,
     });
-    await page.waitForTimeout(120);
+    await expectRetryLockWithoutEditableCell(page, workRowSelector, 1_500);
 
     const retryLockedCellBox = await page.locator(workRowSelector).boundingBox();
     assert.ok(
@@ -500,11 +525,7 @@ test("visual workflow: wrong work-row digit keeps cell dimensions stable during 
       Math.abs((retryLockedCellBox?.height ?? 0) - (initialCellBox?.height ?? 0)) <= 2,
       `Expected retry-locked work-row cell height to stay aligned. Initial height: ${initialCellBox?.height}, locked height: ${retryLockedCellBox?.height}`,
     );
-    assert.equal(
-      await page.locator(activeEditableSelector).count(),
-      0,
-      "Expected no editable digit cell while retry lock is active after wrong work-row digit input.",
-    );
+    await expectRetryLockWithoutEditableCell(page, workRowSelector, 450);
 
     await expectActiveEditableCell(page, workRowStep);
   } finally {
@@ -714,4 +735,19 @@ async function expectFocusedEditableCell(page, { stepId, digitIndex }) {
     digitIndex: String(digitIndex),
     isEditable: true,
   });
+}
+
+async function expectRetryLockWithoutEditableCell(page, stepSelector, timeout = 1_200) {
+  await page.waitForFunction(
+    ({ cellSelector, editableSelector }) => {
+      const lockedCell = document.querySelector(`${cellSelector}[data-entry-error="locked"]`);
+      if (!lockedCell) {
+        return false;
+      }
+
+      return document.querySelectorAll(editableSelector).length === 0;
+    },
+    { cellSelector: stepSelector, editableSelector: activeEditableSelector },
+    { timeout },
+  );
 }
