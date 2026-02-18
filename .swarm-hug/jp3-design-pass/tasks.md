@@ -29,17 +29,17 @@ Every task below should be implemented to visually match these comps. When in do
 ## Gallery Rework
 
 - [x] (#10) Rework `DinoGalleryPanel` thumbnail grid to match the JP3 Research Center thumbnail grid layout shown in the left panel of `test-comp-targets/Jp3websitebrachi.webp`: bright green tile backgrounds, dinosaur images centered within tiles, name labels below each tile, 3×3 grid matching the comp's proportions [5 pts] (blocked by #4) (A) (A)
-- [ ] (#11) Implement the Research Center two-panel detail view for gallery matching `test-comp-targets/Jp3websitebrachi.webp`: when a dinosaur is selected, show dinosaur image top-left with a data-sheet info card on the right (name, scientific name, pronunciation, diet, name meaning, length, height, weight, time period, location, taxon) matching the exact layout of the Brachiosaurus info card in the comp, description paragraph below [5 pts] (blocked by #10) (A)
+- [x] (#11) Implement the Research Center two-panel detail view for gallery matching `test-comp-targets/Jp3websitebrachi.webp`: when a dinosaur is selected, show dinosaur image top-left with a data-sheet info card on the right (name, scientific name, pronunciation, diet, name meaning, length, height, weight, time period, location, taxon) matching the exact layout of the Brachiosaurus info card in the comp, description paragraph below [5 pts] (blocked by #10) (A) (C)
 - [ ] (#12) Add red triangular scroll indicators (up/down arrows) for scrollable content areas in the gallery detail view and any overflow panels, matching the red triangle scroll arrows visible in the right panel of `test-comp-targets/Jp3websitebrachi.webp` [5 pts] (blocked by #11) (B)
 
 ## Player Start & Reward Screens
 
 - [x] (#13) Restyle the player-start screen with the Research Center title treatment matching the "The Research Center" heading style in `test-comp-targets/Jp3websitebrachi.webp`: serif heading, subtitle text, all on a green panel within the wood frame, with the player-name input styled as a field-station terminal input (cream text on dark-green input field) [5 pts] (blocked by #3, #4) (B) (C)
-- [ ] (#14) Adapt `EarnedRewardRevealPanel` to use green panel + wood frame aesthetic consistent with the comp's panel styling for the egg-hatching container, and style the revealed dinosaur image in a bordered frame matching the comp's dinosaur portrait area in the info card [5 pts] (blocked by #4) (B)
+- [x] (#14) Adapt `EarnedRewardRevealPanel` to use green panel + wood frame aesthetic consistent with the comp's panel styling for the egg-hatching container, and style the revealed dinosaur image in a bordered frame matching the comp's dinosaur portrait area in the info card [5 pts] (blocked by #4) (B) (B)
 
 ## Layout & Responsive
 
-- [ ] (#15) Update the `.jurassic-content` grid layout for desktop to use the comp's two-column proportions as seen in `test-comp-targets/Jp3websitebrachi.webp` (left navigation/gallery column, right workspace/detail column) and ensure the wood frame, toolbar, and jungle background remain correct at all breakpoints [5 pts] (blocked by #3, #6) (A)
+- [x] (#15) Update the `.jurassic-content` grid layout for desktop to use the comp's two-column proportions as seen in `test-comp-targets/Jp3websitebrachi.webp` (left navigation/gallery column, right workspace/detail column) and ensure the wood frame, toolbar, and jungle background remain correct at all breakpoints [5 pts] (blocked by #3, #6) (A) (A)
 
 ## Visual Tests
 
@@ -50,7 +50,7 @@ Every task below should be implemented to visually match these comps. When in do
 
 ## Existing Test Updates
 
-- [ ] (#20) Update `tests/jurassic-theme-ui.test.mjs` assertions to match the new CSS class names, color values, and design tokens introduced by the JP3 restyling [5 pts] (blocked by #4, #6) (A)
+- [x] (#20) Update `tests/jurassic-theme-ui.test.mjs` assertions to match the new CSS class names, color values, and design tokens introduced by the JP3 restyling [5 pts] (blocked by #4, #6) (A) (B)
 
 ## Polish & Integration
 
@@ -58,4 +58,9 @@ Every task below should be implemented to visually match these comps. When in do
 - [ ] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#23) Fix toolbar `currentStreak` stat to track actual consecutive-correct-answer streak instead of reusing `sessionSolvedProblems` (blocked by #7)
+- [x] (#23) Fix toolbar `currentStreak` stat to track actual consecutive-correct-answer streak instead of reusing `sessionSolvedProblems` (blocked by #7) (C)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#24) Resolve merge conflict markers in `src/app/page.tsx` (lines 1838–1848) — accept the `IslaSornaToolbar` stashed changes to wire streak/stats into the toolbar (blocked by #23)
+- [ ] (#25) Restore `tests/toolbar-current-streak.test.mjs` lost during merge (file exists in commit e06424e but is missing from HEAD) (blocked by #23)
+- [ ] (#26) Restore `tests/gallery-detail-two-panel.test.mjs` lost during merge (file exists in commit 748ca55 but is missing from HEAD) (blocked by #11)

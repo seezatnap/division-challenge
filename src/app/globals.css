@@ -1426,20 +1426,119 @@ body {
   padding: 0.13rem 0.46rem;
 }
 
-.gallery-detail-image,
+/* ── Research Center Two-Panel Detail View ──────────────── */
+
+.detail-two-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.detail-panel-image {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gallery-detail-image {
+  width: 100%;
+  max-height: min(54vh, 22rem);
+  object-fit: contain;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.08);
+}
+
 .reward-modal-image {
   width: 100%;
   max-height: min(54vh, 22rem);
   object-fit: cover;
-  border-radius: 0.35rem;
-  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 0.25rem;
+  border: 3px solid var(--jp-panel-border);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+  background: #0d3d15;
+}
+
+.detail-panel-info {
+  min-width: 0;
+}
+
+.detail-info-card {
+  border: 1px solid rgba(240, 237, 216, 0.18);
+  border-radius: 0.45rem;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 0.65rem 0.75rem;
+}
+
+.info-card-name {
+  font-family: var(--font-jurassic-display), "Times New Roman", serif;
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--jp-panel-text);
+  margin: 0;
+}
+
+.info-card-scientific {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: rgba(240, 237, 216, 0.78);
+  margin-top: 0.15rem;
+}
+
+.info-card-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.18rem 0.55rem;
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.info-card-label {
+  font-weight: 700;
+  color: var(--jp-panel-text);
+  white-space: nowrap;
+}
+
+.info-card-value {
+  color: rgba(240, 237, 216, 0.88);
+  margin: 0;
+}
+
+.detail-description-section {
+  margin-top: 0.25rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(240, 237, 216, 0.12);
+  border-radius: 0.45rem;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.detail-description-section .dino-dossier-description {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(240, 237, 216, 0.85);
+}
+
+@media (min-width: 40rem) {
+  .detail-two-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    align-items: start;
+  }
+
+  .gallery-detail-image {
+    max-height: min(50vh, 20rem);
+  }
 }
 
 .reward-reveal-modal {
   display: grid;
   gap: 0.8rem;
   justify-items: start;
-  border-color: rgba(211, 160, 58, 0.5);
+  border: 3px solid var(--jp-frame);
+  background-image: var(--jp-frame-grain);
+  background-clip: padding-box;
   box-shadow:
     inset 2px 2px 0 rgba(255, 255, 255, 0.12),
     inset -2px -2px 0 rgba(0, 0, 0, 0.25),
@@ -1528,10 +1627,17 @@ body {
 
 .earned-reward-panel {
   margin-top: 0.85rem;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 3px solid var(--jp-frame);
   border-radius: 0.45rem;
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--jp-panel-bg);
+  color: var(--jp-panel-text);
   padding: 0.75rem;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.12),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    0 0.75rem 2rem rgba(0, 0, 0, 0.25);
+  background-image: var(--jp-frame-grain);
+  background-clip: padding-box;
   transition:
     border-color 220ms ease,
     box-shadow 220ms ease,
@@ -1539,19 +1645,21 @@ body {
 }
 
 .earned-reward-panel[data-reward-motion="cracking"] {
-  border-color: rgba(211, 160, 58, 0.54);
+  border-color: var(--jp-amber);
   box-shadow:
-    inset 0 0 0 1px rgba(244, 212, 141, 0.28),
-    0 0 1rem rgba(211, 160, 58, 0.18);
+    inset 2px 2px 0 rgba(255, 255, 255, 0.12),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    0 0 1rem rgba(211, 160, 58, 0.28);
   transform: translateY(-1px);
 }
 
 .earned-reward-panel[data-reward-motion="revealing"],
 .earned-reward-panel[data-reward-motion="revealed"] {
-  border-color: rgba(70, 96, 56, 0.42);
+  border-color: var(--jp-panel-border);
   box-shadow:
-    inset 0 0 0 1px rgba(113, 137, 81, 0.18),
-    0 0 1.1rem rgba(70, 96, 56, 0.13);
+    inset 2px 2px 0 rgba(255, 255, 255, 0.12),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.25),
+    0 0 1.1rem rgba(26, 122, 46, 0.2);
 }
 
 .earned-reward-header {
@@ -1700,14 +1808,23 @@ body {
 
 .reward-reveal-figure {
   margin-top: 0.75rem;
+  border: 2px solid var(--jp-panel-border);
+  border-radius: 0.35rem;
+  background: #0d3d15;
+  padding: 0.5rem;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .reward-reveal-image {
   width: 100%;
   max-height: 11rem;
   object-fit: cover;
-  border-radius: 0.35rem;
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 0.25rem;
+  border: 3px solid var(--jp-panel-border);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+  background: #0d3d15;
 }
 
 .reward-reveal-figure[data-reveal-state="revealing"] .reward-reveal-image {
@@ -1740,15 +1857,24 @@ body {
 
 @keyframes reward-reveal-glow {
   0% {
-    box-shadow: 0 0 0 rgba(113, 137, 81, 0);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 2px 8px rgba(0, 0, 0, 0.3),
+      0 0 0 rgba(26, 122, 46, 0);
   }
 
   60% {
-    box-shadow: 0 0 1.2rem rgba(113, 137, 81, 0.35);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 2px 8px rgba(0, 0, 0, 0.3),
+      0 0 1.2rem rgba(26, 122, 46, 0.4);
   }
 
   100% {
-    box-shadow: 0 0 0 rgba(113, 137, 81, 0);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 2px 8px rgba(0, 0, 0, 0.3),
+      0 0 0 rgba(26, 122, 46, 0);
   }
 }
 
@@ -2076,6 +2202,23 @@ body {
     grid-template-columns: minmax(0, 1.42fr) minmax(0, 0.95fr);
     align-items: start;
   }
+
+  /* Two-column layout at tablet: gallery/nav left, workspace/detail right.
+     Matches the comp's two-panel proportions (narrower left, wider right).
+     HTML order is workspace then side-stack, so use `order` to swap. */
+  .jurassic-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr);
+    align-items: start;
+  }
+
+  /* Gallery / side-stack appears in the left (first) column */
+  .jurassic-layout > .side-stack {
+    order: -1;
+  }
+
+  .side-stack {
+    align-content: start;
+  }
 }
 
 @media (min-width: 64rem) {
@@ -2083,12 +2226,8 @@ body {
     padding: 2rem;
   }
 
+  /* Desktop: refine proportions to match comp's ~35% / ~65% split */
   .jurassic-layout {
-    grid-template-columns: minmax(0, 1.52fr) minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .side-stack {
-    align-content: start;
+    grid-template-columns: minmax(0, 0.54fr) minmax(0, 1fr);
   }
 }
