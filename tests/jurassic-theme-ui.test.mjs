@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -59,6 +59,10 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     source.includes('data-ui-surface="hybrid-lab-modal"'),
     "Expected hybrid lab modal surface to be rendered from the home page",
   );
+  assert.ok(
+    source.includes("<SurveillanceToolbar />"),
+    "Expected persistent surveillance toolbar component to be mounted on the home page",
+  );
 });
 
 test("root layout wires themed typography variables", async () => {
@@ -71,11 +75,31 @@ test("root layout wires themed typography variables", async () => {
     "--font-jurassic-display",
     "--font-jurassic-body",
     "--font-jurassic-mono",
+    'className="jurassic-app-frame"',
+    'data-ui-decoration="viewport-frame"',
   ]) {
     assert.ok(source.includes(fragment), `Expected themed typography fragment: ${fragment}`);
   }
 
   assert.equal(source.includes("Geist"), false, "Geist font wiring should be removed for Jurassic typography");
+});
+
+test("surveillance toolbar component includes JP3 footer label, icon controls, and MORE affordance", async () => {
+  const source = await readRepoFile("src/features/workspace-ui/components/surveillance-toolbar.tsx");
+
+  for (const fragment of [
+    'data-ui-surface="surveillance-toolbar"',
+    "ISLA SORNA SURVEILLANCE DEVICE",
+    "Footprint tracker",
+    "Fossil scanner",
+    "DNA analyzer",
+    "Egg monitor",
+    'data-ui-action="toolbar-more"',
+    "MORE",
+    "jp-surveillance-icon-button",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected surveillance toolbar fragment: ${fragment}`);
+  }
 });
 
 test("global stylesheet defines Jurassic palette, motif overlays, glow animation, and responsive breakpoints", async () => {
@@ -86,11 +110,33 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-panel-bg:",
     "--jp-panel-text:",
     "--jp-panel-border:",
+    ".jurassic-panel {",
+    "background: var(--jp-panel-bg);",
+    "color: var(--jp-panel-text);",
+    "--jp-bark: var(--jp-panel-text);",
+    "inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 86%, black)",
     "--jp-frame:",
+    "--jp-frame-width:",
+    "--jp-frame-rivet-size:",
     "--jp-frame-grain:",
+    ".jurassic-app-frame {",
+    ".jurassic-app-frame::before",
+    ".jurassic-app-frame::after",
+    "-webkit-mask-composite: xor;",
+    "mask-composite: exclude;",
     "--jp-toolbar:",
     "--jp-toolbar-text:",
     "--jp-accent-red:",
+    ".jp-surveillance-toolbar",
+    "position: fixed;",
+    ".jp-surveillance-toolbar-label",
+    "font-variant: small-caps;",
+    ".jp-surveillance-toolbar-icons",
+    ".jp-surveillance-icon-button",
+    ".jp-surveillance-toolbar-more",
+    ".jp-surveillance-toolbar-more::after",
+    "border-left: 0.45rem solid var(--jp-accent-red);",
+    "--background-image: url(\"/jp3-jungle-canopy.jpg\");",
     "--jp-amber:",
     "--jp-glow:",
     ".motif-claw::after",
@@ -128,6 +174,22 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
   }
 
+  assert.ok(source.includes("background-size: cover;"), "Expected full-viewport canopy image sizing");
+  assert.ok(source.includes("background-position: center;"), "Expected centered canopy framing");
+  assert.equal(
+    source.includes("radial-gradient(circle at 18% 10%"),
+    false,
+    "Legacy radial gradient body background should be removed",
+  );
   assert.equal(source.includes("--jp-sand:"), false, "Legacy sand token should be removed");
   assert.equal(source.includes("--jp-ivory:"), false, "Legacy ivory token should be removed");
+  assert.equal(
+    source.includes("rgba(244, 236, 214"),
+    false,
+    "Legacy translucent ivory panel fill should be removed",
+  );
+});
+
+test("jungle canopy background asset exists in public", async () => {
+  await access(path.join(repoRoot, "public/jp3-jungle-canopy.jpg"));
 });

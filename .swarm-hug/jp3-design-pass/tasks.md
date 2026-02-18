@@ -8,17 +8,17 @@ Every task below should be implemented to visually match these comps. When in do
 ## Design System Foundation
 
 - [x] (#1) Update the CSS custom properties palette in `globals.css` to replace sand/ivory tokens with JP3 green panel colors matching the green seen in `test-comp-targets/Jp3websitebrachi.webp`, add new tokens for wood frame, dark metallic toolbar, silver toolbar text, and accent red, while preserving amber/glow tokens for active-cell highlighting [5 pts] (A) (A)
-- [ ] (#2) Replace the current radial-gradient body background with a full-viewport jungle canopy background image matching the lush tropical tree canopy visible behind panels in `test-comp-targets/Jp3websitebrachi.webp` (generate or source a dark atmospheric tropical canopy JPG, place in `public/`, apply as `background-image` on body with `background-size: cover`) [5 pts] (blocked by #1) (A)
-- [ ] (#3) Implement a wood/bamboo textured border frame that surrounds the entire app viewport on all four sides, matching the weathered rough-hewn wood frame with visible grain texture seen in `test-comp-targets/Jp3websitebrachi.webp`, including decorative corner bolt/rivet details at the frame corners as shown in the comp [5 pts] (blocked by #1) (A)
+- [x] (#2) Replace the current radial-gradient body background with a full-viewport jungle canopy background image matching the lush tropical tree canopy visible behind panels in `test-comp-targets/Jp3websitebrachi.webp` (generate or source a dark atmospheric tropical canopy JPG, place in `public/`, apply as `background-image` on body with `background-size: cover`) [5 pts] (blocked by #1) (A) (A)
+- [x] (#3) Implement a wood/bamboo textured border frame that surrounds the entire app viewport on all four sides, matching the weathered rough-hewn wood frame with visible grain texture seen in `test-comp-targets/Jp3websitebrachi.webp`, including decorative corner bolt/rivet details at the frame corners as shown in the comp [5 pts] (blocked by #1) (A) (A)
 
 ## Panel Restyling
 
-- [ ] (#4) Restyle `.jurassic-panel` from translucent ivory to opaque bright JP3 green matching the info panel color in `test-comp-targets/Jp3websitebrachi.webp` (approximately `#1a7a2e`), with darker green inset borders giving the "computer screen" bevel effect visible in the comp, and update all text within panels to cream/white for readability as shown in the comp's data text [5 pts] (blocked by #1) (A)
+- [x] (#4) Restyle `.jurassic-panel` from translucent ivory to opaque bright JP3 green matching the info panel color in `test-comp-targets/Jp3websitebrachi.webp` (approximately `#1a7a2e`), with darker green inset borders giving the "computer screen" bevel effect visible in the comp, and update all text within panels to cream/white for readability as shown in the comp's data text [5 pts] (blocked by #1) (A) (B)
 - [ ] (#5) Update the motif overlay pseudo-element classes (`.motif-canopy`, `.motif-claw`, `.motif-fossil`, `.motif-track`) to work with the new green panel backgrounds, adjusting opacity and colors so they remain subtle decorative accents [5 pts] (blocked by #4) (B)
 
 ## Toolbar / Footer Bar
 
-- [ ] (#6) Build a persistent bottom toolbar component matching the "ISLA SORNA SURVEILLANCE DEVICE" bar shown at the bottom of `test-comp-targets/Jp3websitebrachi.webp`: dark metallic background, centered small-caps label, small icon buttons matching the equipment pictograms in the comp (footprint, fossil, DNA helix, egg), and a "MORE" link with red arrow indicator as shown in the comp's bottom-right corner [5 pts] (blocked by #1) (A)
+- [x] (#6) Build a persistent bottom toolbar component matching the "ISLA SORNA SURVEILLANCE DEVICE" bar shown at the bottom of `test-comp-targets/Jp3websitebrachi.webp`: dark metallic background, centered small-caps label, small icon buttons matching the equipment pictograms in the comp (footprint, fossil, DNA helix, egg), and a "MORE" link with red arrow indicator as shown in the comp's bottom-right corner [5 pts] (blocked by #1) (A) (B)
 - [ ] (#7) Wire session stats (problems solved, current streak, difficulty level) into the toolbar bar so they display as readout-style data alongside the icon buttons, maintaining the comp's dark metallic aesthetic [5 pts] (blocked by #6) (B)
 
 ## Division Workspace Adaptation
