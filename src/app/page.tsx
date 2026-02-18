@@ -1378,6 +1378,12 @@ export default function Home() {
   const activeLaneLabel = formatActiveInputLane(
     gameSession.steps[0] ? "quotient" : null,
   );
+  const toolbarSessionStats = {
+    problemsSolved: gameSession.sessionSolvedProblems,
+    currentStreak: gameSession.sessionSolvedProblems,
+    difficultyLevel: gameSession.activeProblem.difficultyLevel,
+  };
+
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
@@ -1444,7 +1450,7 @@ export default function Home() {
             </form>
           </section>
         </div>
-        <IslaSornaSurveillanceToolbar />
+        <IslaSornaSurveillanceToolbar sessionStats={toolbarSessionStats} />
       </main>
     );
   }
@@ -1837,7 +1843,7 @@ export default function Home() {
             modalHost,
           )
         : null}
-      <IslaSornaSurveillanceToolbar />
+      <IslaSornaSurveillanceToolbar sessionStats={toolbarSessionStats} />
     </main>
   );
 }

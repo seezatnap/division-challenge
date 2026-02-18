@@ -173,9 +173,18 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
   const cssSource = await readRepoFile("src/app/globals.css");
 
   assert.ok(
-    pageSource.includes("<IslaSornaSurveillanceToolbar />"),
-    "Expected home page to render the persistent surveillance toolbar",
+    pageSource.includes("<IslaSornaSurveillanceToolbar sessionStats={toolbarSessionStats} />"),
+    "Expected home page to render the persistent surveillance toolbar with session stats",
   );
+
+  for (const fragment of [
+    "const toolbarSessionStats = {",
+    "problemsSolved: gameSession.sessionSolvedProblems,",
+    "currentStreak: gameSession.sessionSolvedProblems,",
+    "difficultyLevel: gameSession.activeProblem.difficultyLevel,",
+  ]) {
+    assert.ok(pageSource.includes(fragment), `Expected page session stats wiring fragment: ${fragment}`);
+  }
 
   for (const fragment of [
     'data-ui-surface="surveillance-toolbar"',
@@ -185,6 +194,10 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
     'iconKind: "fossil"',
     'iconKind: "dna"',
     'iconKind: "egg"',
+    "Session statistics readouts",
+    "Problems Solved",
+    "Current Streak",
+    "Difficulty Level",
   ]) {
     assert.ok(toolbarSource.includes(fragment), `Expected toolbar fragment: ${fragment}`);
   }
@@ -192,8 +205,13 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
   for (const fragment of [
     ".surveillance-toolbar-shell",
     ".surveillance-toolbar {",
+    ".surveillance-toolbar-controls",
     ".surveillance-toolbar-label",
     ".surveillance-toolbar-icon-button",
+    ".surveillance-toolbar-readouts",
+    ".surveillance-toolbar-readout",
+    ".surveillance-toolbar-readout-label",
+    ".surveillance-toolbar-readout-value",
     ".surveillance-toolbar-more",
     ".surveillance-toolbar-more-arrow",
     "var(--jp-toolbar)",

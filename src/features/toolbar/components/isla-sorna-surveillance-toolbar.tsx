@@ -1,8 +1,25 @@
 type SurveillanceIconKind = "footprint" | "fossil" | "dna" | "egg";
+type SurveillanceReadoutKey = "problemsSolved" | "currentStreak" | "difficultyLevel";
 
 interface SurveillanceIconButtonDefinition {
   iconKind: SurveillanceIconKind;
   label: string;
+}
+
+interface SurveillanceSessionStats {
+  problemsSolved: number;
+  currentStreak: number;
+  difficultyLevel: number;
+}
+
+interface SurveillanceReadoutDefinition {
+  key: SurveillanceReadoutKey;
+  label: string;
+  abbreviatedLabel: string;
+}
+
+interface IslaSornaSurveillanceToolbarProps {
+  sessionStats?: SurveillanceSessionStats;
 }
 
 const SURVEILLANCE_ICON_BUTTONS: readonly SurveillanceIconButtonDefinition[] = [
@@ -11,6 +28,38 @@ const SURVEILLANCE_ICON_BUTTONS: readonly SurveillanceIconButtonDefinition[] = [
   { iconKind: "dna", label: "DNA Trace" },
   { iconKind: "egg", label: "Egg Monitor" },
 ];
+
+const SURVEILLANCE_SESSION_READOUTS: readonly SurveillanceReadoutDefinition[] = [
+  {
+    key: "problemsSolved",
+    label: "Problems Solved",
+    abbreviatedLabel: "SOL",
+  },
+  {
+    key: "currentStreak",
+    label: "Current Streak",
+    abbreviatedLabel: "STR",
+  },
+  {
+    key: "difficultyLevel",
+    label: "Difficulty Level",
+    abbreviatedLabel: "LVL",
+  },
+];
+
+const DEFAULT_SESSION_STATS: SurveillanceSessionStats = {
+  problemsSolved: 0,
+  currentStreak: 0,
+  difficultyLevel: 1,
+};
+
+function toReadoutValue(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.trunc(value));
+}
 
 function SurveillanceIcon({ kind }: { kind: SurveillanceIconKind }) {
   if (kind === "footprint") {
@@ -67,7 +116,15 @@ function SurveillanceIconButton({ definition }: { definition: SurveillanceIconBu
   );
 }
 
-export function IslaSornaSurveillanceToolbar() {
+export function IslaSornaSurveillanceToolbar({
+  sessionStats = DEFAULT_SESSION_STATS,
+}: IslaSornaSurveillanceToolbarProps) {
+  const normalizedSessionStats: SurveillanceSessionStats = {
+    problemsSolved: toReadoutValue(sessionStats.problemsSolved),
+    currentStreak: toReadoutValue(sessionStats.currentStreak),
+    difficultyLevel: Math.max(1, toReadoutValue(sessionStats.difficultyLevel)),
+  };
+
   return (
     <footer
       aria-label="Isla Sorna surveillance toolbar"
@@ -75,10 +132,27 @@ export function IslaSornaSurveillanceToolbar() {
       id="surveillance-toolbar-more"
     >
       <div className="surveillance-toolbar" data-ui-surface="surveillance-toolbar">
-        <div aria-label="Surveillance equipment controls" className="surveillance-toolbar-icons" role="group">
-          {SURVEILLANCE_ICON_BUTTONS.map((definition) => (
-            <SurveillanceIconButton definition={definition} key={definition.iconKind} />
-          ))}
+        <div className="surveillance-toolbar-controls">
+          <div aria-label="Surveillance equipment controls" className="surveillance-toolbar-icons" role="group">
+            {SURVEILLANCE_ICON_BUTTONS.map((definition) => (
+              <SurveillanceIconButton definition={definition} key={definition.iconKind} />
+            ))}
+          </div>
+
+          <dl aria-label="Session statistics readouts" className="surveillance-toolbar-readouts">
+            {SURVEILLANCE_SESSION_READOUTS.map((readout) => (
+              <div className="surveillance-toolbar-readout" key={readout.key}>
+                <dt className="surveillance-toolbar-readout-label">{readout.abbreviatedLabel}</dt>
+                <dd
+                  aria-label={`${readout.label}: ${normalizedSessionStats[readout.key]}`}
+                  className="surveillance-toolbar-readout-value"
+                  title={readout.label}
+                >
+                  {normalizedSessionStats[readout.key]}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
         <p className="surveillance-toolbar-label">ISLA SORNA SURVEILLANCE DEVICE</p>
