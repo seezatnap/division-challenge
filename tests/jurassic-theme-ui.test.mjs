@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -133,4 +133,25 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
   ]) {
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
   }
+});
+
+test("global stylesheet uses a full-viewport jungle canopy body background image", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  assert.equal(
+    source.includes("--background: radial-gradient"),
+    false,
+    "Expected radial-gradient body background token to be removed",
+  );
+  assert.ok(
+    source.includes('--background-image: url("/jungle-canopy-bg.jpg");'),
+    "Expected canopy JPG token in the root palette",
+  );
+  assert.ok(source.includes("background-image:"), "Expected body background-image declaration");
+  assert.ok(source.includes("var(--background-image);"), "Expected body to use canopy image token");
+  assert.ok(source.includes("background-size: cover;"), "Expected full-viewport cover sizing on body");
+
+  const canopyImage = await stat(path.join(repoRoot, "public/jungle-canopy-bg.jpg"));
+  assert.ok(canopyImage.isFile(), "Expected jungle canopy JPG asset to exist in public/");
+  assert.ok(canopyImage.size > 0, "Expected jungle canopy JPG asset to be non-empty");
 });

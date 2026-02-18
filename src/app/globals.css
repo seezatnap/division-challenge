@@ -25,7 +25,8 @@
   --jp-ink: #1b1711;
   --jp-surface: var(--jp-panel-bg);
   --jp-glow: rgba(211, 160, 58, 0.62);
-  --background: radial-gradient(circle at 18% 10%, #fbf1db 0%, #e7d9b8 36%, #c5b08a 100%);
+  --background: #08160f;
+  --background-image: url("/jungle-canopy-bg.jpg");
   --foreground: var(--jp-ink);
 }
 
@@ -42,7 +43,13 @@
 
 body {
   min-height: 100vh;
-  background: var(--background);
+  background-color: var(--background);
+  background-image:
+    linear-gradient(180deg, rgba(8, 22, 15, 0.58), rgba(8, 22, 15, 0.74)),
+    var(--background-image);
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-size: cover;
   color: var(--foreground);
   font-family: var(--font-jurassic-body), "Trebuchet MS", sans-serif;
   text-rendering: optimizeLegibility;
