@@ -170,17 +170,16 @@ test("reward reveal modal uses JP3 wood frame border aesthetic", async () => {
 test("reward modal image uses bordered frame matching comp dinosaur portrait", async () => {
   const source = await readRepoFile("src/app/globals.css");
 
-  // The shared .gallery-detail-image, .reward-modal-image rule
-  const sharedRuleStart = source.indexOf(".gallery-detail-image,");
-  const sharedRuleEnd = source.indexOf("}", sharedRuleStart);
-  const sharedRule = source.slice(sharedRuleStart, sharedRuleEnd + 1);
+  const rewardModalImageRuleStart = source.indexOf(".reward-modal-image {");
+  const rewardModalImageRuleEnd = source.indexOf("}", rewardModalImageRuleStart);
+  const rewardModalImageRule = source.slice(rewardModalImageRuleStart, rewardModalImageRuleEnd + 1);
 
   assert.ok(
-    sharedRule.includes("var(--jp-panel-border)"),
+    rewardModalImageRule.includes("var(--jp-panel-border)"),
     "Expected reward-modal-image to use --jp-panel-border for bordered frame",
   );
   assert.ok(
-    sharedRule.includes("box-shadow"),
+    rewardModalImageRule.includes("box-shadow"),
     "Expected reward-modal-image to have box-shadow for portrait frame effect",
   );
 });
