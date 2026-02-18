@@ -325,7 +325,7 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
   for (const fragment of [
     "const toolbarSessionStats = {",
     "problemsSolved: gameSession.sessionSolvedProblems,",
-    "currentStreak: gameSession.sessionSolvedProblems,",
+    "currentStreak: gameSession.currentStreak,",
     "difficultyLevel: gameSession.activeProblem.difficultyLevel,",
   ]) {
     assert.ok(pageSource.includes(fragment), `Expected page session stats wiring fragment: ${fragment}`);

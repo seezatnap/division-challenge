@@ -19,6 +19,7 @@ const PREEXISTING_SERVER_BASE_URL_CANDIDATES = [
 let workspaceUrl = TEST_WORKSPACE_BASE_URL;
 let workspaceVisualUrl = `${workspaceUrl}/visual-tests/workspace`;
 const activeEditableSelector = '[data-entry-inline="true"][contenteditable="true"]';
+const RETRY_LOCK_MIN_DURATION_MS = 850;
 const manualSolvePlan = [
   { digit: "3", stepId: "workspace-preview-problem:step:0:quotient-digit", digitIndex: "0" },
   { digit: "3", stepId: "workspace-preview-problem:step:1:multiply-result", digitIndex: "0" },
@@ -149,24 +150,30 @@ async function resolveHeadlessShellExecutablePath() {
   throw new Error("Unable to resolve a Chromium headless-shell executable.");
 }
 
+async function waitForChildExit(childProcess, timeoutMilliseconds) {
+  if (childProcess.exitCode !== null) {
+    return true;
+  }
+
+  return Promise.race([
+    new Promise((resolve) => {
+      childProcess.once("exit", () => resolve(true));
+    }),
+    wait(timeoutMilliseconds).then(() => childProcess.exitCode !== null),
+  ]);
+}
+
 async function stopServerProcess() {
   if (!serverProcess || serverProcess.exitCode !== null) {
     return;
   }
 
   serverProcess.kill("SIGTERM");
-  const didExitGracefully = await Promise.race([
-    new Promise((resolve) => {
-      serverProcess.once("exit", () => resolve(true));
-    }),
-    wait(5_000).then(() => false),
-  ]);
+  const didExitGracefully = await waitForChildExit(serverProcess, 5_000);
 
   if (!didExitGracefully) {
     serverProcess.kill("SIGKILL");
-    await new Promise((resolve) => {
-      serverProcess.once("exit", resolve);
-    });
+    await waitForChildExit(serverProcess, 5_000);
   }
 }
 
@@ -273,7 +280,8 @@ test.before(async () => {
     setWorkspaceBaseUrl(preexistingServerBaseUrl);
   } else {
     setWorkspaceBaseUrl(TEST_WORKSPACE_BASE_URL);
-    serverProcess = spawn("npm", ["run", "dev", "--", "--port", "4173", "--hostname", "127.0.0.1"], {
+    const nextDevExecutable = path.join(repoRoot, "node_modules", ".bin", "next");
+    serverProcess = spawn(nextDevExecutable, ["dev", "--port", "4173", "--hostname", "127.0.0.1"], {
       cwd: repoRoot,
       env: {
         ...process.env,
@@ -409,6 +417,7 @@ test("visual workflow: wrong digit triggers red error feedback and a 1-second re
     await expectActiveEditableCell(page, firstStep);
     const initialCellBox = await page.locator(firstStepSelector).boundingBox();
     assert.ok(initialCellBox, "Expected the active quotient digit cell to be measurable before retry lock.");
+    const wrongInputStartedAt = Date.now();
     await typeDigitIntoActiveCell(page, "9");
     await page.waitForSelector(
       `${firstStepSelector}[data-entry-error="pulse"]`,
@@ -424,7 +433,12 @@ test("visual workflow: wrong digit triggers red error feedback and a 1-second re
       `${firstStepSelector}[data-entry-error="locked"]`,
       { timeout: 1_400 },
     );
-    await page.waitForTimeout(120);
+    assert.equal(
+      await page.locator(activeEditableSelector).count(),
+      0,
+      "Expected retry lock to keep all editable digit cells disabled while locked.",
+    );
+
     const retryLockedCellBox = await page.locator(firstStepSelector).boundingBox();
     assert.ok(
       retryLockedCellBox,
@@ -438,13 +452,12 @@ test("visual workflow: wrong digit triggers red error feedback and a 1-second re
       Math.abs((retryLockedCellBox?.height ?? 0) - (initialCellBox?.height ?? 0)) <= 2,
       `Expected retry-locked quotient cell height to stay aligned. Initial height: ${initialCellBox?.height}, locked height: ${retryLockedCellBox?.height}`,
     );
-    assert.equal(
-      await page.locator(activeEditableSelector).count(),
-      0,
-      "Expected retry lock to remain active shortly after the wrong-digit feedback pulse.",
-    );
-
     await expectActiveEditableCell(page, firstStep);
+    const retryLockElapsedMilliseconds = Date.now() - wrongInputStartedAt;
+    assert.ok(
+      retryLockElapsedMilliseconds >= RETRY_LOCK_MIN_DURATION_MS,
+      `Expected retry lock to hold for at least ${RETRY_LOCK_MIN_DURATION_MS}ms, but it released after ${retryLockElapsedMilliseconds}ms.`,
+    );
     await expectFocusedEditableCell(page, firstStep);
     await typeDigitIntoActiveCell(page, "3");
     await wait(170);
@@ -478,6 +491,7 @@ test("visual workflow: wrong work-row digit keeps cell dimensions stable during 
     const initialCellBox = await page.locator(workRowSelector).boundingBox();
     assert.ok(initialCellBox, "Expected the active work-row digit cell to be measurable before retry lock.");
 
+    const wrongInputStartedAt = Date.now();
     await typeDigitIntoActiveCell(page, "9");
     await page.waitForSelector(`${workRowSelector}[data-entry-error="pulse"]`, {
       timeout: 1_200,
@@ -485,7 +499,11 @@ test("visual workflow: wrong work-row digit keeps cell dimensions stable during 
     await page.waitForSelector(`${workRowSelector}[data-entry-error="locked"]`, {
       timeout: 1_400,
     });
-    await page.waitForTimeout(120);
+    assert.equal(
+      await page.locator(activeEditableSelector).count(),
+      0,
+      "Expected no editable digit cell while retry lock is active after wrong work-row digit input.",
+    );
 
     const retryLockedCellBox = await page.locator(workRowSelector).boundingBox();
     assert.ok(
@@ -500,13 +518,12 @@ test("visual workflow: wrong work-row digit keeps cell dimensions stable during 
       Math.abs((retryLockedCellBox?.height ?? 0) - (initialCellBox?.height ?? 0)) <= 2,
       `Expected retry-locked work-row cell height to stay aligned. Initial height: ${initialCellBox?.height}, locked height: ${retryLockedCellBox?.height}`,
     );
-    assert.equal(
-      await page.locator(activeEditableSelector).count(),
-      0,
-      "Expected no editable digit cell while retry lock is active after wrong work-row digit input.",
-    );
-
     await expectActiveEditableCell(page, workRowStep);
+    const retryLockElapsedMilliseconds = Date.now() - wrongInputStartedAt;
+    assert.ok(
+      retryLockElapsedMilliseconds >= RETRY_LOCK_MIN_DURATION_MS,
+      `Expected work-row retry lock to hold for at least ${RETRY_LOCK_MIN_DURATION_MS}ms, but it released after ${retryLockElapsedMilliseconds}ms.`,
+    );
   } finally {
     await context.close();
   }

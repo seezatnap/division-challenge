@@ -50,6 +50,11 @@ import {
   writePlayerProfileSnapshot,
 } from "@/features/persistence/lib";
 import { IslaSornaSurveillanceToolbar } from "@/features/toolbar/components/isla-sorna-surveillance-toolbar";
+import {
+  resolveCurrentStreakAfterValidationOutcome,
+  resolveSolvedProgressAfterCompletedProblem,
+} from "@/features/toolbar/lib/session-streak";
+import { useScrollIndicatorState } from "@/features/hooks/use-scroll-indicator-state";
 
 const PROVISIONAL_REWARD_IMAGE_PATH = "/window.svg";
 
@@ -67,6 +72,7 @@ interface LiveGameSessionState {
   activeProblem: DivisionProblem;
   steps: readonly LongDivisionStep[];
   sessionSolvedProblems: number;
+  currentStreak: number;
   sessionAttemptedProblems: number;
   totalProblemsSolved: number;
   totalProblemsAttempted: number;
@@ -91,6 +97,7 @@ interface PersistedPlayerProfileSnapshot {
 const INITIAL_TOTAL_PROBLEMS_SOLVED = 0;
 const INITIAL_TOTAL_PROBLEMS_ATTEMPTED = 0;
 const INITIAL_SESSION_PROBLEMS_SOLVED = 0;
+const INITIAL_SESSION_CURRENT_STREAK = 0;
 const INITIAL_SESSION_PROBLEMS_ATTEMPTED = 0;
 const AMBER_EARNED_PER_SOLVED_PROBLEM = 1;
 const AMBER_COST_PER_DINO_UNLOCK = 5;
@@ -322,6 +329,9 @@ function isPersistedPlayerProfileSnapshot(
   ) {
     return false;
   }
+  if ("currentStreak" in snapshot.gameSession && typeof snapshot.gameSession.currentStreak !== "number") {
+    return false;
+  }
   if (
     typeof snapshot.gameSession.totalProblemsSolved !== "number" ||
     typeof snapshot.gameSession.totalProblemsAttempted !== "number"
@@ -531,6 +541,7 @@ const initialLiveGameSessionState: LiveGameSessionState = {
   activeProblem: workspacePreviewProblem,
   steps: workspacePreviewSolution.steps,
   sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
+  currentStreak: INITIAL_SESSION_CURRENT_STREAK,
   sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
   totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
   totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
@@ -551,6 +562,7 @@ function createFreshLiveGameSessionState(): LiveGameSessionState {
     activeProblem: workspacePreviewProblem,
     steps: workspacePreviewSolution.steps,
     sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
+    currentStreak: INITIAL_SESSION_CURRENT_STREAK,
     sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
     totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
     totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
@@ -630,8 +642,14 @@ function normalizeUnlockedHybridRewardsForSession(
 function hydrateLiveGameSessionState(
   persistedState: LiveGameSessionState,
 ): LiveGameSessionState {
+  const persistedCurrentStreak = (persistedState as Partial<LiveGameSessionState>).currentStreak;
+
   return {
     ...persistedState,
+    currentStreak:
+      typeof persistedCurrentStreak === "number"
+        ? toNonNegativeInteger(persistedCurrentStreak)
+        : toNonNegativeInteger(persistedState.sessionSolvedProblems),
     amberBalance:
       typeof persistedState.amberBalance === "number"
         ? toNonNegativeInteger(persistedState.amberBalance)
@@ -668,6 +686,12 @@ export default function Home() {
     useState<UnlockedHybridReward | null>(null);
   const [selectedHybridDossier, setSelectedHybridDossier] =
     useState<RewardDinosaurDossier | null>(null);
+  const [hybridLabModalElement, setHybridLabModalElement] = useState<HTMLElement | null>(null);
+  const hybridLabModalScrollIndicators = useScrollIndicatorState(hybridLabModalElement);
+  const [hybridDetailModalElement, setHybridDetailModalElement] =
+    useState<HTMLElement | null>(null);
+  const hybridDetailModalScrollIndicators =
+    useScrollIndicatorState(hybridDetailModalElement);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
   const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1237,13 +1261,18 @@ export default function Home() {
   const advanceToNextProblem = useCallback(() => {
     const currentState = gameSessionRef.current;
     const nextTotalProblemsSolved = currentState.totalProblemsSolved + 1;
+    const nextSolvedProgress = resolveSolvedProgressAfterCompletedProblem({
+      sessionSolvedProblems: currentState.sessionSolvedProblems,
+      currentStreak: currentState.currentStreak,
+    });
     const { problem: nextProblem, steps: nextSteps } =
       resolveNextLiveProblem(nextTotalProblemsSolved);
 
     setGameSession({
       activeProblem: nextProblem,
       steps: nextSteps,
-      sessionSolvedProblems: currentState.sessionSolvedProblems + 1,
+      sessionSolvedProblems: nextSolvedProgress.sessionSolvedProblems,
+      currentStreak: nextSolvedProgress.currentStreak,
       sessionAttemptedProblems: currentState.sessionAttemptedProblems + 1,
       totalProblemsSolved: nextTotalProblemsSolved,
       totalProblemsAttempted: currentState.totalProblemsAttempted + 1,
@@ -1355,6 +1384,24 @@ export default function Home() {
 
   const handleWorkspaceStepValidation = useCallback(
     (validation: LongDivisionStepValidationResult) => {
+      if (validation.outcome === "incorrect") {
+        setGameSession((currentState) => {
+          const nextCurrentStreak = resolveCurrentStreakAfterValidationOutcome({
+            currentStreak: currentState.currentStreak,
+            outcome: validation.outcome,
+          });
+          if (nextCurrentStreak === currentState.currentStreak) {
+            return currentState;
+          }
+
+          return {
+            ...currentState,
+            currentStreak: nextCurrentStreak,
+          };
+        });
+        return;
+      }
+
       if (!validation.didAdvance || validation.outcome !== "complete") {
         return;
       }
@@ -1380,7 +1427,7 @@ export default function Home() {
   );
   const toolbarSessionStats = {
     problemsSolved: gameSession.sessionSolvedProblems,
-    currentStreak: gameSession.sessionSolvedProblems,
+    currentStreak: gameSession.currentStreak,
     difficultyLevel: gameSession.activeProblem.difficultyLevel,
   };
 
@@ -1678,8 +1725,14 @@ export default function Home() {
                   aria-label="Hybrid Lab"
                   aria-modal="true"
                   className="jp-modal hybrid-lab-modal"
+                  data-scroll-indicator-down={hybridLabModalScrollIndicators.canScrollDown ? "true" : "false"}
+                  data-scroll-indicator-enabled={hybridLabModalScrollIndicators.isScrollable ? "true" : "false"}
+                  data-scroll-indicator-up={hybridLabModalScrollIndicators.canScrollUp ? "true" : "false"}
                   onClick={(event) => {
                     event.stopPropagation();
+                  }}
+                  ref={(element) => {
+                    setHybridLabModalElement(element);
                   }}
                   role="dialog"
                 >
@@ -1793,8 +1846,14 @@ export default function Home() {
                   aria-label={`${selectedHybridReward.hybridName} details`}
                   aria-modal="true"
                   className="jp-modal gallery-detail-modal"
+                  data-scroll-indicator-down={hybridDetailModalScrollIndicators.canScrollDown ? "true" : "false"}
+                  data-scroll-indicator-enabled={hybridDetailModalScrollIndicators.isScrollable ? "true" : "false"}
+                  data-scroll-indicator-up={hybridDetailModalScrollIndicators.canScrollUp ? "true" : "false"}
                   onClick={(event) => {
                     event.stopPropagation();
+                  }}
+                  ref={(element) => {
+                    setHybridDetailModalElement(element);
                   }}
                   role="dialog"
                 >

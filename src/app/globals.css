@@ -1485,6 +1485,36 @@ body::after {
   animation: jp-modal-enter 200ms ease-out;
 }
 
+.jp-modal[data-scroll-indicator-up="true"]::before,
+.jp-modal[data-scroll-indicator-down="true"]::after {
+  content: "";
+  position: absolute;
+  right: 0.62rem;
+  width: 1.05rem;
+  height: 0.88rem;
+  pointer-events: none;
+  z-index: 4;
+  border: 1px solid rgba(240, 237, 216, 0.86);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--jp-accent-red) 84%, #ff6f6f) 0%,
+    color-mix(in srgb, var(--jp-accent-red) 84%, #7a1010) 100%
+  );
+  filter: drop-shadow(0 0.14rem 0.24rem rgba(19, 4, 4, 0.58));
+}
+
+.jp-modal[data-scroll-indicator-up="true"]::before {
+  top: 50%;
+  transform: translateY(-172%);
+  clip-path: polygon(50% 2%, 4% 98%, 96% 98%);
+}
+
+.jp-modal[data-scroll-indicator-down="true"]::after {
+  top: 50%;
+  transform: translateY(72%);
+  clip-path: polygon(4% 2%, 96% 2%, 50% 98%);
+}
+
 .gallery-detail-modal {
   display: grid;
   gap: 0.72rem;
