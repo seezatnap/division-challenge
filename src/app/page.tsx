@@ -18,6 +18,7 @@ import {
   type LongDivisionStepValidationResult,
 } from "@/features/division-engine";
 import { DinoGalleryPanel } from "@/features/gallery/components/dino-gallery-panel";
+import { IslaSornaToolbar } from "./isla-sorna-toolbar";
 import {
   type ActiveInputLane,
   type DivisionProblem,
@@ -1355,23 +1356,21 @@ export default function Home() {
     return (
       <main className="jurassic-shell">
         <div className="jurassic-content">
-          <header className="jurassic-panel jurassic-hero motif-canopy">
-            <p className="eyebrow">Dino Division v2</p>
-            <h1 className="hero-title">Jurassic Command Deck</h1>
-          </header>
-
           <section
             aria-labelledby="player-start-heading"
             className="jurassic-panel player-start-panel"
             data-ui-surface="player-start"
           >
-            <div className="surface-header">
-              <div>
-                <p className="surface-kicker">Player Profile</p>
-                <h2 className="surface-title" id="player-start-heading">
-                  Start Sequencing
-                </h2>
-              </div>
+            <div className="research-center-header">
+              <h1
+                className="research-center-title"
+                id="player-start-heading"
+              >
+                The Research Center
+              </h1>
+              <p className="research-center-subtitle">
+                Use the computer to begin your Isla Sorna field research.
+              </p>
             </div>
 
             <form className="game-start-flow" onSubmit={handleStartSession}>
@@ -1380,7 +1379,7 @@ export default function Home() {
               </label>
               <input
                 autoComplete="name"
-                className="game-start-input"
+                className="game-start-input terminal-input"
                 id="game-start-player-name"
                 name="playerName"
                 onChange={(event) => {
@@ -1417,6 +1416,8 @@ export default function Home() {
             </form>
           </section>
         </div>
+
+        <IslaSornaToolbar />
       </main>
     );
   }
@@ -1809,6 +1810,14 @@ export default function Home() {
             modalHost,
           )
         : null}
+
+      <IslaSornaToolbar
+        stats={{
+          problemsSolved: gameSession.sessionSolvedProblems,
+          currentStreak: gameSession.sessionSolvedProblems,
+          difficultyLevel: gameSession.activeProblem.difficultyLevel,
+        }}
+      />
     </main>
   );
 }

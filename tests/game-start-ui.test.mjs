@@ -37,3 +37,59 @@ test("home page requires player name to start and wires localStorage profile per
     "Expedition Files save/load surface should be removed",
   );
 });
+
+test("player-start screen uses Research Center title treatment with serif heading and subtitle", async () => {
+  const pageSource = await readRepoFile("src/app/page.tsx");
+
+  assert.ok(
+    pageSource.includes("The Research Center"),
+    "Expected Research Center title heading on player-start screen",
+  );
+  assert.ok(
+    pageSource.includes("research-center-title"),
+    "Expected research-center-title CSS class on heading",
+  );
+  assert.ok(
+    pageSource.includes("research-center-subtitle"),
+    "Expected research-center-subtitle CSS class for subtitle text",
+  );
+  assert.ok(
+    pageSource.includes("research-center-header"),
+    "Expected research-center-header wrapper for title treatment",
+  );
+});
+
+test("player-name input is styled as a field-station terminal input", async () => {
+  const pageSource = await readRepoFile("src/app/page.tsx");
+
+  assert.ok(
+    pageSource.includes("terminal-input"),
+    "Expected terminal-input CSS class on player-name input",
+  );
+});
+
+test("global stylesheet defines Research Center title and terminal input styles", async () => {
+  const cssSource = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    ".research-center-header",
+    ".research-center-title",
+    ".research-center-subtitle",
+    ".game-start-input.terminal-input",
+    "--font-jurassic-display",
+  ]) {
+    assert.ok(
+      cssSource.includes(fragment),
+      `Expected Research Center styling fragment: ${fragment}`,
+    );
+  }
+
+  assert.ok(
+    cssSource.includes(".game-start-input.terminal-input::placeholder"),
+    "Expected terminal input placeholder styling",
+  );
+  assert.ok(
+    cssSource.includes(".game-start-input.terminal-input:focus-visible"),
+    "Expected terminal input focus-visible styling",
+  );
+});
