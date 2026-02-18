@@ -72,6 +72,15 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     "Expected persistent surveillance toolbar component to be mounted on the home page",
   );
   for (const fragment of [
+    'className="jurassic-content jurassic-content-start"',
+    'className="jurassic-content jurassic-content-live"',
+    "jurassic-start-column",
+    "jurassic-workspace-column",
+    "jurassic-side-column",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected desktop layout wiring fragment: ${fragment}`);
+  }
+  for (const fragment of [
     "problemsSolved={gameSession.sessionSolvedProblems}",
     "currentStreak={currentSessionStreak}",
     "difficultyLevel={currentDifficultyLevel}",
@@ -222,6 +231,13 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "@keyframes work-row-enter",
     "@media (min-width: 48rem)",
     "@media (min-width: 64rem)",
+    ".jurassic-content-start,",
+    ".jurassic-content-live {",
+    "grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.58fr);",
+    ".jurassic-content-live > .jurassic-layout {",
+    "display: contents;",
+    ".jurassic-content-live > .jurassic-layout > .jurassic-workspace-column {",
+    ".jurassic-content-live > .jurassic-layout > .jurassic-side-column {",
   ]) {
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
   }

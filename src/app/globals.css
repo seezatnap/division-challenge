@@ -2603,12 +2603,44 @@ body {
     padding-bottom: calc(var(--jp-frame-width) + 6.05rem + env(safe-area-inset-bottom));
   }
 
-  .jurassic-layout {
-    grid-template-columns: minmax(0, 1.52fr) minmax(0, 1fr);
+  .jurassic-content-start,
+  .jurassic-content-live {
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.58fr);
     align-items: start;
   }
 
-  .side-stack {
+  .jurassic-content-start {
+    grid-template-areas: "hero start";
+  }
+
+  .jurassic-content-start > .jurassic-hero {
+    grid-area: hero;
+  }
+
+  .jurassic-content-start > .jurassic-start-column {
+    grid-area: start;
+  }
+
+  .jurassic-content-live {
+    grid-template-areas:
+      "hero workspace"
+      "sidebar workspace";
+  }
+
+  .jurassic-content-live > .jurassic-hero {
+    grid-area: hero;
+  }
+
+  .jurassic-content-live > .jurassic-layout {
+    display: contents;
+  }
+
+  .jurassic-content-live > .jurassic-layout > .jurassic-workspace-column {
+    grid-area: workspace;
+  }
+
+  .jurassic-content-live > .jurassic-layout > .jurassic-side-column {
+    grid-area: sidebar;
     align-content: start;
   }
 

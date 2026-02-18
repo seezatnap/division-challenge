@@ -1361,7 +1361,7 @@ export default function Home() {
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
-        <div className="jurassic-content">
+        <div className="jurassic-content jurassic-content-start">
           <header className="jurassic-panel jurassic-hero motif-canopy">
             <p className="eyebrow">Dino Division v2</p>
             <h1 className="hero-title">Jurassic Command Deck</h1>
@@ -1369,7 +1369,7 @@ export default function Home() {
 
           <section
             aria-labelledby="player-start-heading"
-            className="jurassic-panel player-start-panel"
+            className="jurassic-panel player-start-panel jurassic-start-column"
             data-ui-surface="player-start"
           >
             <div className="surface-header player-start-header">
@@ -1438,7 +1438,7 @@ export default function Home() {
 
   return (
     <main className="jurassic-shell">
-      <div className="jurassic-content">
+      <div className="jurassic-content jurassic-content-live">
         <header className="jurassic-panel jurassic-hero motif-canopy">
           <p className="eyebrow">Dino Division v2</p>
           <h1 className="hero-title">Jurassic Command Deck</h1>
@@ -1447,7 +1447,7 @@ export default function Home() {
         <div className="jurassic-layout">
           <section
             aria-labelledby="game-surface-heading"
-            className="jurassic-panel motif-claw"
+            className="jurassic-panel motif-claw jurassic-workspace-column"
             data-ui-surface="game"
           >
             <div className="surface-header">
@@ -1485,7 +1485,7 @@ export default function Home() {
             ) : null}
           </section>
 
-          <div className="side-stack">
+          <div className="side-stack jurassic-side-column">
             <section
               aria-labelledby="gallery-surface-heading"
               className="jurassic-panel motif-fossil"
