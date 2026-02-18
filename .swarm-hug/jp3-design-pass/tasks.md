@@ -55,7 +55,7 @@ Every task below should be implemented to visually match these comps. When in do
 ## Polish & Integration
 
 - [x] (#21) Run the full existing test suite (`npm test` and `npm run test:visual`) and fix any regressions caused by the design pass, ensuring all workspace interaction, game logic, persistence, and reward pipeline tests still pass [5 pts] (blocked by #8, #9, #10, #13, #14, #15, #20) (A) (A)
-- [ ] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A)
+- [x] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A) (A)
 
 ## Follow-up tasks (from sprint review)
 - [x] (#23) Rename `tests/jp3-design-visual.test.mjs` to a visual-only target (for example `tests/jp3-design-visual.visual.mjs`) and update `npm run test:visual` to run it, so `npm test` does not unexpectedly require Playwright/browser artifacts. (A)
