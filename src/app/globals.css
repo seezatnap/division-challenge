@@ -262,8 +262,8 @@ body {
   inset: auto -16% -34% -16%;
   height: 74%;
   background:
-    radial-gradient(circle at 25% 30%, rgba(70, 96, 56, 0.18) 0%, transparent 44%),
-    radial-gradient(circle at 70% 40%, rgba(113, 137, 81, 0.16) 0%, transparent 42%);
+    radial-gradient(circle at 25% 30%, rgba(180, 220, 160, 0.1) 0%, transparent 44%),
+    radial-gradient(circle at 70% 40%, rgba(200, 240, 180, 0.08) 0%, transparent 42%);
 }
 
 .motif-claw::after {
@@ -274,7 +274,7 @@ body {
   background: repeating-linear-gradient(
     128deg,
     transparent 0 14px,
-    rgba(169, 127, 69, 0.2) 14px 17px,
+    rgba(240, 237, 216, 0.07) 14px 17px,
     transparent 17px 34px
   );
   transform: rotate(4deg);
@@ -288,7 +288,7 @@ body {
   background:
     repeating-radial-gradient(
       circle,
-      rgba(169, 127, 69, 0.22) 0 2px,
+      rgba(240, 237, 216, 0.08) 0 2px,
       transparent 2px 12px
     );
 }
@@ -299,9 +299,9 @@ body {
   width: 115%;
   height: 4.75rem;
   background-image:
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%),
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%),
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%);
+    radial-gradient(ellipse at center, rgba(0, 40, 10, 0.18) 0 34%, transparent 35%),
+    radial-gradient(ellipse at center, rgba(0, 40, 10, 0.18) 0 34%, transparent 35%),
+    radial-gradient(ellipse at center, rgba(0, 40, 10, 0.18) 0 34%, transparent 35%);
   background-size: 2.5rem 1.7rem;
   background-position:
     0 0,
