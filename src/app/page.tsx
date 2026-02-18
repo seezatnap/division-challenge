@@ -1813,7 +1813,13 @@ export default function Home() {
           )
         : null}
 
-      <IslaSornaToolbar />
+      <IslaSornaToolbar
+        stats={{
+          problemsSolved: gameSession.sessionSolvedProblems,
+          currentStreak: gameSession.sessionSolvedProblems,
+          difficultyLevel: gameSession.activeProblem.difficultyLevel,
+        }}
+      />
     </main>
   );
 }
