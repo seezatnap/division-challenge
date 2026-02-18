@@ -201,7 +201,13 @@ function EarnedRewardRevealPanelContent({
     }
 
     didAutoOpenRevealModalRef.current = true;
-    setIsRevealModalOpen(true);
+    const autoOpenHandle = window.setTimeout(() => {
+      setIsRevealModalOpen(true);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(autoOpenHandle);
+    };
   }, [imagePath, phase]);
 
   useEffect(() => {

@@ -155,3 +155,43 @@ test("global stylesheet uses a full-viewport jungle canopy body background image
   assert.ok(canopyImage.isFile(), "Expected jungle canopy JPG asset to exist in public/");
   assert.ok(canopyImage.size > 0, "Expected jungle canopy JPG asset to be non-empty");
 });
+
+test("surveillance toolbar renders JP3 footer affordances with icon controls and MORE link", async () => {
+  const pageSource = await readRepoFile("src/app/page.tsx");
+  const toolbarSource = await readRepoFile(
+    "src/features/toolbar/components/isla-sorna-surveillance-toolbar.tsx",
+  );
+  const cssSource = await readRepoFile("src/app/globals.css");
+
+  assert.ok(
+    pageSource.includes("<IslaSornaSurveillanceToolbar />"),
+    "Expected home page to render the persistent surveillance toolbar",
+  );
+
+  for (const fragment of [
+    'data-ui-surface="surveillance-toolbar"',
+    "ISLA SORNA SURVEILLANCE DEVICE",
+    "MORE",
+    'iconKind: "footprint"',
+    'iconKind: "fossil"',
+    'iconKind: "dna"',
+    'iconKind: "egg"',
+  ]) {
+    assert.ok(toolbarSource.includes(fragment), `Expected toolbar fragment: ${fragment}`);
+  }
+
+  for (const fragment of [
+    ".surveillance-toolbar-shell",
+    ".surveillance-toolbar {",
+    ".surveillance-toolbar-label",
+    ".surveillance-toolbar-icon-button",
+    ".surveillance-toolbar-more",
+    ".surveillance-toolbar-more-arrow",
+    "var(--jp-toolbar)",
+    "var(--jp-toolbar-text)",
+    "var(--jp-accent-red)",
+    "font-variant-caps: all-small-caps;",
+  ]) {
+    assert.ok(cssSource.includes(fragment), `Expected surveillance toolbar styling fragment: ${fragment}`);
+  }
+});
