@@ -2109,6 +2109,23 @@ body {
     grid-template-columns: minmax(0, 1.42fr) minmax(0, 0.95fr);
     align-items: start;
   }
+
+  /* Two-column layout at tablet: gallery/nav left, workspace/detail right.
+     Matches the comp's two-panel proportions (narrower left, wider right).
+     HTML order is workspace then side-stack, so use `order` to swap. */
+  .jurassic-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr);
+    align-items: start;
+  }
+
+  /* Gallery / side-stack appears in the left (first) column */
+  .jurassic-layout > .side-stack {
+    order: -1;
+  }
+
+  .side-stack {
+    align-content: start;
+  }
 }
 
 @media (min-width: 64rem) {
@@ -2116,12 +2133,8 @@ body {
     padding: 2rem;
   }
 
+  /* Desktop: refine proportions to match comp's ~35% / ~65% split */
   .jurassic-layout {
-    grid-template-columns: minmax(0, 1.52fr) minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .side-stack {
-    align-content: start;
+    grid-template-columns: minmax(0, 0.54fr) minmax(0, 1fr);
   }
 }
