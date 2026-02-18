@@ -7,7 +7,7 @@ Every task below should be implemented to visually match these comps. When in do
 
 ## Design System Foundation
 
-- [ ] (#1) Update the CSS custom properties palette in `globals.css` to replace sand/ivory tokens with JP3 green panel colors matching the green seen in `test-comp-targets/Jp3websitebrachi.webp`, add new tokens for wood frame, dark metallic toolbar, silver toolbar text, and accent red, while preserving amber/glow tokens for active-cell highlighting [5 pts] (A)
+- [x] (#1) Update the CSS custom properties palette in `globals.css` to replace sand/ivory tokens with JP3 green panel colors matching the green seen in `test-comp-targets/Jp3websitebrachi.webp`, add new tokens for wood frame, dark metallic toolbar, silver toolbar text, and accent red, while preserving amber/glow tokens for active-cell highlighting [5 pts] (A) (A)
 - [ ] (#2) Replace the current radial-gradient body background with a full-viewport jungle canopy background image matching the lush tropical tree canopy visible behind panels in `test-comp-targets/Jp3websitebrachi.webp` (generate or source a dark atmospheric tropical canopy JPG, place in `public/`, apply as `background-image` on body with `background-size: cover`) [5 pts] (blocked by #1) (A)
 - [ ] (#3) Implement a wood/bamboo textured border frame that surrounds the entire app viewport on all four sides, matching the weathered rough-hewn wood frame with visible grain texture seen in `test-comp-targets/Jp3websitebrachi.webp`, including decorative corner bolt/rivet details at the frame corners as shown in the comp [5 pts] (blocked by #1) (A)
 
