@@ -59,6 +59,26 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     source.includes('data-ui-surface="hybrid-lab-modal"'),
     "Expected hybrid lab modal surface to be rendered from the home page",
   );
+  assert.ok(
+    source.includes("Fusion Preview"),
+    "Expected hybrid lab to render fusion preview copy",
+  );
+  assert.ok(
+    source.includes("hybrid-preview-row"),
+    "Expected hybrid lab to render preview tiles for selected dinosaurs",
+  );
+  assert.ok(
+    source.includes("setIsHybridFusionInProgress(true);"),
+    "Expected hybrid creation to enter a fusion-loading state",
+  );
+  assert.ok(
+    source.includes("await requestHybridImageGeneration("),
+    "Expected hybrid creation flow to wait for generation before opening detail modal",
+  );
+  assert.ok(
+    source.includes("setSelectedHybridReward("),
+    "Expected hybrid creation flow to open the hybrid detail modal after generation resolves",
+  );
 });
 
 test("home page includes Research Center title treatment on player-start screen", async () => {
@@ -238,10 +258,15 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".amber-actions",
     ".hybrid-lab-modal",
     ".hybrid-lab-select",
+    ".hybrid-preview-row",
+    ".hybrid-preview-card",
+    ".hybrid-fusion-loader",
+    ".hybrid-fusion-bar",
     ".hybrid-lab-actions",
     ".coach-item[data-feedback-tone=\"retry\"]",
     "@keyframes amber-pulse",
     "@keyframes amber-pulse-bring-down",
+    "@keyframes hybrid-fusion-pulse",
     "@keyframes inline-entry-lock-in",
     "@keyframes inline-entry-lock-ring",
     "@keyframes work-row-enter",
