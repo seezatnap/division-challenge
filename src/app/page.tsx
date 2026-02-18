@@ -1459,7 +1459,7 @@ export default function Home() {
 
   return (
     <main className="jurassic-shell">
-      <div className="jurassic-content">
+      <div className="jurassic-content jurassic-content-session">
         <header className="jurassic-panel jurassic-hero motif-canopy">
           <p className="eyebrow">Dino Division v2</p>
           <h1 className="hero-title">Jurassic Command Deck</h1>

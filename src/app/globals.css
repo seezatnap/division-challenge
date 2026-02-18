@@ -224,6 +224,8 @@ body::after {
 }
 
 .jurassic-content {
+  --jurassic-session-left-column: minmax(0, 0.92fr);
+  --jurassic-session-right-column: minmax(0, 1.48fr);
   max-width: 78rem;
   margin: 0 auto;
   position: relative;
@@ -2616,12 +2618,29 @@ body::after {
     padding-bottom: calc(var(--jp-frame-thickness) + 6.8rem + env(safe-area-inset-bottom));
   }
 
-  .jurassic-layout {
-    grid-template-columns: minmax(0, 1.52fr) minmax(0, 1fr);
+  .jurassic-content-session {
+    grid-template-columns: var(--jurassic-session-left-column) var(--jurassic-session-right-column);
+    grid-template-areas:
+      "hero detail"
+      "nav detail";
     align-items: start;
   }
 
-  .side-stack {
+  .jurassic-content-session > .jurassic-hero {
+    grid-area: hero;
+    align-self: start;
+  }
+
+  .jurassic-content-session > .jurassic-layout {
+    display: contents;
+  }
+
+  .jurassic-content-session > .jurassic-layout > [data-ui-surface="game"] {
+    grid-area: detail;
+  }
+
+  .jurassic-content-session > .jurassic-layout > .side-stack {
+    grid-area: nav;
     align-content: start;
   }
 
