@@ -111,6 +111,14 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".motif-claw::after",
     ".motif-fossil::after",
     ".motif-track::after",
+    "rgba(20, 90, 34, 0.2)",
+    "rgba(16, 68, 29, 0.18)",
+    "rgba(240, 237, 216, 0.12)",
+    "rgba(10, 44, 18, 0.2)",
+    "opacity: 0.74;",
+    "opacity: 0.66;",
+    "opacity: 0.62;",
+    "opacity: 0.68;",
     ".inline-entry",
     '.inline-entry[data-entry-inline="true"][contenteditable="true"]:focus-visible',
     ".inline-entry-quotient.inline-entry-pending:focus-visible",
@@ -131,6 +139,17 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".hybrid-lab-modal",
     ".hybrid-lab-select",
     ".hybrid-lab-actions",
+    ".gallery-shell-research-center {",
+    ".gallery-shell-research-center .gallery-grid {",
+    "grid-template-columns: repeat(3, minmax(0, 1fr));",
+    ".gallery-shell-research-center .gallery-thumb {",
+    "aspect-ratio: 1 / 0.86;",
+    ".gallery-shell-research-center .gallery-image {",
+    "object-fit: contain;",
+    ".gallery-shell-research-center .gallery-name {",
+    "text-transform: uppercase;",
+    ".gallery-shell-research-center .gallery-meta {",
+    "display: none;",
     ".coach-item[data-feedback-tone=\"retry\"]",
     "@keyframes amber-pulse",
     "@keyframes amber-pulse-bring-down",
@@ -165,6 +184,76 @@ test("global stylesheet uses a full-viewport jungle canopy body background image
   assert.ok(canopyImage.size > 0, "Expected jungle canopy JPG asset to be non-empty");
 });
 
+test("bus-stop workspace color styling renders cream text on green surfaces while preserving amber and error states", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    ".workspace-paper {",
+    "color: color-mix(in srgb, var(--jp-panel-text) 92%, white);",
+    ".workspace-label {",
+    "color: color-mix(in srgb, var(--jp-panel-text) 84%, white);",
+    ".bracket-stack {",
+    "border-left: var(--division-bracket-stroke-width) solid color-mix(in srgb, var(--jp-panel-text) 72%, transparent);",
+    ".work-row[data-step-kind=\"multiply-result\"] .work-row-value-shell::after",
+    "border-bottom: 0.12rem solid color-mix(in srgb, var(--jp-panel-text) 66%, transparent);",
+    ".dividend-line,",
+    ".work-row-op {",
+    "color: var(--jp-panel-text);",
+    ".inline-entry.inline-entry-error-pulse {",
+    "background: rgba(131, 26, 26, 0.56);",
+    ".inline-entry.inline-entry-retry-lock {",
+    "background: rgba(104, 19, 19, 0.46);",
+    ".glow-amber {",
+    "@keyframes inline-entry-lock-in",
+    "background: color-mix(in srgb, var(--jp-amber-bright) 36%, rgba(4, 16, 8, 0.18));",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected bus-stop workspace styling fragment: ${fragment}`);
+  }
+
+  assert.equal(
+    source.includes("border-left: var(--division-bracket-stroke-width) solid rgba(45, 36, 25, 0.68);"),
+    false,
+    "Expected brown bracket stroke color to be removed for green-panel workspace rendering",
+  );
+});
+
+test("dino coach sidebar uses an inset field-station readout treatment with cream monospace messaging", async () => {
+  const cssSource = await readRepoFile("src/app/globals.css");
+  const panelSource = await readRepoFile(
+    "src/features/workspace-ui/components/live-division-workspace-panel.tsx",
+  );
+
+  for (const fragment of [
+    ".hint-stack {",
+    "color-mix(in srgb, var(--jp-panel-border) 90%, #08190d)",
+    "inset 0 0 0 2px color-mix(in srgb, var(--jp-panel-border) 70%, black)",
+    ".hint-title {",
+    "font-size: 0.78rem;",
+    ".hint-status {",
+    "font-family: var(--font-jurassic-mono), \"Courier New\", monospace;",
+    ".coach-list {",
+    "list-style: none;",
+    ".coach-item {",
+    "color: color-mix(in srgb, var(--jp-panel-text) 94%, white);",
+    ".coach-item[data-feedback-tone=\"retry\"] {",
+    ".coach-item[data-feedback-tone=\"celebration\"] {",
+    ".hint-note {",
+    "color: color-mix(in srgb, var(--jp-panel-text) 74%, #d2ceb8);",
+  ]) {
+    assert.ok(cssSource.includes(fragment), `Expected Dino Coach readout styling fragment: ${fragment}`);
+  }
+
+  for (const fragment of [
+    "className=\"hint-stack\"",
+    "data-feedback-tone={activeCoachMessage.tone}",
+    "className=\"hint-title\">Dino Coach</h3>",
+    "className=\"coach-item\"",
+    "className=\"hint-note\"",
+  ]) {
+    assert.ok(panelSource.includes(fragment), `Expected Dino Coach panel fragment: ${fragment}`);
+  }
+});
+
 test("surveillance toolbar renders JP3 footer affordances with icon controls and MORE link", async () => {
   const pageSource = await readRepoFile("src/app/page.tsx");
   const toolbarSource = await readRepoFile(
@@ -173,9 +262,18 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
   const cssSource = await readRepoFile("src/app/globals.css");
 
   assert.ok(
-    pageSource.includes("<IslaSornaSurveillanceToolbar />"),
-    "Expected home page to render the persistent surveillance toolbar",
+    pageSource.includes("<IslaSornaSurveillanceToolbar sessionStats={toolbarSessionStats} />"),
+    "Expected home page to render the persistent surveillance toolbar with session stats",
   );
+
+  for (const fragment of [
+    "const toolbarSessionStats = {",
+    "problemsSolved: gameSession.sessionSolvedProblems,",
+    "currentStreak: gameSession.sessionSolvedProblems,",
+    "difficultyLevel: gameSession.activeProblem.difficultyLevel,",
+  ]) {
+    assert.ok(pageSource.includes(fragment), `Expected page session stats wiring fragment: ${fragment}`);
+  }
 
   for (const fragment of [
     'data-ui-surface="surveillance-toolbar"',
@@ -185,6 +283,10 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
     'iconKind: "fossil"',
     'iconKind: "dna"',
     'iconKind: "egg"',
+    "Session statistics readouts",
+    "Problems Solved",
+    "Current Streak",
+    "Difficulty Level",
   ]) {
     assert.ok(toolbarSource.includes(fragment), `Expected toolbar fragment: ${fragment}`);
   }
@@ -192,8 +294,13 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
   for (const fragment of [
     ".surveillance-toolbar-shell",
     ".surveillance-toolbar {",
+    ".surveillance-toolbar-controls",
     ".surveillance-toolbar-label",
     ".surveillance-toolbar-icon-button",
+    ".surveillance-toolbar-readouts",
+    ".surveillance-toolbar-readout",
+    ".surveillance-toolbar-readout-label",
+    ".surveillance-toolbar-readout-value",
     ".surveillance-toolbar-more",
     ".surveillance-toolbar-more-arrow",
     "var(--jp-toolbar)",

@@ -1378,6 +1378,12 @@ export default function Home() {
   const activeLaneLabel = formatActiveInputLane(
     gameSession.steps[0] ? "quotient" : null,
   );
+  const toolbarSessionStats = {
+    problemsSolved: gameSession.sessionSolvedProblems,
+    currentStreak: gameSession.sessionSolvedProblems,
+    difficultyLevel: gameSession.activeProblem.difficultyLevel,
+  };
+
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
@@ -1392,46 +1398,48 @@ export default function Home() {
             className="jurassic-panel player-start-panel"
             data-ui-surface="player-start"
           >
-            <div className="surface-header">
+            <div className="surface-header player-start-header">
               <div>
-                <p className="surface-kicker">Player Profile</p>
-                <h2 className="surface-title" id="player-start-heading">
-                  Start Sequencing
+                <h2 className="surface-title player-start-title" id="player-start-heading">
+                  The Research Center
                 </h2>
+                <p className="player-start-subtitle">
+                  Use the field terminal to open or resume your Isla Sorna operator profile.
+                </p>
               </div>
             </div>
 
             <form className="game-start-flow" onSubmit={handleStartSession}>
-              <label className="game-start-label" htmlFor="game-start-player-name">
+              <label className="game-start-label player-start-label" htmlFor="game-start-player-name">
                 Player Name
               </label>
               <input
                 autoComplete="name"
-                className="game-start-input"
+                className="game-start-input player-start-input"
                 id="game-start-player-name"
                 name="playerName"
                 onChange={(event) => {
                   setPlayerNameDraft(event.target.value);
                   setSessionStartError(null);
                 }}
-                placeholder="Enter your dino wrangler name"
+                placeholder="enter field operator name"
                 required
                 type="text"
                 value={playerNameDraft}
               />
 
-              <p className="game-start-helper">
+              <p className="game-start-helper player-start-helper">
                 Profiles are auto-saved in this browser by lowercase player name.
               </p>
 
               {sessionStartError ? (
-                <p className="game-start-error" role="alert">
+                <p className="game-start-error player-start-error" role="alert">
                   {sessionStartError}
                 </p>
               ) : null}
 
               {sessionStartStatus ? (
-                <p className="game-start-helper" role="status">
+                <p className="game-start-helper player-start-helper" role="status">
                   {sessionStartStatus}
                 </p>
               ) : null}
@@ -1444,7 +1452,7 @@ export default function Home() {
             </form>
           </section>
         </div>
-        <IslaSornaSurveillanceToolbar />
+        <IslaSornaSurveillanceToolbar sessionStats={toolbarSessionStats} />
       </main>
     );
   }
@@ -1837,7 +1845,7 @@ export default function Home() {
             modalHost,
           )
         : null}
-      <IslaSornaSurveillanceToolbar />
+      <IslaSornaSurveillanceToolbar sessionStats={toolbarSessionStats} />
     </main>
   );
 }
