@@ -78,6 +78,49 @@ test("root layout wires themed typography variables", async () => {
   assert.equal(source.includes("Geist"), false, "Geist font wiring should be removed for Jurassic typography");
 });
 
+test("root layout includes JP3 wood frame wrapper with corner bolt elements", async () => {
+  const source = await readRepoFile("src/app/layout.tsx");
+
+  assert.ok(
+    source.includes('className="jp3-frame"'),
+    "Expected jp3-frame wrapper element in layout",
+  );
+  assert.ok(
+    source.includes('data-ui-frame="wood-border"'),
+    "Expected data-ui-frame attribute on frame wrapper",
+  );
+  for (const corner of ["tl", "tr", "bl", "br"]) {
+    assert.ok(
+      source.includes(`jp3-frame-bolt--${corner}`),
+      `Expected corner bolt element for ${corner} corner`,
+    );
+  }
+  assert.ok(
+    source.includes('aria-hidden="true"'),
+    "Expected bolt elements to be aria-hidden decorative elements",
+  );
+});
+
+test("global stylesheet defines JP3 wood frame and corner bolt styles", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    ".jp3-frame",
+    "--jp-frame:",
+    "--jp-frame-grain:",
+    "border-image:",
+    ".jp3-frame-bolt",
+    ".jp3-frame-bolt--tl",
+    ".jp3-frame-bolt--tr",
+    ".jp3-frame-bolt--bl",
+    ".jp3-frame-bolt--br",
+    ".jp3-frame-bolt::before",
+    ".jp3-frame-bolt::after",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected wood frame styling fragment: ${fragment}`);
+  }
+});
+
 test("global stylesheet defines Jurassic palette, motif overlays, glow animation, and responsive breakpoints", async () => {
   const source = await readRepoFile("src/app/globals.css");
 

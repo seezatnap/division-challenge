@@ -62,6 +62,118 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* ── JP3 Wood/Bamboo Frame ─────────────────────────────────── */
+
+.jp3-frame {
+  position: relative;
+  min-height: 100vh;
+  border: clamp(18px, 2.6vw, 32px) solid var(--jp-frame);
+  background-image: var(--jp-frame-grain);
+  background-clip: border-box;
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 4px rgba(255, 255, 255, 0.08),
+    0 0 0 2px rgba(0, 0, 0, 0.35);
+  border-image: repeating-linear-gradient(
+    178deg,
+    #7a5a32 0px,
+    #6b4c2a 4px,
+    #5a3e20 8px,
+    #7a5a32 12px,
+    #8b6634 16px,
+    #6b4c2a 20px
+  ) 32 fill;
+  isolation: isolate;
+}
+
+/* Wood grain texture overlay on the border area */
+.jp3-frame::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * clamp(18px, 2.6vw, 32px));
+  pointer-events: none;
+  z-index: 10;
+  border: clamp(18px, 2.6vw, 32px) solid transparent;
+  border-image: repeating-linear-gradient(
+    92deg,
+    rgba(0, 0, 0, 0.06) 0px,
+    transparent 1px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.04) 4px,
+    transparent 5px,
+    transparent 7px,
+    rgba(139, 90, 43, 0.08) 8px
+  ) 32;
+}
+
+/* Corner bolt/rivet decorations */
+.jp3-frame-bolt {
+  position: absolute;
+  width: clamp(14px, 1.8vw, 22px);
+  height: clamp(14px, 1.8vw, 22px);
+  z-index: 20;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 35%, #d4d0c8 0%, #a8a29e 30%, #78716c 60%, #57534e 80%, #44403c 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.45),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.35),
+    0 1px 3px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+/* Cross/slot detail on each bolt */
+.jp3-frame-bolt::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60%;
+  height: 1.5px;
+  background: rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+}
+
+.jp3-frame-bolt::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.5px;
+  height: 60%;
+  background: rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  border-radius: 1px;
+}
+
+/* Bolt positions — centered in each corner of the frame border.
+   The bolts sit at the intersection of the border edges, so they
+   are offset by half the border width minus half the bolt size. */
+.jp3-frame-bolt--tl {
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+}
+
+.jp3-frame-bolt--tr {
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
+}
+
+.jp3-frame-bolt--bl {
+  bottom: 0;
+  left: 0;
+  transform: translate(-50%, 50%);
+}
+
+.jp3-frame-bolt--br {
+  bottom: 0;
+  right: 0;
+  transform: translate(50%, 50%);
+}
+
 .jurassic-shell {
   min-height: 100vh;
   padding: 1.25rem;
