@@ -35,7 +35,13 @@ export default function RootLayout({
       <body
         className={`${jurassicDisplay.variable} ${jurassicBody.variable} ${jurassicMono.variable} antialiased`}
       >
-        {children}
+        <div className="jp3-frame" data-ui-frame="wood-border">
+          <div className="jp3-frame-bolt jp3-frame-bolt--tl" aria-hidden="true" />
+          <div className="jp3-frame-bolt jp3-frame-bolt--tr" aria-hidden="true" />
+          <div className="jp3-frame-bolt jp3-frame-bolt--bl" aria-hidden="true" />
+          <div className="jp3-frame-bolt jp3-frame-bolt--br" aria-hidden="true" />
+          {children}
+        </div>
       </body>
     </html>
   );
