@@ -23,7 +23,7 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     assert.ok(source.includes(surface), `Expected ${surface} to be defined`);
   }
 
-  assert.ok(source.includes("Jurassic Command Deck"), "Expected themed Jurassic heading content");
+  assert.ok(source.includes("InGen Division Dashboard"), "Expected themed Jurassic heading content");
   assert.equal(
     source.includes("Earth-tone surfaces, jungle overlays, and amber-glow focus states now span the live game board"),
     false,
@@ -44,8 +44,8 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     "Expected expedition-file save/load UX copy to be removed",
   );
   assert.ok(
-    source.includes("Profiles are auto-saved in this browser by lowercase player name."),
-    "Expected player-start copy to describe lowercase localStorage profile behavior",
+    source.includes("Use this Operator ID to log in later and resume your progress on this device."),
+    "Expected player-start copy to describe logging in later to resume progress",
   );
   assert.ok(
     source.includes('data-ui-action="trade-amber-for-dino"'),
@@ -65,12 +65,16 @@ test("home page includes Research Center title treatment on player-start screen"
   const source = await readRepoFile("src/app/page.tsx");
 
   assert.ok(
-    source.includes("The Research Center"),
-    "Expected Research Center title heading on player-start screen",
+    source.includes("InGen System Login"),
+    "Expected InGen login heading on player-start screen",
   );
   assert.ok(
     source.includes("research-center-header"),
     "Expected research-center-header class for title treatment",
+  );
+  assert.ok(
+    source.includes("research-center-kicker"),
+    "Expected research-center-kicker class for auth panel kicker text",
   );
   assert.ok(
     source.includes("research-center-title"),

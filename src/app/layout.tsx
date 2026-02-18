@@ -21,7 +21,7 @@ const jurassicMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dino Division v2",
+  title: "InGen Division Dashboard",
   description: "Jurassic-themed long-division practice game.",
 };
 
@@ -32,6 +32,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link href="https://fonts.googleapis.com" rel="preconnect" />
+        <link crossOrigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
         className={`${jurassicDisplay.variable} ${jurassicBody.variable} ${jurassicMono.variable} antialiased`}
       >

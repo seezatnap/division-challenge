@@ -19,6 +19,7 @@
   /* Dark metallic toolbar */
   --jp-toolbar: #2a2a2a;
   --jp-toolbar-text: #c0c0c0;
+  --jp-toolbar-height: 2.75rem;
 
   /* Accent red (scroll arrows, action indicators) */
   --jp-accent-red: #cc3333;
@@ -325,7 +326,7 @@ body {
 
 .hero-title,
 .surface-title {
-  font-family: var(--font-jurassic-display), "Times New Roman", serif;
+  font-family: "Orbitron", var(--font-jurassic-display), "Times New Roman", serif;
   line-height: 1.1;
   color: var(--jp-panel-text);
 }
@@ -1052,7 +1053,7 @@ body {
 }
 
 .hint-title {
-  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-family: "Orbitron", var(--font-jurassic-display), "Times New Roman", serif;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -1853,7 +1854,7 @@ body {
 }
 
 .reward-loader-title {
-  font-family: var(--font-jurassic-display), "Times New Roman", serif;
+  font-family: "Orbitron", var(--font-jurassic-display), "Times New Roman", serif;
   font-size: 1.02rem;
   color: var(--jp-panel-text);
 }
@@ -1949,10 +1950,18 @@ body {
   gap: 0.62rem;
 }
 
+.player-start-content {
+  max-width: 44rem;
+  min-height: calc(100dvh - var(--jp-toolbar-height) - clamp(3rem, 7vw, 5rem));
+  display: grid;
+  align-items: center;
+}
+
 .player-start-panel {
   max-width: 34rem;
+  width: 100%;
   margin-inline: auto;
-  margin-top: 2rem;
+  margin-top: 0;
 }
 
 /* ── Research Center Title Treatment ─────────────────────── */
@@ -1964,8 +1973,16 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.research-center-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.67rem;
+  font-weight: 700;
+  color: rgba(240, 237, 216, 0.72);
+}
+
 .research-center-title {
-  font-family: var(--font-jurassic-display), "Times New Roman", serif;
+  font-family: "Orbitron", var(--font-jurassic-display), "Times New Roman", serif;
   font-size: clamp(1.6rem, 3vw, 2.4rem);
   font-weight: 700;
   line-height: 1.15;
@@ -2093,6 +2110,7 @@ body {
 }
 
 .module-title {
+  font-family: "Orbitron", var(--font-jurassic-display), "Times New Roman", serif;
   font-size: 0.88rem;
   font-weight: 700;
   color: var(--jp-panel-text);
@@ -2117,7 +2135,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  height: 2.75rem;
+  height: var(--jp-toolbar-height);
   background: linear-gradient(
     180deg,
     #3a3a3a 0%,

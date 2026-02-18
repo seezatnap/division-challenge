@@ -17,8 +17,8 @@ test("home page requires player name to start and wires localStorage profile per
   for (const fragment of [
     'data-ui-surface="player-start"',
     'data-ui-action="start-session"',
-    "Player Name",
-    "Profiles are auto-saved in this browser by lowercase player name.",
+    "Operator ID",
+    "Use this Operator ID to log in later and resume your progress on this device.",
     "normalizePlayerProfileName",
     "readPlayerProfileSnapshot",
     "writePlayerProfileSnapshot",
@@ -38,12 +38,12 @@ test("home page requires player name to start and wires localStorage profile per
   );
 });
 
-test("player-start screen uses Research Center title treatment with serif heading and subtitle", async () => {
+test("player-start screen uses InGen login title treatment with serif heading and subtitle", async () => {
   const pageSource = await readRepoFile("src/app/page.tsx");
 
   assert.ok(
-    pageSource.includes("The Research Center"),
-    "Expected Research Center title heading on player-start screen",
+    pageSource.includes("InGen System Login"),
+    "Expected InGen login title heading on player-start screen",
   );
   assert.ok(
     pageSource.includes("research-center-title"),
@@ -56,6 +56,10 @@ test("player-start screen uses Research Center title treatment with serif headin
   assert.ok(
     pageSource.includes("research-center-header"),
     "Expected research-center-header wrapper for title treatment",
+  );
+  assert.ok(
+    pageSource.includes("research-center-kicker"),
+    "Expected research-center-kicker class for authentication panel kicker text",
   );
 });
 
@@ -73,6 +77,7 @@ test("global stylesheet defines Research Center title and terminal input styles"
 
   for (const fragment of [
     ".research-center-header",
+    ".research-center-kicker",
     ".research-center-title",
     ".research-center-subtitle",
     ".game-start-input.terminal-input",

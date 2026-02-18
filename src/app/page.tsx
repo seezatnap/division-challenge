@@ -1375,30 +1375,31 @@ export default function Home() {
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
-        <div className="jurassic-content">
+        <div className="jurassic-content player-start-content">
           <section
             aria-labelledby="player-start-heading"
             className="jurassic-panel player-start-panel"
             data-ui-surface="player-start"
           >
             <div className="research-center-header">
+              <p className="research-center-kicker">InGen Access Node</p>
               <h1
                 className="research-center-title"
                 id="player-start-heading"
               >
-                The Research Center
+                InGen System Login
               </h1>
               <p className="research-center-subtitle">
-                Use the computer to begin your Isla Sorna field research.
+                Authenticate operator credentials to access the InGen Division Dashboard.
               </p>
             </div>
 
             <form className="game-start-flow" onSubmit={handleStartSession}>
               <label className="game-start-label" htmlFor="game-start-player-name">
-                Player Name
+                Operator ID
               </label>
               <input
-                autoComplete="name"
+                autoComplete="username"
                 className="game-start-input terminal-input"
                 id="game-start-player-name"
                 name="playerName"
@@ -1406,14 +1407,14 @@ export default function Home() {
                   setPlayerNameDraft(event.target.value);
                   setSessionStartError(null);
                 }}
-                placeholder="Enter your dino wrangler name"
+                placeholder="Enter your InGen operator ID"
                 required
                 type="text"
                 value={playerNameDraft}
               />
 
               <p className="game-start-helper">
-                Profiles are auto-saved in this browser by lowercase player name.
+                Use this Operator ID to log in later and resume your progress on this device.
               </p>
 
               {sessionStartError ? (
@@ -1430,7 +1431,7 @@ export default function Home() {
 
               <div className="save-actions">
                 <button className="jp-button" data-ui-action="start-session" type="submit">
-                  Start Sequencing
+                  Authenticate Session
                 </button>
               </div>
             </form>
@@ -1446,8 +1447,8 @@ export default function Home() {
     <main className="jurassic-shell">
       <div className="jurassic-content">
         <header className="jurassic-panel jurassic-hero motif-canopy">
-          <p className="eyebrow">Dino Division v2</p>
-          <h1 className="hero-title">Jurassic Command Deck</h1>
+          <p className="eyebrow">Dinosaur Genomic Sequencing Console</p>
+          <h1 className="hero-title">InGen Division Dashboard</h1>
         </header>
 
         <div className="jurassic-layout">
