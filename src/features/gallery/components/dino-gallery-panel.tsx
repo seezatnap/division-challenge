@@ -179,19 +179,13 @@ export function DinoGalleryPanel({
                 <Image
                   alt={`${reward.dinosaurName} unlocked reward image`}
                   className="gallery-image"
-                  height={352}
+                  height={240}
                   loading="lazy"
                   src={reward.imagePath}
-                  width={640}
+                  width={240}
                 />
               </div>
               <p className="gallery-name">{reward.dinosaurName}</p>
-              <p className="gallery-meta">
-                Earned{" "}
-                <time dateTime={reward.earnedAt}>
-                  {formatGalleryEarnedDate(reward.earnedAt)}
-                </time>
-              </p>
             </button>
           </article>
         ))}
