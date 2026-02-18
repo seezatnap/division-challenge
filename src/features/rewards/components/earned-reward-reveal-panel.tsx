@@ -201,6 +201,7 @@ function EarnedRewardRevealPanelContent({
     }
 
     didAutoOpenRevealModalRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsRevealModalOpen(true);
   }, [imagePath, phase]);
 

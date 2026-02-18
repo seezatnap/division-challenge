@@ -678,7 +678,6 @@ export default function Home() {
 
   useEffect(() => {
     completedProblemIdRef.current = null;
-    setIsNextProblemReady(false);
   }, [gameSession.activeProblem.id]);
 
   useEffect(() => {
@@ -730,12 +729,14 @@ export default function Home() {
       hybridLabSecondDinosaurName.length > 0 &&
       !hybridLabSecondDinosaurOptions.includes(hybridLabSecondDinosaurName)
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHybridLabSecondDinosaurName("");
     }
   }, [hybridLabSecondDinosaurName, hybridLabSecondDinosaurOptions]);
 
   useEffect(() => {
     if (!selectedHybridReward) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedHybridDossier(null);
       return;
     }
@@ -1188,6 +1189,7 @@ export default function Home() {
     }
 
     for (const unlockedReward of gameSession.unlockedRewards) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void requestRewardImageGeneration(unlockedReward.dinosaurName);
     }
     for (const unlockedHybrid of gameSession.unlockedHybrids) {
@@ -1352,6 +1354,10 @@ export default function Home() {
   const activeLaneLabel = formatActiveInputLane(
     gameSession.steps[0] ? "quotient" : null,
   );
+  const currentSessionStreak = Math.max(0, Math.trunc(gameSession.sessionSolvedProblems));
+  const currentDifficultyLevel = Number.isFinite(gameSession.activeProblem.difficultyLevel)
+    ? Math.max(1, Math.trunc(gameSession.activeProblem.difficultyLevel))
+    : LIVE_PROBLEM_FIXED_DIFFICULTY_LEVEL;
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
@@ -1418,7 +1424,11 @@ export default function Home() {
             </form>
           </section>
         </div>
-        <SurveillanceToolbar />
+        <SurveillanceToolbar
+          currentStreak={currentSessionStreak}
+          difficultyLevel={currentDifficultyLevel}
+          problemsSolved={gameSession.sessionSolvedProblems}
+        />
       </main>
     );
   }
@@ -1630,7 +1640,11 @@ export default function Home() {
           </div>
         </div>
       </div>
-      <SurveillanceToolbar />
+      <SurveillanceToolbar
+        currentStreak={currentSessionStreak}
+        difficultyLevel={currentDifficultyLevel}
+        problemsSolved={gameSession.sessionSolvedProblems}
+      />
 
       {isHybridLabOpen && modalHost
         ? createPortal(

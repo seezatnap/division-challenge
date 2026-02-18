@@ -60,9 +60,16 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     "Expected hybrid lab modal surface to be rendered from the home page",
   );
   assert.ok(
-    source.includes("<SurveillanceToolbar />"),
+    source.includes("<SurveillanceToolbar"),
     "Expected persistent surveillance toolbar component to be mounted on the home page",
   );
+  for (const fragment of [
+    "problemsSolved={gameSession.sessionSolvedProblems}",
+    "currentStreak={currentSessionStreak}",
+    "difficultyLevel={currentDifficultyLevel}",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected toolbar stat wiring fragment: ${fragment}`);
+  }
 });
 
 test("root layout wires themed typography variables", async () => {
@@ -84,11 +91,23 @@ test("root layout wires themed typography variables", async () => {
   assert.equal(source.includes("Geist"), false, "Geist font wiring should be removed for Jurassic typography");
 });
 
-test("surveillance toolbar component includes JP3 footer label, icon controls, and MORE affordance", async () => {
+test("surveillance toolbar component includes JP3 footer label, icon controls, stat readouts, and MORE affordance", async () => {
   const source = await readRepoFile("src/features/workspace-ui/components/surveillance-toolbar.tsx");
 
   for (const fragment of [
+    "problemsSolved",
+    "currentStreak",
+    "difficultyLevel",
+    "formatToolbarReadout",
     'data-ui-surface="surveillance-toolbar"',
+    'data-ui-surface="surveillance-toolbar-stats"',
+    "data-ui-stat={id}",
+    '"problems-solved"',
+    '"current-streak"',
+    '"difficulty-level"',
+    "Solved",
+    "Streak",
+    "Level",
     "ISLA SORNA SURVEILLANCE DEVICE",
     "Footprint tracker",
     "Fossil scanner",
@@ -97,6 +116,8 @@ test("surveillance toolbar component includes JP3 footer label, icon controls, a
     'data-ui-action="toolbar-more"',
     "MORE",
     "jp-surveillance-icon-button",
+    "jp-surveillance-toolbar-readouts",
+    "jp-surveillance-readout-value",
   ]) {
     assert.ok(source.includes(fragment), `Expected surveillance toolbar fragment: ${fragment}`);
   }
@@ -132,6 +153,10 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".jp-surveillance-toolbar-label",
     "font-variant: small-caps;",
     ".jp-surveillance-toolbar-icons",
+    ".jp-surveillance-toolbar-readouts",
+    ".jp-surveillance-readout",
+    ".jp-surveillance-readout-label",
+    ".jp-surveillance-readout-value",
     ".jp-surveillance-icon-button",
     ".jp-surveillance-toolbar-more",
     ".jp-surveillance-toolbar-more::after",
