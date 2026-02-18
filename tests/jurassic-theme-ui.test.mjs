@@ -82,8 +82,17 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
   const source = await readRepoFile("src/app/globals.css");
 
   for (const fragment of [
+    "--jp-panel-bg:",
+    "--jp-panel-text:",
+    "--jp-panel-border:",
+    "--jp-frame:",
+    "--jp-frame-grain:",
+    "--jp-toolbar:",
+    "--jp-toolbar-text:",
+    "--jp-accent-red:",
     "--jp-jungle:",
     "--jp-amber:",
+    "--jp-glow:",
     "--jp-surface:",
     ".motif-claw::after",
     ".motif-fossil::after",
