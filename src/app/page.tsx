@@ -18,6 +18,7 @@ import {
   type LongDivisionStepValidationResult,
 } from "@/features/division-engine";
 import { DinoGalleryPanel } from "@/features/gallery/components/dino-gallery-panel";
+import { IslaSornaToolbar } from "./isla-sorna-toolbar";
 import {
   type ActiveInputLane,
   type DivisionProblem,
@@ -1417,6 +1418,8 @@ export default function Home() {
             </form>
           </section>
         </div>
+
+        <IslaSornaToolbar />
       </main>
     );
   }
@@ -1809,6 +1812,8 @@ export default function Home() {
             modalHost,
           )
         : null}
+
+      <IslaSornaToolbar />
     </main>
   );
 }
