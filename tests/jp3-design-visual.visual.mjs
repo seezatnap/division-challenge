@@ -18,6 +18,11 @@ const PREEXISTING_SERVER_BASE_URL_CANDIDATES = [
   "http://127.0.0.1:3000",
   "http://localhost:3000",
 ];
+const APP_SERVER_PROBE_PATH = "/visual-tests/workspace";
+const APP_SERVER_PROBE_MARKERS = Object.freeze([
+  'data-visual-snapshot="workspace-live"',
+  'data-visual-snapshot="workspace-solved"',
+]);
 const ACTIVE_EDITABLE_SELECTOR =
   '[data-ui-component="bus-stop-renderer"] [data-entry-inline="true"][contenteditable="true"]';
 
@@ -56,16 +61,31 @@ function setAppBaseUrl(nextAppBaseUrl) {
   appBaseUrl = nextAppBaseUrl;
 }
 
+function toProbeUrl(candidateBaseUrl) {
+  return `${candidateBaseUrl.replace(/\/+$/, "")}${APP_SERVER_PROBE_PATH}`;
+}
+
+async function isReachableAppServer(candidateBaseUrl) {
+  try {
+    const response = await fetch(toProbeUrl(candidateBaseUrl));
+    if (!response.ok) {
+      return false;
+    }
+
+    const serverRenderedMarkup = await response.text();
+    return APP_SERVER_PROBE_MARKERS.every((marker) => serverRenderedMarkup.includes(marker));
+  } catch {
+    return false;
+  }
+}
+
 async function waitForAppServer(timeoutMilliseconds = 120_000) {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMilliseconds) {
-    try {
-      const response = await fetch(appBaseUrl);
-      if (response.ok) {
-        return;
-      }
-    } catch {}
+    if (await isReachableAppServer(appBaseUrl)) {
+      return;
+    }
 
     await wait(300);
   }
@@ -81,12 +101,9 @@ async function waitForAppServer(timeoutMilliseconds = 120_000) {
 
 async function resolveReachableServerBaseUrl(candidates) {
   for (const candidateUrl of candidates) {
-    try {
-      const response = await fetch(candidateUrl);
-      if (response.ok) {
-        return candidateUrl;
-      }
-    } catch {}
+    if (await isReachableAppServer(candidateUrl)) {
+      return candidateUrl;
+    }
   }
 
   return null;
