@@ -12,7 +12,7 @@ import { chromium } from "playwright-core";
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "..");
 const DEFAULT_TEST_SERVER_PORT = 4174;
-const VISUAL_TEST_DIST_DIR = ".next-visual-tests";
+const VISUAL_TEST_DIST_DIR = ".next-visual-tests-jp3";
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const GALLERY_TILE_TARGET_COUNT = 9;
 const JP3_GALLERY_DINOSAUR_NAMES = [
@@ -26,6 +26,8 @@ const JP3_GALLERY_DINOSAUR_NAMES = [
   "Spinosaurus",
   "Compsognathus",
 ];
+const activeAmberGlowCellSelector =
+  '[data-entry-inline="true"][data-entry-active="true"][data-entry-glow="amber"]';
 
 let testServerPort = DEFAULT_TEST_SERVER_PORT;
 let appBaseUrl = `http://127.0.0.1:${testServerPort}`;
@@ -509,6 +511,17 @@ function isWorkspaceGreenSample(sample) {
   );
 }
 
+function isAmberGoldSample(sample) {
+  return (
+    sample.r >= 120 &&
+    sample.g >= 85 &&
+    sample.b <= 150 &&
+    sample.r >= sample.g - 8 &&
+    sample.r >= sample.b + 40 &&
+    sample.g >= sample.b + 20
+  );
+}
+
 function findGreenSampleNearCenter(
   pngImage,
   centerX,
@@ -694,6 +707,13 @@ function calculateContrastRatio(foregroundColor, backgroundColor) {
   const brighter = Math.max(foregroundLuminance, backgroundLuminance);
   const darker = Math.min(foregroundLuminance, backgroundLuminance);
   return (brighter + 0.05) / (darker + 0.05);
+}
+
+function calculateColorDistance(leftColor, rightColor) {
+  const redDelta = leftColor.r - rightColor.r;
+  const greenDelta = leftColor.g - rightColor.g;
+  const blueDelta = leftColor.b - rightColor.b;
+  return Math.sqrt(redDelta ** 2 + greenDelta ** 2 + blueDelta ** 2);
 }
 
 function splitFontFamilyTokens(fontFamilyValue) {
@@ -1315,6 +1335,134 @@ test(
           `Expected ${bodySample.selector} body font stack to avoid serif fallback, got "${bodySample.fontFamily}".`,
         );
       }
+    } finally {
+      await context.close();
+    }
+  },
+);
+
+test(
+  "JP3 visual: active input cell keeps amber/gold glow against green workspace panel",
+  { concurrency: false },
+  async () => {
+    const { context, page } = await createHomePage();
+
+    try {
+      await page.waitForSelector('[data-ui-component="bus-stop-renderer"]');
+      await page.waitForSelector(activeAmberGlowCellSelector);
+
+      const glowSnapshot = await page.evaluate((selector) => {
+        const workspaceElement = document.querySelector('[data-ui-component="bus-stop-renderer"]');
+        if (!workspaceElement) {
+          return null;
+        }
+
+        const activeGlowCells = workspaceElement.querySelectorAll(selector);
+        const activeGlowCell = activeGlowCells[0];
+        if (!activeGlowCell) {
+          return {
+            activeGlowCellCount: activeGlowCells.length,
+            workspaceBounds: null,
+            activeCellBounds: null,
+            hasGlowAmberClass: false,
+            borderColor: null,
+            boxShadow: null,
+            animationName: null,
+            animationDuration: null,
+          };
+        }
+
+        const activeCellStyle = getComputedStyle(activeGlowCell);
+        const workspaceBounds = workspaceElement.getBoundingClientRect();
+        const activeCellBounds = activeGlowCell.getBoundingClientRect();
+
+        return {
+          activeGlowCellCount: activeGlowCells.length,
+          workspaceBounds: {
+            left: workspaceBounds.left,
+            top: workspaceBounds.top,
+            width: workspaceBounds.width,
+            height: workspaceBounds.height,
+          },
+          activeCellBounds: {
+            left: activeCellBounds.left,
+            top: activeCellBounds.top,
+            width: activeCellBounds.width,
+            height: activeCellBounds.height,
+          },
+          hasGlowAmberClass: activeGlowCell.classList.contains("glow-amber"),
+          borderColor: activeCellStyle.borderTopColor,
+          boxShadow: activeCellStyle.boxShadow,
+          animationName: activeCellStyle.animationName,
+          animationDuration: activeCellStyle.animationDuration,
+        };
+      }, activeAmberGlowCellSelector);
+
+      assert.ok(glowSnapshot, "Expected active glow snapshot to resolve.");
+      assert.equal(
+        glowSnapshot.activeGlowCellCount,
+        1,
+        `Expected exactly one active amber glow input cell, got ${glowSnapshot.activeGlowCellCount}.`,
+      );
+      assert.ok(glowSnapshot.hasGlowAmberClass, "Expected active input cell to include glow-amber class.");
+      assert.notEqual(glowSnapshot.boxShadow, "none", "Expected active input cell glow to render box-shadow.");
+      assert.match(
+        String(glowSnapshot.animationName),
+        /amber-pulse/i,
+        `Expected active input glow animation to use amber pulse, got "${glowSnapshot.animationName}".`,
+      );
+      assert.notEqual(
+        String(glowSnapshot.animationDuration).trim(),
+        "0s",
+        "Expected active input glow animation duration to be non-zero.",
+      );
+      assert.ok(
+        glowSnapshot.workspaceBounds &&
+          glowSnapshot.workspaceBounds.width > 0 &&
+          glowSnapshot.workspaceBounds.height > 0,
+        "Expected workspace bounds to resolve for glow contrast checks.",
+      );
+      assert.ok(
+        glowSnapshot.activeCellBounds &&
+          glowSnapshot.activeCellBounds.width > 0 &&
+          glowSnapshot.activeCellBounds.height > 0,
+        "Expected active input cell bounds to resolve for glow checks.",
+      );
+
+      const borderColor = parseCssColor(glowSnapshot.borderColor);
+      const viewportScreenshot = await page.screenshot({ type: "png" });
+      const decodedScreenshot = decodePngRgba(viewportScreenshot);
+      const workspaceBackgroundMatch = findGreenSampleInRect(
+        decodedScreenshot,
+        glowSnapshot.workspaceBounds,
+        isWorkspaceGreenSample,
+      );
+      assert.ok(
+        workspaceBackgroundMatch,
+        "Expected to find a green workspace sample behind the active input glow cell.",
+      );
+      assert.ok(
+        isWorkspaceGreenSample(workspaceBackgroundMatch.sample),
+        `Expected workspace sample to remain green-dominant, got rgba(${workspaceBackgroundMatch.sample.r}, ${workspaceBackgroundMatch.sample.g}, ${workspaceBackgroundMatch.sample.b}, ${workspaceBackgroundMatch.sample.a}).`,
+      );
+
+      const compositedGlowColor = compositeColorOverBackground(
+        borderColor,
+        workspaceBackgroundMatch.sample,
+      );
+      assert.ok(
+        isAmberGoldSample(compositedGlowColor),
+        `Expected active glow color to resolve amber/gold over the green panel background, got rgba(${compositedGlowColor.r}, ${compositedGlowColor.g}, ${compositedGlowColor.b}, ${compositedGlowColor.a}).`,
+      );
+
+      const glowDistanceFromPanel = calculateColorDistance(
+        compositedGlowColor,
+        workspaceBackgroundMatch.sample,
+      );
+      assert.ok(
+        glowDistanceFromPanel >= 60,
+        `Expected active amber glow to stand out against the green workspace panel, got color distance ${glowDistanceFromPanel.toFixed(2)}.`,
+      );
     } finally {
       await context.close();
     }
