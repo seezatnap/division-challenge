@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, readdir } from "node:fs/promises";
+import { createServer } from "node:net";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -10,12 +11,12 @@ import { chromium } from "playwright-core";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "..");
-const TEST_SERVER_PORT = "4174";
-const TEST_BASE_URL = `http://127.0.0.1:${TEST_SERVER_PORT}`;
+const DEFAULT_TEST_SERVER_PORT = 4174;
 const VISUAL_TEST_DIST_DIR = ".next-visual-tests";
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
-let appBaseUrl = TEST_BASE_URL;
+let testServerPort = DEFAULT_TEST_SERVER_PORT;
+let appBaseUrl = `http://127.0.0.1:${testServerPort}`;
 let serverProcess = null;
 let browser = null;
 let serverStdoutBuffer = "";
@@ -61,6 +62,65 @@ function resolveNextDevExecutablePath() {
   }
 
   return path.join(repoRoot, "node_modules", ".bin", "next");
+}
+
+async function claimServerPort(preferredPort) {
+  const claimPort = (candidatePort) =>
+    new Promise((resolve) => {
+      const probeServer = createServer();
+      probeServer.unref();
+      probeServer.on("error", () => {
+        resolve(null);
+      });
+      probeServer.listen(candidatePort, "127.0.0.1", () => {
+        const activeAddress = probeServer.address();
+        const resolvedPort =
+          typeof activeAddress === "object" && activeAddress ? activeAddress.port : candidatePort;
+        probeServer.close(() => {
+          resolve(resolvedPort);
+        });
+      });
+    });
+
+  const preferredClaim = await claimPort(preferredPort);
+  if (preferredClaim !== null) {
+    return preferredClaim;
+  }
+
+  const ephemeralClaim = await claimPort(0);
+  if (ephemeralClaim !== null) {
+    return ephemeralClaim;
+  }
+
+  throw new Error("Unable to claim a port for JP3 visual tests.");
+}
+
+async function gotoAppWithRetry(page, relativePath = "/", maxAttempts = 3) {
+  let lastError = null;
+  const destination = `${appBaseUrl}${relativePath}`;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      await page.goto(destination, { waitUntil: "domcontentloaded", timeout: 120_000 });
+      return;
+    } catch (error) {
+      lastError = error;
+      const errorMessage = String(error?.message ?? error);
+      const shouldRetry =
+        errorMessage.includes("ERR_CONNECTION_REFUSED") ||
+        errorMessage.includes("ERR_CONNECTION_RESET");
+      if (!shouldRetry || attempt === maxAttempts - 1) {
+        throw error;
+      }
+
+      await waitForAppServer();
+      await wait(300 * (attempt + 1));
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
 }
 
 async function fileExists(filePath) {
@@ -176,8 +236,8 @@ async function createHomePage() {
     viewport: { width: 1500, height: 980 },
   });
   const page = await context.newPage();
-  await page.goto(`${appBaseUrl}/`, { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle");
+  await gotoAppWithRetry(page, "/");
+  await page.waitForLoadState("networkidle", { timeout: 120_000 });
 
   const playerStartSurface = page.locator('[data-ui-surface="player-start"]');
   if ((await playerStartSurface.count()) > 0) {
@@ -373,7 +433,23 @@ function looksWoodFrameSample(sample) {
   return sample.r >= 35 && sample.g >= 20 && sample.b <= 130 && sample.r >= sample.b + 8 && sample.g >= sample.b;
 }
 
-function findGreenSampleNearCenter(pngImage, centerX, centerY, maxOffset = 20) {
+function isWorkspaceGreenSample(sample) {
+  return (
+    sample.g >= 70 &&
+    sample.g > sample.r + 10 &&
+    sample.g > sample.b + 8 &&
+    sample.r < 120 &&
+    sample.b < 110
+  );
+}
+
+function findGreenSampleNearCenter(
+  pngImage,
+  centerX,
+  centerY,
+  maxOffset = 20,
+  sampleMatcher = isJp3GreenSample,
+) {
   const candidateOffsets = [
     [0, 0],
     [-8, 0],
@@ -400,7 +476,7 @@ function findGreenSampleNearCenter(pngImage, centerX, centerY, maxOffset = 20) {
     }
 
     const sample = sampleNeighborhoodMedian(pngImage, centerX + offsetX, centerY + offsetY, 8, 2);
-    if (isJp3GreenSample(sample)) {
+    if (sampleMatcher(sample)) {
       return { sample, offsetX, offsetY };
     }
   }
@@ -408,24 +484,182 @@ function findGreenSampleNearCenter(pngImage, centerX, centerY, maxOffset = 20) {
   return null;
 }
 
+function findGreenSampleInRect(pngImage, rect, sampleMatcher = isJp3GreenSample) {
+  const candidateRatios = [
+    [0.5, 0.5],
+    [0.22, 0.24],
+    [0.78, 0.24],
+    [0.24, 0.76],
+    [0.76, 0.76],
+    [0.5, 0.26],
+    [0.5, 0.74],
+  ];
+
+  for (const [xRatio, yRatio] of candidateRatios) {
+    const sampleCenterX = rect.left + rect.width * xRatio;
+    const sampleCenterY = rect.top + rect.height * yRatio;
+    const matchedSample = findGreenSampleNearCenter(
+      pngImage,
+      sampleCenterX,
+      sampleCenterY,
+      28,
+      sampleMatcher,
+    );
+    if (matchedSample) {
+      return matchedSample;
+    }
+  }
+
+  return null;
+}
+
+function parseCssColor(cssColorValue) {
+  const normalizedColorValue = String(cssColorValue ?? "").trim();
+  assert.ok(normalizedColorValue.length > 0, "Expected a non-empty CSS color value.");
+  const parseAlphaChannel = (componentValue) => {
+    if (!componentValue) {
+      return 1;
+    }
+    if (componentValue.endsWith("%")) {
+      return clamp(Number.parseFloat(componentValue) / 100, 0, 1);
+    }
+    return clamp(Number.parseFloat(componentValue), 0, 1);
+  };
+
+  if (normalizedColorValue.startsWith("rgb")) {
+    const components = normalizedColorValue.match(/[\d.]+%?/g);
+    assert.ok(
+      components && components.length >= 3,
+      `Expected at least three RGB components, got "${normalizedColorValue}".`,
+    );
+
+    const parseColorChannel = (componentValue) => {
+      if (componentValue.endsWith("%")) {
+        return clamp((Number.parseFloat(componentValue) / 100) * 255, 0, 255);
+      }
+      return clamp(Number.parseFloat(componentValue), 0, 255);
+    };
+
+    return {
+      r: Math.round(parseColorChannel(components[0])),
+      g: Math.round(parseColorChannel(components[1])),
+      b: Math.round(parseColorChannel(components[2])),
+      a: parseAlphaChannel(components[3] ?? "1"),
+    };
+  }
+
+  if (normalizedColorValue.startsWith("color(")) {
+    const srgbMatch = normalizedColorValue.match(/^color\(\s*srgb\s+(.+)\)$/i);
+    assert.ok(
+      srgbMatch,
+      `Expected color() value to use srgb, got "${normalizedColorValue}".`,
+    );
+
+    const [rawChannels, rawAlpha = "1"] = srgbMatch[1]
+      .split("/")
+      .map((component) => component.trim());
+    const channelParts = rawChannels.split(/\s+/).filter((component) => component.length > 0);
+    assert.ok(
+      channelParts.length >= 3,
+      `Expected at least three color(srgb) components, got "${normalizedColorValue}".`,
+    );
+
+    const parseSrgbChannel = (componentValue) => {
+      if (componentValue.endsWith("%")) {
+        return clamp((Number.parseFloat(componentValue) / 100) * 255, 0, 255);
+      }
+
+      const numericComponent = Number.parseFloat(componentValue);
+      if (numericComponent <= 1) {
+        return clamp(numericComponent * 255, 0, 255);
+      }
+      return clamp(numericComponent, 0, 255);
+    };
+
+    return {
+      r: Math.round(parseSrgbChannel(channelParts[0])),
+      g: Math.round(parseSrgbChannel(channelParts[1])),
+      b: Math.round(parseSrgbChannel(channelParts[2])),
+      a: parseAlphaChannel(rawAlpha),
+    };
+  }
+
+  assert.fail(`Unsupported CSS color format "${normalizedColorValue}".`);
+}
+
+function compositeColorOverBackground(foregroundColor, backgroundColor) {
+  const alpha = clamp(Number.isFinite(foregroundColor.a) ? foregroundColor.a : 1, 0, 1);
+  if (alpha >= 0.999) {
+    return {
+      r: foregroundColor.r,
+      g: foregroundColor.g,
+      b: foregroundColor.b,
+      a: 1,
+    };
+  }
+
+  const inverseAlpha = 1 - alpha;
+  return {
+    r: Math.round(foregroundColor.r * alpha + backgroundColor.r * inverseAlpha),
+    g: Math.round(foregroundColor.g * alpha + backgroundColor.g * inverseAlpha),
+    b: Math.round(foregroundColor.b * alpha + backgroundColor.b * inverseAlpha),
+    a: 1,
+  };
+}
+
+function toRelativeLuminance(color) {
+  const linearizeChannel = (channel) => {
+    const normalized = clamp(channel, 0, 255) / 255;
+    if (normalized <= 0.04045) {
+      return normalized / 12.92;
+    }
+    return ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+
+  const red = linearizeChannel(color.r);
+  const green = linearizeChannel(color.g);
+  const blue = linearizeChannel(color.b);
+  return red * 0.2126 + green * 0.7152 + blue * 0.0722;
+}
+
+function calculateContrastRatio(foregroundColor, backgroundColor) {
+  const foregroundLuminance = toRelativeLuminance(foregroundColor);
+  const backgroundLuminance = toRelativeLuminance(backgroundColor);
+  const brighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+  return (brighter + 0.05) / (darker + 0.05);
+}
+
+function splitFontFamilyTokens(fontFamilyValue) {
+  return String(fontFamilyValue ?? "")
+    .split(",")
+    .map((token) => token.trim().replace(/^["']|["']$/g, "").toLowerCase())
+    .filter((token) => token.length > 0);
+}
+
 test.before(async () => {
   serverStdoutBuffer = "";
   serverStderrBuffer = "";
-  appBaseUrl = TEST_BASE_URL;
+  testServerPort = await claimServerPort(DEFAULT_TEST_SERVER_PORT);
+  appBaseUrl = `http://127.0.0.1:${testServerPort}`;
   const nextDevExecutablePath = resolveNextDevExecutablePath();
   assert.ok(
     await fileExists(nextDevExecutablePath),
     `Unable to find Next.js executable at ${nextDevExecutablePath}. Run npm ci first.`,
   );
-  serverProcess = spawn(nextDevExecutablePath, ["dev", "--port", TEST_SERVER_PORT, "--hostname", "127.0.0.1"], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      NEXT_DIST_DIR: VISUAL_TEST_DIST_DIR,
-      PORT: TEST_SERVER_PORT,
+  serverProcess = spawn(
+    nextDevExecutablePath,
+    ["dev", "--port", String(testServerPort), "--hostname", "127.0.0.1"],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        NEXT_DIST_DIR: VISUAL_TEST_DIST_DIR,
+        PORT: String(testServerPort),
+      },
+      stdio: ["ignore", "pipe", "pipe"],
     },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  );
   serverProcess.stdout?.on("data", (chunk) => {
     serverStdoutBuffer = `${serverStdoutBuffer}${String(chunk)}`.slice(-8_000);
   });
@@ -674,6 +908,180 @@ test(
         assert.ok(
           isDarkToolbarSample(sample),
           `Expected toolbar sample ${sampleIndex + 1} to be dark-colored, got rgba(${sample.r}, ${sample.g}, ${sample.b}, ${sample.a}).`,
+        );
+      }
+    } finally {
+      await context.close();
+    }
+  },
+);
+
+test(
+  "JP3 visual: workspace notation text stays light with sufficient contrast on green workspace panel",
+  { concurrency: false },
+  async () => {
+    const { context, page } = await createHomePage();
+
+    try {
+      await page.waitForSelector('[data-ui-component="bus-stop-renderer"]');
+      const workspaceSnapshot = await page.evaluate(() => {
+        const workspaceElement = document.querySelector('[data-ui-component="bus-stop-renderer"]');
+        if (!workspaceElement) {
+          return null;
+        }
+
+        const workspaceBounds = workspaceElement.getBoundingClientRect();
+        const trackedTextSelectors = [
+          ".divisor-cell",
+          ".dividend-line",
+          ".work-row-op",
+          ".work-row-value",
+        ];
+        const textStyles = trackedTextSelectors.map((selector) => {
+          const textElement = workspaceElement.querySelector(selector);
+          if (!textElement) {
+            return null;
+          }
+
+          const computedStyle = getComputedStyle(textElement);
+          return {
+            selector,
+            color: computedStyle.color,
+          };
+        });
+
+        return {
+          workspaceBounds: {
+            left: workspaceBounds.left,
+            top: workspaceBounds.top,
+            width: workspaceBounds.width,
+            height: workspaceBounds.height,
+          },
+          textStyles,
+        };
+      });
+
+      assert.ok(workspaceSnapshot, "Expected workspace snapshot to resolve.");
+      assert.ok(
+        workspaceSnapshot.workspaceBounds.width > 0 && workspaceSnapshot.workspaceBounds.height > 0,
+        "Expected workspace bounds to have measurable dimensions.",
+      );
+      assert.equal(
+        workspaceSnapshot.textStyles.filter(Boolean).length,
+        workspaceSnapshot.textStyles.length,
+        "Expected all tracked workspace text selectors to resolve.",
+      );
+
+      const viewportScreenshot = await page.screenshot({ type: "png" });
+      const decodedScreenshot = decodePngRgba(viewportScreenshot);
+      const workspaceBackgroundMatch = findGreenSampleInRect(
+        decodedScreenshot,
+        workspaceSnapshot.workspaceBounds,
+        isWorkspaceGreenSample,
+      );
+      assert.ok(workspaceBackgroundMatch, "Expected to find a green workspace background sample.");
+      assert.ok(
+        isWorkspaceGreenSample(workspaceBackgroundMatch.sample),
+        `Expected workspace background sample to remain green-dominant, got rgba(${workspaceBackgroundMatch.sample.r}, ${workspaceBackgroundMatch.sample.g}, ${workspaceBackgroundMatch.sample.b}, ${workspaceBackgroundMatch.sample.a}).`,
+      );
+
+      for (const textStyle of workspaceSnapshot.textStyles) {
+        const foregroundColor = parseCssColor(textStyle.color);
+        const compositedForegroundColor = compositeColorOverBackground(
+          foregroundColor,
+          workspaceBackgroundMatch.sample,
+        );
+        const contrastRatio = calculateContrastRatio(
+          compositedForegroundColor,
+          workspaceBackgroundMatch.sample,
+        );
+        const textLuminance = toRelativeLuminance(compositedForegroundColor);
+        assert.ok(
+          textLuminance >= 0.48,
+          `Expected ${textStyle.selector} text color to stay light on green workspace background, got rgba(${compositedForegroundColor.r}, ${compositedForegroundColor.g}, ${compositedForegroundColor.b}, ${compositedForegroundColor.a}) with luminance=${textLuminance.toFixed(3)}.`,
+        );
+        assert.ok(
+          contrastRatio >= 4.5,
+          `Expected ${textStyle.selector} to keep at least 4.5:1 contrast on green workspace background, got ${contrastRatio.toFixed(2)}:1.`,
+        );
+      }
+    } finally {
+      await context.close();
+    }
+  },
+);
+
+test(
+  "JP3 visual: heading typography resolves serif while body copy resolves sans-serif",
+  { concurrency: false },
+  async () => {
+    const { context, page } = await createHomePage();
+
+    try {
+      await page.waitForSelector(".hero-title");
+      await page.waitForSelector(".surface-title");
+      await page.waitForSelector(".hint-status");
+      const typographySnapshot = await page.evaluate(() => {
+        const captureFontFamily = (selector) => {
+          const element = document.querySelector(selector);
+          if (!element) {
+            return null;
+          }
+          return {
+            selector,
+            fontFamily: getComputedStyle(element).fontFamily,
+          };
+        };
+
+        return {
+          headingSamples: [
+            captureFontFamily(".hero-title"),
+            captureFontFamily('[data-ui-surface="game"] .surface-title'),
+            captureFontFamily('[data-ui-surface="gallery"] .surface-title'),
+          ],
+          bodySamples: [
+            captureFontFamily("body"),
+            captureFontFamily(".hint-status"),
+            captureFontFamily(".amber-actions-note"),
+          ],
+        };
+      });
+
+      assert.ok(typographySnapshot, "Expected typography snapshot to resolve.");
+      assert.equal(
+        typographySnapshot.headingSamples.filter(Boolean).length,
+        typographySnapshot.headingSamples.length,
+        "Expected heading typography samples to resolve.",
+      );
+      assert.equal(
+        typographySnapshot.bodySamples.filter(Boolean).length,
+        typographySnapshot.bodySamples.length,
+        "Expected body typography samples to resolve.",
+      );
+
+      for (const headingSample of typographySnapshot.headingSamples) {
+        const headingTokens = splitFontFamilyTokens(headingSample.fontFamily);
+        assert.ok(
+          headingTokens.includes("serif"),
+          `Expected ${headingSample.selector} heading font stack to include serif, got "${headingSample.fontFamily}".`,
+        );
+        assert.equal(
+          headingTokens.includes("sans-serif"),
+          false,
+          `Expected ${headingSample.selector} heading font stack to avoid sans-serif fallback, got "${headingSample.fontFamily}".`,
+        );
+      }
+
+      for (const bodySample of typographySnapshot.bodySamples) {
+        const bodyTokens = splitFontFamilyTokens(bodySample.fontFamily);
+        assert.ok(
+          bodyTokens.includes("sans-serif"),
+          `Expected ${bodySample.selector} body font stack to include sans-serif, got "${bodySample.fontFamily}".`,
+        );
+        assert.equal(
+          bodyTokens.includes("serif"),
+          false,
+          `Expected ${bodySample.selector} body font stack to avoid serif fallback, got "${bodySample.fontFamily}".`,
         );
       }
     } finally {
