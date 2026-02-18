@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -87,6 +87,9 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-panel-border:",
     "--jp-frame:",
     "--jp-frame-grain:",
+    "--jp-frame-thickness:",
+    "--jp-frame-rivet-size:",
+    "--jp-frame-rivet-offset:",
     "--jp-toolbar:",
     "--jp-toolbar-text:",
     "--jp-accent-red:",
@@ -94,6 +97,17 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-amber:",
     "--jp-glow:",
     "--jp-surface:",
+    "body::before {",
+    "body::after {",
+    "var(--jp-frame-thickness)",
+    "var(--jp-frame-rivet-size)",
+    "left var(--jp-frame-rivet-offset) top var(--jp-frame-rivet-offset)",
+    "circle at 32% 30%",
+    ".jurassic-panel {",
+    "background: var(--jp-panel-bg);",
+    "color: var(--jp-panel-text);",
+    "inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 84%, black)",
+    ".jurassic-panel :where(p, h1, h2, h3, h4, h5, h6, li, label, legend, time, dt, dd, figcaption)",
     ".motif-claw::after",
     ".motif-fossil::after",
     ".motif-track::after",
@@ -127,5 +141,66 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "@media (min-width: 64rem)",
   ]) {
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
+  }
+});
+
+test("global stylesheet uses a full-viewport jungle canopy body background image", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  assert.equal(
+    source.includes("--background: radial-gradient"),
+    false,
+    "Expected radial-gradient body background token to be removed",
+  );
+  assert.ok(
+    source.includes('--background-image: url("/jungle-canopy-bg.jpg");'),
+    "Expected canopy JPG token in the root palette",
+  );
+  assert.ok(source.includes("background-image:"), "Expected body background-image declaration");
+  assert.ok(source.includes("var(--background-image);"), "Expected body to use canopy image token");
+  assert.ok(source.includes("background-size: cover;"), "Expected full-viewport cover sizing on body");
+
+  const canopyImage = await stat(path.join(repoRoot, "public/jungle-canopy-bg.jpg"));
+  assert.ok(canopyImage.isFile(), "Expected jungle canopy JPG asset to exist in public/");
+  assert.ok(canopyImage.size > 0, "Expected jungle canopy JPG asset to be non-empty");
+});
+
+test("surveillance toolbar renders JP3 footer affordances with icon controls and MORE link", async () => {
+  const pageSource = await readRepoFile("src/app/page.tsx");
+  const toolbarSource = await readRepoFile(
+    "src/features/toolbar/components/isla-sorna-surveillance-toolbar.tsx",
+  );
+  const cssSource = await readRepoFile("src/app/globals.css");
+
+  assert.ok(
+    pageSource.includes("<IslaSornaSurveillanceToolbar />"),
+    "Expected home page to render the persistent surveillance toolbar",
+  );
+
+  for (const fragment of [
+    'data-ui-surface="surveillance-toolbar"',
+    "ISLA SORNA SURVEILLANCE DEVICE",
+    "MORE",
+    'iconKind: "footprint"',
+    'iconKind: "fossil"',
+    'iconKind: "dna"',
+    'iconKind: "egg"',
+  ]) {
+    assert.ok(toolbarSource.includes(fragment), `Expected toolbar fragment: ${fragment}`);
+  }
+
+  for (const fragment of [
+    ".surveillance-toolbar-shell",
+    ".surveillance-toolbar {",
+    ".surveillance-toolbar-label",
+    ".surveillance-toolbar-icon-button",
+    ".surveillance-toolbar-more",
+    ".surveillance-toolbar-more-arrow",
+    "var(--jp-toolbar)",
+    "var(--jp-toolbar-text)",
+    "var(--jp-accent-red)",
+    "font-variant-caps: all-small-caps;",
+  ]) {
+    assert.ok(cssSource.includes(fragment), `Expected surveillance toolbar styling fragment: ${fragment}`);
   }
 });
