@@ -5,6 +5,8 @@
   --jp-panel-text: #f0edd8;
   --jp-panel-border: #145a22;
   --jp-frame: #6b4c2a;
+  --jp-frame-width: clamp(0.9rem, 2.2vw, 1.7rem);
+  --jp-frame-rivet-size: clamp(0.65rem, 1.25vw, 0.9rem);
   --jp-frame-grain:
     repeating-linear-gradient(
       142deg,
@@ -56,9 +58,87 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.jurassic-app-frame {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 120;
+}
+
+.jurassic-app-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: var(--jp-frame-width);
+  background:
+    linear-gradient(
+      138deg,
+      rgba(165, 130, 82, 0.95),
+      rgba(92, 62, 34, 0.98) 34%,
+      rgba(62, 41, 21, 0.98) 62%,
+      rgba(145, 111, 66, 0.95)
+    ),
+    var(--jp-frame-grain),
+    repeating-linear-gradient(
+      18deg,
+      rgba(34, 20, 9, 0.2) 0 7px,
+      rgba(238, 206, 144, 0.12) 7px 13px
+    );
+  background-blend-mode: multiply, normal, soft-light;
+  box-shadow:
+    inset 0 0 0 1px rgba(17, 9, 3, 0.92),
+    inset 0 0 0 calc(var(--jp-frame-width) * 0.16) rgba(244, 224, 179, 0.22),
+    inset 0 0 0 calc(var(--jp-frame-width) * 0.58) rgba(16, 8, 3, 0.34),
+    0 0 1.15rem rgba(0, 0, 0, 0.5);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.jurassic-app-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      circle,
+      rgba(220, 204, 174, 0.96) 0 34%,
+      rgba(92, 76, 52, 0.94) 35% 62%,
+      rgba(20, 13, 7, 0.95) 63% 100%
+    ),
+    radial-gradient(
+      circle,
+      rgba(220, 204, 174, 0.96) 0 34%,
+      rgba(92, 76, 52, 0.94) 35% 62%,
+      rgba(20, 13, 7, 0.95) 63% 100%
+    ),
+    radial-gradient(
+      circle,
+      rgba(220, 204, 174, 0.96) 0 34%,
+      rgba(92, 76, 52, 0.94) 35% 62%,
+      rgba(20, 13, 7, 0.95) 63% 100%
+    ),
+    radial-gradient(
+      circle,
+      rgba(220, 204, 174, 0.96) 0 34%,
+      rgba(92, 76, 52, 0.94) 35% 62%,
+      rgba(20, 13, 7, 0.95) 63% 100%
+    );
+  background-repeat: no-repeat;
+  background-size: var(--jp-frame-rivet-size) var(--jp-frame-rivet-size);
+  background-position:
+    calc(var(--jp-frame-width) * 0.52) calc(var(--jp-frame-width) * 0.52),
+    calc(100% - (var(--jp-frame-width) * 0.52)) calc(var(--jp-frame-width) * 0.52),
+    calc(var(--jp-frame-width) * 0.52) calc(100% - (var(--jp-frame-width) * 0.52)),
+    calc(100% - (var(--jp-frame-width) * 0.52)) calc(100% - (var(--jp-frame-width) * 0.52));
+  filter: drop-shadow(0 0.05rem 0.12rem rgba(0, 0, 0, 0.65));
+}
+
 .jurassic-shell {
   min-height: 100vh;
-  padding: 1.25rem;
+  padding: calc(var(--jp-frame-width) + 0.5rem);
   position: relative;
   overflow: hidden;
 }
@@ -1749,7 +1829,7 @@ body {
 
 @media (min-width: 48rem) {
   .jurassic-shell {
-    padding: 1.6rem;
+    padding: calc(var(--jp-frame-width) + 0.85rem);
   }
 
   .jurassic-panel {
@@ -1764,7 +1844,7 @@ body {
 
 @media (min-width: 64rem) {
   .jurassic-shell {
-    padding: 2rem;
+    padding: calc(var(--jp-frame-width) + 1.2rem);
   }
 
   .jurassic-layout {

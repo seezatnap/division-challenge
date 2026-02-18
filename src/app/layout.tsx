@@ -35,6 +35,11 @@ export default function RootLayout({
       <body
         className={`${jurassicDisplay.variable} ${jurassicBody.variable} ${jurassicMono.variable} antialiased`}
       >
+        <div
+          aria-hidden="true"
+          className="jurassic-app-frame"
+          data-ui-decoration="viewport-frame"
+        />
         {children}
       </body>
     </html>
