@@ -241,75 +241,81 @@ function EarnedRewardRevealPanelContent({
         data-reward-phase={phase}
         data-ui-surface="earned-reward"
       >
-        <header className="earned-reward-header">
-          <div>
-            <p className="surface-kicker">Earned Reward</p>
-            <h3 className="surface-title">Milestone {milestoneSolvedCount}</h3>
-          </div>
-          <p className="status-chip">{resolveRewardStatusChipLabel(phase)}</p>
-        </header>
-
-        {(phase === "revealing" || phase === "revealed") && imagePath ? (
-          <figure
-            className="reward-reveal-figure"
-            data-reveal-state={phase === "revealing" ? "revealing" : "revealed"}
-          >
-            <Image
-              alt={`${dinosaurName} reward image`}
-              className="reward-reveal-image"
-              height={540}
-              loading="lazy"
-              src={imagePath}
-              width={960}
-            />
-            <figcaption className="reward-reveal-caption">
-              {dinosaurName} unlocked at {milestoneSolvedCount} solves.
-            </figcaption>
-          </figure>
-        ) : null}
-
-        {isRewardLoaderPhase(phase) ? (
-          <div className="reward-egg-loader" data-hatch-state={phase} role="status">
-            <div className="reward-egg-shell" aria-hidden="true">
-              <span className="reward-egg-shell-top" />
-              <span className="reward-egg-shell-bottom" />
-              <span className="reward-egg-shell-crack" />
+        <div className="earned-reward-panel-shell">
+          <header className="earned-reward-header">
+            <div>
+              <p className="surface-kicker">Earned Reward</p>
+              <h3 className="surface-title">Milestone {milestoneSolvedCount}</h3>
             </div>
-            {phase === "cracking" ? (
-              <>
-                <p className="reward-loader-title">Shell fracture detected...</p>
-                <p className="reward-loader-copy">
-                  {dinosaurName} is breaking through. Hold steady for reveal.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="reward-loader-title">The reward egg is hatching...</p>
-                <p className="reward-loader-copy">
-                  Checking generation status for {dinosaurName}. Poll attempt {pollAttempt}.
-                </p>
-              </>
-            )}
-          </div>
-        ) : null}
+            <p className="status-chip">{resolveRewardStatusChipLabel(phase)}</p>
+          </header>
 
-        {phase === "missing" ? (
-          <p className="reward-loader-copy">
-            Reward image generation is not running yet. Keep solving and we&apos;ll hatch it soon.
-          </p>
-        ) : null}
+          {(phase === "revealing" || phase === "revealed") && imagePath ? (
+            <figure
+              className="reward-reveal-figure"
+              data-reveal-state={phase === "revealing" ? "revealing" : "revealed"}
+            >
+              <div className="reward-portrait-frame reward-reveal-portrait-frame">
+                <div className="reward-portrait-screen">
+                  <Image
+                    alt={`${dinosaurName} reward image`}
+                    className="reward-reveal-image"
+                    height={540}
+                    loading="lazy"
+                    src={imagePath}
+                    width={960}
+                  />
+                </div>
+              </div>
+              <figcaption className="reward-reveal-caption">
+                {dinosaurName} unlocked at {milestoneSolvedCount} solves.
+              </figcaption>
+            </figure>
+          ) : null}
 
-        {phase === "timed-out" ? (
-          <p className="reward-loader-copy">
-            Hatching is taking longer than expected. We&apos;ll reveal your reward automatically once ready.
-          </p>
-        ) : null}
+          {isRewardLoaderPhase(phase) ? (
+            <div className="reward-egg-loader" data-hatch-state={phase} role="status">
+              <div className="reward-egg-shell" aria-hidden="true">
+                <span className="reward-egg-shell-top" />
+                <span className="reward-egg-shell-bottom" />
+                <span className="reward-egg-shell-crack" />
+              </div>
+              {phase === "cracking" ? (
+                <>
+                  <p className="reward-loader-title">Shell fracture detected...</p>
+                  <p className="reward-loader-copy">
+                    {dinosaurName} is breaking through. Hold steady for reveal.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="reward-loader-title">The reward egg is hatching...</p>
+                  <p className="reward-loader-copy">
+                    Checking generation status for {dinosaurName}. Poll attempt {pollAttempt}.
+                  </p>
+                </>
+              )}
+            </div>
+          ) : null}
 
-        {phase === "error" ? (
-          <p className="reward-loader-copy">
-            Could not load reward status right now. Try again in a moment.
-          </p>
-        ) : null}
+          {phase === "missing" ? (
+            <p className="reward-loader-copy">
+              Reward image generation is not running yet. Keep solving and we&apos;ll hatch it soon.
+            </p>
+          ) : null}
+
+          {phase === "timed-out" ? (
+            <p className="reward-loader-copy">
+              Hatching is taking longer than expected. We&apos;ll reveal your reward automatically once ready.
+            </p>
+          ) : null}
+
+          {phase === "error" ? (
+            <p className="reward-loader-copy">
+              Could not load reward status right now. Try again in a moment.
+            </p>
+          ) : null}
+        </div>
       </article>
 
       {isRevealModalOpen && imagePath && modalHost
@@ -335,14 +341,18 @@ function EarnedRewardRevealPanelContent({
               <p className="reward-modal-subtitle">
                 Milestone {milestoneSolvedCount} complete.
               </p>
-              <Image
-                alt={`${dinosaurName} reward image`}
-                className="reward-modal-image"
-                height={540}
-                loading="lazy"
-                src={imagePath}
-                width={960}
-              />
+              <div className="reward-portrait-frame reward-modal-image-frame">
+                <div className="reward-portrait-screen">
+                  <Image
+                    alt={`${dinosaurName} reward image`}
+                    className="reward-modal-image"
+                    height={540}
+                    loading="lazy"
+                    src={imagePath}
+                    width={960}
+                  />
+                </div>
+              </div>
               <button className="jp-button" onClick={closeRevealModal} type="button">
                 Back To Board
               </button>
