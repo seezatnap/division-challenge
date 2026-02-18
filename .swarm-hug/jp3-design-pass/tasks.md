@@ -59,3 +59,8 @@ Every task below should be implemented to visually match these comps. When in do
 
 ## Follow-up tasks (from sprint review)
 - [x] (#23) Fix toolbar `currentStreak` stat to track actual consecutive-correct-answer streak instead of reusing `sessionSolvedProblems` (blocked by #7) (C)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#24) Resolve merge conflict markers in `src/app/page.tsx` (lines 1838–1848) — accept the `IslaSornaToolbar` stashed changes to wire streak/stats into the toolbar (blocked by #23)
+- [ ] (#25) Restore `tests/toolbar-current-streak.test.mjs` lost during merge (file exists in commit e06424e but is missing from HEAD) (blocked by #23)
+- [ ] (#26) Restore `tests/gallery-detail-two-panel.test.mjs` lost during merge (file exists in commit 748ca55 but is missing from HEAD) (blocked by #11)
