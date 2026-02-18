@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -96,6 +96,7 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-toolbar:",
     "--jp-toolbar-text:",
     "--jp-accent-red:",
+    "--background-image: url(\"/jp3-jungle-canopy.jpg\");",
     "--jp-amber:",
     "--jp-glow:",
     ".motif-claw::after",
@@ -133,6 +134,13 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
   }
 
+  assert.ok(source.includes("background-size: cover;"), "Expected full-viewport canopy image sizing");
+  assert.ok(source.includes("background-position: center;"), "Expected centered canopy framing");
+  assert.equal(
+    source.includes("radial-gradient(circle at 18% 10%"),
+    false,
+    "Legacy radial gradient body background should be removed",
+  );
   assert.equal(source.includes("--jp-sand:"), false, "Legacy sand token should be removed");
   assert.equal(source.includes("--jp-ivory:"), false, "Legacy ivory token should be removed");
   assert.equal(
@@ -140,4 +148,8 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     false,
     "Legacy translucent ivory panel fill should be removed",
   );
+});
+
+test("jungle canopy background asset exists in public", async () => {
+  await access(path.join(repoRoot, "public/jp3-jungle-canopy.jpg"));
 });
