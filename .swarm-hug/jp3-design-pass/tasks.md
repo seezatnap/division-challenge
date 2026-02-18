@@ -69,4 +69,4 @@ Every task below should be implemented to visually match these comps. When in do
 - [x] (#27) Resolve the unresolved merge conflict markers in `src/app/page.tsx` (lines 1838–1848) — task #24 was marked complete but conflict markers remain; accept the `IslaSornaToolbar` stashed changes and remove the conflict markers (blocked by #23) (A)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#28) Investigate `test-results/.last-run.json` showing `"status": "failed"` with empty `failedTests` array — re-run the full test suite (`npm test`) and ensure all tests pass cleanly with `"status": "passed"` (blocked by #27)
+- [A] (#28) Investigate `test-results/.last-run.json` showing `"status": "failed"` with empty `failedTests` array — re-run the full test suite (`npm test`) and ensure all tests pass cleanly with `"status": "passed"` (blocked by #27)
