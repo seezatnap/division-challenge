@@ -30,7 +30,7 @@ Every task below should be implemented to visually match these comps. When in do
 
 - [x] (#10) Rework `DinoGalleryPanel` thumbnail grid to match the JP3 Research Center thumbnail grid layout shown in the left panel of `test-comp-targets/Jp3websitebrachi.webp`: bright green tile backgrounds, dinosaur images centered within tiles, name labels below each tile, 3×3 grid matching the comp's proportions [5 pts] (blocked by #4) (A) (A)
 - [x] (#11) Implement the Research Center two-panel detail view for gallery matching `test-comp-targets/Jp3websitebrachi.webp`: when a dinosaur is selected, show dinosaur image top-left with a data-sheet info card on the right (name, scientific name, pronunciation, diet, name meaning, length, height, weight, time period, location, taxon) matching the exact layout of the Brachiosaurus info card in the comp, description paragraph below [5 pts] (blocked by #10) (A) (C)
-- [ ] (#12) Add red triangular scroll indicators (up/down arrows) for scrollable content areas in the gallery detail view and any overflow panels, matching the red triangle scroll arrows visible in the right panel of `test-comp-targets/Jp3websitebrachi.webp` [5 pts] (blocked by #11) (B)
+- [x] (#12) Add red triangular scroll indicators (up/down arrows) for scrollable content areas in the gallery detail view and any overflow panels, matching the red triangle scroll arrows visible in the right panel of `test-comp-targets/Jp3websitebrachi.webp` [5 pts] (blocked by #11) (B) (B)
 
 ## Player Start & Reward Screens
 
@@ -61,6 +61,6 @@ Every task below should be implemented to visually match these comps. When in do
 - [x] (#23) Fix toolbar `currentStreak` stat to track actual consecutive-correct-answer streak instead of reusing `sessionSolvedProblems` (blocked by #7) (C)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#24) Resolve merge conflict markers in `src/app/page.tsx` (lines 1838–1848) — accept the `IslaSornaToolbar` stashed changes to wire streak/stats into the toolbar (blocked by #23)
-- [ ] (#25) Restore `tests/toolbar-current-streak.test.mjs` lost during merge (file exists in commit e06424e but is missing from HEAD) (blocked by #23)
+- [x] (#24) Resolve merge conflict markers in `src/app/page.tsx` (lines 1838–1848) — accept the `IslaSornaToolbar` stashed changes to wire streak/stats into the toolbar (blocked by #23) (C)
+- [x] (#25) Restore `tests/toolbar-current-streak.test.mjs` lost during merge (file exists in commit e06424e but is missing from HEAD) (blocked by #23) (C)
 - [ ] (#26) Restore `tests/gallery-detail-two-panel.test.mjs` lost during merge (file exists in commit 748ca55 but is missing from HEAD) (blocked by #11)

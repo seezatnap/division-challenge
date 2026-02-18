@@ -8,3 +8,4 @@ export const galleryModule: FeatureModuleDescriptor = {
 };
 
 export * from "./dino-gallery-panel";
+export * from "./scroll-indicators";

@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+import { ScrollIndicators } from "./scroll-indicators";
 
 import type { UnlockedReward } from "@/features/contracts";
 import {
@@ -42,6 +44,7 @@ export function DinoGalleryPanel({
   const [selectedReward, setSelectedReward] = useState<UnlockedReward | null>(null);
   const [selectedRewardDossier, setSelectedRewardDossier] =
     useState<RewardDinosaurDossier | null>(null);
+  const modalScrollRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setGalleryRewards(sortedUnlockedRewards);
@@ -204,12 +207,14 @@ export function DinoGalleryPanel({
             <section
               aria-label={`${selectedReward.dinosaurName} details`}
               aria-modal="true"
-              className="jp-modal gallery-detail-modal"
+              className="jp-modal gallery-detail-modal scroll-indicator-container"
               onClick={(event) => {
                 event.stopPropagation();
               }}
+              ref={modalScrollRef}
               role="dialog"
             >
+              <ScrollIndicators scrollRef={modalScrollRef} />
               <div className="detail-two-panel" data-ui-surface="detail-two-panel">
                 <div className="detail-panel-image">
                   <Image

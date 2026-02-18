@@ -18,6 +18,7 @@ import {
   type LongDivisionStepValidationResult,
 } from "@/features/division-engine";
 import { DinoGalleryPanel } from "@/features/gallery/components/dino-gallery-panel";
+import { ScrollIndicators } from "@/features/gallery/components/scroll-indicators";
 import { IslaSornaToolbar } from "./isla-sorna-toolbar";
 import {
   type ActiveInputLane,
@@ -679,6 +680,7 @@ export default function Home() {
   const completedProblemIdRef = useRef<string | null>(null);
   const hadErrorInCurrentProblemRef = useRef(false);
   const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
+  const hybridDetailScrollRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     gameSessionRef.current = gameSession;
@@ -1775,12 +1777,14 @@ export default function Home() {
                 <section
                   aria-label={`${selectedHybridReward.hybridName} details`}
                   aria-modal="true"
-                  className="jp-modal gallery-detail-modal"
+                  className="jp-modal gallery-detail-modal scroll-indicator-container"
                   onClick={(event) => {
                     event.stopPropagation();
                   }}
+                  ref={hybridDetailScrollRef}
                   role="dialog"
                 >
+                  <ScrollIndicators scrollRef={hybridDetailScrollRef} />
                   <p className="surface-kicker">Hybrid Detail</p>
                   <h3 className="surface-title gallery-detail-title">{selectedHybridReward.hybridName}</h3>
                   <p className="gallery-detail-meta">
