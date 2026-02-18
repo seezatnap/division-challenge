@@ -86,6 +86,11 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-panel-bg:",
     "--jp-panel-text:",
     "--jp-panel-border:",
+    ".jurassic-panel {",
+    "background: var(--jp-panel-bg);",
+    "color: var(--jp-panel-text);",
+    "--jp-bark: var(--jp-panel-text);",
+    "inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 86%, black)",
     "--jp-frame:",
     "--jp-frame-grain:",
     "--jp-toolbar:",
@@ -130,4 +135,9 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
 
   assert.equal(source.includes("--jp-sand:"), false, "Legacy sand token should be removed");
   assert.equal(source.includes("--jp-ivory:"), false, "Legacy ivory token should be removed");
+  assert.equal(
+    source.includes("rgba(244, 236, 214"),
+    false,
+    "Legacy translucent ivory panel fill should be removed",
+  );
 });
