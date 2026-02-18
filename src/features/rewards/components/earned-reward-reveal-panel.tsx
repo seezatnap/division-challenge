@@ -8,6 +8,7 @@ import {
   createGalleryRewardFromUnlock,
   dispatchDinoGalleryRewardsUpdatedEvent,
 } from "@/features/gallery/lib";
+import { useScrollIndicatorState } from "@/features/hooks/use-scroll-indicator-state";
 import {
   fetchEarnedRewardImageStatus,
   pollEarnedRewardImageUntilReady,
@@ -96,6 +97,8 @@ function EarnedRewardRevealPanelContent({
   const [imagePath, setImagePath] = useState<string | null>(initialImagePath);
   const [pollAttempt, setPollAttempt] = useState(0);
   const [isRevealModalOpen, setIsRevealModalOpen] = useState(false);
+  const [revealModalElement, setRevealModalElement] = useState<HTMLElement | null>(null);
+  const revealModalScrollIndicators = useScrollIndicatorState(revealModalElement);
   const revealedRewardBroadcastKeyRef = useRef<string | null>(null);
   const didAutoOpenRevealModalRef = useRef(false);
 
@@ -335,8 +338,14 @@ function EarnedRewardRevealPanelContent({
               aria-label={`${dinosaurName} reward reveal`}
               aria-modal="true"
               className="jp-modal reward-reveal-modal"
+              data-scroll-indicator-down={revealModalScrollIndicators.canScrollDown ? "true" : "false"}
+              data-scroll-indicator-enabled={revealModalScrollIndicators.isScrollable ? "true" : "false"}
+              data-scroll-indicator-up={revealModalScrollIndicators.canScrollUp ? "true" : "false"}
               onClick={(event) => {
                 event.stopPropagation();
+              }}
+              ref={(element) => {
+                setRevealModalElement(element);
               }}
               role="dialog"
             >

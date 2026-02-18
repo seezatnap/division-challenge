@@ -50,6 +50,7 @@ import {
   writePlayerProfileSnapshot,
 } from "@/features/persistence/lib";
 import { IslaSornaSurveillanceToolbar } from "@/features/toolbar/components/isla-sorna-surveillance-toolbar";
+import { useScrollIndicatorState } from "@/features/hooks/use-scroll-indicator-state";
 
 const PROVISIONAL_REWARD_IMAGE_PATH = "/window.svg";
 
@@ -668,6 +669,12 @@ export default function Home() {
     useState<UnlockedHybridReward | null>(null);
   const [selectedHybridDossier, setSelectedHybridDossier] =
     useState<RewardDinosaurDossier | null>(null);
+  const [hybridLabModalElement, setHybridLabModalElement] = useState<HTMLElement | null>(null);
+  const hybridLabModalScrollIndicators = useScrollIndicatorState(hybridLabModalElement);
+  const [hybridDetailModalElement, setHybridDetailModalElement] =
+    useState<HTMLElement | null>(null);
+  const hybridDetailModalScrollIndicators =
+    useScrollIndicatorState(hybridDetailModalElement);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
   const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1678,8 +1685,14 @@ export default function Home() {
                   aria-label="Hybrid Lab"
                   aria-modal="true"
                   className="jp-modal hybrid-lab-modal"
+                  data-scroll-indicator-down={hybridLabModalScrollIndicators.canScrollDown ? "true" : "false"}
+                  data-scroll-indicator-enabled={hybridLabModalScrollIndicators.isScrollable ? "true" : "false"}
+                  data-scroll-indicator-up={hybridLabModalScrollIndicators.canScrollUp ? "true" : "false"}
                   onClick={(event) => {
                     event.stopPropagation();
+                  }}
+                  ref={(element) => {
+                    setHybridLabModalElement(element);
                   }}
                   role="dialog"
                 >
@@ -1793,8 +1806,14 @@ export default function Home() {
                   aria-label={`${selectedHybridReward.hybridName} details`}
                   aria-modal="true"
                   className="jp-modal gallery-detail-modal"
+                  data-scroll-indicator-down={hybridDetailModalScrollIndicators.canScrollDown ? "true" : "false"}
+                  data-scroll-indicator-enabled={hybridDetailModalScrollIndicators.isScrollable ? "true" : "false"}
+                  data-scroll-indicator-up={hybridDetailModalScrollIndicators.canScrollUp ? "true" : "false"}
                   onClick={(event) => {
                     event.stopPropagation();
+                  }}
+                  ref={(element) => {
+                    setHybridDetailModalElement(element);
                   }}
                   role="dialog"
                 >
