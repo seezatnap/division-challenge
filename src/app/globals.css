@@ -39,7 +39,7 @@
   /* Surface alias (now references JP3 green panel bg) */
   --jp-surface: var(--jp-panel-bg);
 
-  --background: radial-gradient(circle at 18% 10%, #fbf1db 0%, #e7d9b8 36%, #c5b08a 100%);
+  --background: #0a1a0c;
   --foreground: var(--jp-ink);
 }
 
@@ -56,7 +56,7 @@
 
 body {
   min-height: 100vh;
-  background: var(--background);
+  background: var(--background) url('/jungle-canopy-bg.jpg') center / cover no-repeat fixed;
   color: var(--foreground);
   font-family: var(--font-jurassic-body), "Trebuchet MS", sans-serif;
   text-rendering: optimizeLegibility;
