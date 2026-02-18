@@ -48,6 +48,14 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     "Expected player-start copy to describe lowercase localStorage profile behavior",
   );
   assert.ok(
+    source.includes("The Research Center"),
+    "Expected player-start heading to use the Research Center title treatment",
+  );
+  assert.ok(
+    source.includes("field-station terminal"),
+    "Expected player-start subtitle copy to reference the field-station terminal",
+  );
+  assert.ok(
     source.includes('data-ui-action="trade-amber-for-dino"'),
     "Expected amber trade action wiring in the gallery surface",
   );
@@ -194,6 +202,11 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".hint-status",
     ".amber-bank",
     ".amber-actions",
+    ".player-start-research-intro",
+    ".player-start-title",
+    ".player-start-subtitle",
+    ".game-start-input-terminal",
+    "font-family: var(--font-jurassic-mono), \"IBM Plex Mono\", monospace;",
     ".hybrid-lab-modal",
     ".hybrid-lab-select",
     ".hybrid-lab-actions",

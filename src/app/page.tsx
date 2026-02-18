@@ -1372,12 +1372,15 @@ export default function Home() {
             className="jurassic-panel player-start-panel"
             data-ui-surface="player-start"
           >
-            <div className="surface-header">
-              <div>
-                <p className="surface-kicker">Player Profile</p>
-                <h2 className="surface-title" id="player-start-heading">
-                  Start Sequencing
+            <div className="surface-header player-start-header">
+              <div className="player-start-research-intro">
+                <p className="surface-kicker player-start-kicker">Player Profile</p>
+                <h2 className="surface-title player-start-title" id="player-start-heading">
+                  The Research Center
                 </h2>
+                <p className="player-start-subtitle">
+                  Use the field-station terminal to initialize your Isla Sorna division log.
+                </p>
               </div>
             </div>
 
@@ -1387,7 +1390,7 @@ export default function Home() {
               </label>
               <input
                 autoComplete="name"
-                className="game-start-input"
+                className="game-start-input game-start-input-terminal"
                 id="game-start-player-name"
                 name="playerName"
                 onChange={(event) => {
