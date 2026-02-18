@@ -177,6 +177,7 @@ body {
 .jurassic-shell {
   min-height: 100vh;
   padding: 1.25rem;
+  padding-bottom: 3.5rem;
   position: relative;
   overflow: hidden;
 }
@@ -1835,6 +1836,110 @@ body {
   margin-top: 0.32rem;
   font-size: 0.75rem;
   color: rgba(240, 237, 216, 0.72);
+}
+
+/* ——— Isla Sorna Surveillance Device Toolbar ——— */
+
+.isla-sorna-toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.75rem;
+  background: linear-gradient(
+    180deg,
+    #3a3a3a 0%,
+    var(--jp-toolbar) 30%,
+    #1e1e1e 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 -2px 8px rgba(0, 0, 0, 0.4);
+  padding: 0 1rem;
+}
+
+.toolbar-label {
+  font-family: var(--font-jurassic-body), "Trebuchet MS", sans-serif;
+  font-variant: small-caps;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  color: var(--jp-toolbar-text);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.toolbar-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.75rem;
+}
+
+.toolbar-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.25rem;
+  background: linear-gradient(180deg, #444 0%, #2e2e2e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  color: var(--jp-amber);
+  cursor: pointer;
+  padding: 0;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.toolbar-icon-btn:hover {
+  background: linear-gradient(180deg, #555 0%, #3a3a3a 100%);
+  transform: translateY(-1px);
+}
+
+.toolbar-icon-btn:focus-visible {
+  outline: 2px solid var(--jp-amber);
+  outline-offset: 1px;
+}
+
+.toolbar-icon-svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.toolbar-more-link {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  text-decoration: none;
+  color: var(--jp-toolbar-text);
+  transition: color 150ms ease;
+}
+
+.toolbar-more-link:hover {
+  color: #fff;
+}
+
+.toolbar-more-text {
+  font-family: var(--font-jurassic-body), "Trebuchet MS", sans-serif;
+  font-variant: small-caps;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.toolbar-more-arrow {
+  width: 0.7rem;
+  height: 0.7rem;
+  color: var(--jp-accent-red);
 }
 
 @media (min-width: 48rem) {
