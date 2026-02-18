@@ -12,6 +12,9 @@
       rgba(77, 54, 31, 0.24) 4px 8px,
       rgba(140, 102, 61, 0.16) 8px 12px
     );
+  --jp-frame-thickness: clamp(1rem, 2.6vw, 1.95rem);
+  --jp-frame-rivet-size: clamp(0.68rem, 1.35vw, 0.96rem);
+  --jp-frame-rivet-offset: calc(var(--jp-frame-thickness) * 0.56);
   --jp-toolbar: #2a2a2a;
   --jp-toolbar-text: #c0c0c0;
   --jp-accent-red: #cc3333;
@@ -42,7 +45,9 @@
 }
 
 body {
+  margin: 0;
   min-height: 100vh;
+  position: relative;
   background-color: var(--background);
   background-image:
     linear-gradient(180deg, rgba(8, 22, 15, 0.58), rgba(8, 22, 15, 0.74)),
@@ -55,9 +60,137 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 120;
+  background-image:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-frame) 62%, #9b7344),
+      color-mix(in srgb, var(--jp-frame) 88%, #201305)
+    ),
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--jp-frame) 64%, #967148),
+      color-mix(in srgb, var(--jp-frame) 88%, #201305)
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--jp-frame) 58%, #a27a4d),
+      color-mix(in srgb, var(--jp-frame) 88%, #1e1208)
+    ),
+    linear-gradient(
+      270deg,
+      color-mix(in srgb, var(--jp-frame) 58%, #a27a4d),
+      color-mix(in srgb, var(--jp-frame) 88%, #1e1208)
+    ),
+    var(--jp-frame-grain),
+    var(--jp-frame-grain),
+    repeating-linear-gradient(
+      0deg,
+      rgba(137, 103, 62, 0.28) 0 5px,
+      rgba(82, 58, 32, 0.25) 5px 10px,
+      rgba(157, 116, 74, 0.14) 10px 15px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(137, 103, 62, 0.28) 0 5px,
+      rgba(82, 58, 32, 0.25) 5px 10px,
+      rgba(157, 116, 74, 0.14) 10px 15px
+    ),
+    linear-gradient(180deg, rgba(18, 9, 3, 0.58), transparent 74%),
+    linear-gradient(0deg, rgba(18, 9, 3, 0.52), transparent 74%),
+    linear-gradient(90deg, rgba(18, 9, 3, 0.56), transparent 74%),
+    linear-gradient(270deg, rgba(18, 9, 3, 0.56), transparent 74%);
+  background-size:
+    100% var(--jp-frame-thickness),
+    100% var(--jp-frame-thickness),
+    var(--jp-frame-thickness) 100%,
+    var(--jp-frame-thickness) 100%,
+    100% var(--jp-frame-thickness),
+    100% var(--jp-frame-thickness),
+    var(--jp-frame-thickness) 100%,
+    var(--jp-frame-thickness) 100%,
+    100% calc(var(--jp-frame-thickness) * 0.48),
+    100% calc(var(--jp-frame-thickness) * 0.48),
+    calc(var(--jp-frame-thickness) * 0.48) 100%,
+    calc(var(--jp-frame-thickness) * 0.48) 100%;
+  background-position:
+    top left,
+    bottom left,
+    top left,
+    top right,
+    top left,
+    bottom left,
+    top left,
+    top right,
+    top left,
+    bottom left,
+    top left,
+    top right;
+  background-repeat: no-repeat;
+  box-shadow:
+    inset 0 0 0 1px rgba(29, 16, 7, 0.82),
+    inset 0 0 0 calc(var(--jp-frame-thickness) * 0.08) rgba(240, 208, 150, 0.2),
+    inset 0 0 0 calc(var(--jp-frame-thickness) + 1px) rgba(16, 9, 4, 0.46),
+    inset 0 0 calc(var(--jp-frame-thickness) * 0.95) rgba(5, 2, 1, 0.66);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 121;
+  background-image:
+    radial-gradient(
+      circle at 32% 30%,
+      rgba(255, 243, 209, 0.9) 0 12%,
+      rgba(186, 164, 123, 0.82) 13% 34%,
+      rgba(112, 82, 45, 0.96) 35% 68%,
+      rgba(31, 18, 8, 0.95) 69% 100%
+    ),
+    radial-gradient(
+      circle at 32% 30%,
+      rgba(255, 243, 209, 0.9) 0 12%,
+      rgba(186, 164, 123, 0.82) 13% 34%,
+      rgba(112, 82, 45, 0.96) 35% 68%,
+      rgba(31, 18, 8, 0.95) 69% 100%
+    ),
+    radial-gradient(
+      circle at 32% 30%,
+      rgba(255, 243, 209, 0.9) 0 12%,
+      rgba(186, 164, 123, 0.82) 13% 34%,
+      rgba(112, 82, 45, 0.96) 35% 68%,
+      rgba(31, 18, 8, 0.95) 69% 100%
+    ),
+    radial-gradient(
+      circle at 32% 30%,
+      rgba(255, 243, 209, 0.9) 0 12%,
+      rgba(186, 164, 123, 0.82) 13% 34%,
+      rgba(112, 82, 45, 0.96) 35% 68%,
+      rgba(31, 18, 8, 0.95) 69% 100%
+    );
+  background-size:
+    var(--jp-frame-rivet-size) var(--jp-frame-rivet-size),
+    var(--jp-frame-rivet-size) var(--jp-frame-rivet-size),
+    var(--jp-frame-rivet-size) var(--jp-frame-rivet-size),
+    var(--jp-frame-rivet-size) var(--jp-frame-rivet-size);
+  background-position:
+    left var(--jp-frame-rivet-offset) top var(--jp-frame-rivet-offset),
+    right var(--jp-frame-rivet-offset) top var(--jp-frame-rivet-offset),
+    left var(--jp-frame-rivet-offset) bottom var(--jp-frame-rivet-offset),
+    right var(--jp-frame-rivet-offset) bottom var(--jp-frame-rivet-offset);
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
+}
+
 .jurassic-shell {
   min-height: 100vh;
-  padding: 1.25rem;
+  padding: calc(var(--jp-frame-thickness) + 0.5rem);
   position: relative;
   overflow: hidden;
 }
@@ -1743,7 +1876,7 @@ body {
 
 @media (min-width: 48rem) {
   .jurassic-shell {
-    padding: 1.6rem;
+    padding: calc(var(--jp-frame-thickness) + 0.85rem);
   }
 
   .jurassic-panel {
@@ -1758,7 +1891,7 @@ body {
 
 @media (min-width: 64rem) {
   .jurassic-shell {
-    padding: 2rem;
+    padding: calc(var(--jp-frame-thickness) + 1.15rem);
   }
 
   .jurassic-layout {
