@@ -457,6 +457,61 @@ test("visual workflow: wrong digit triggers red error feedback and a 1-second re
   }
 });
 
+test("visual workflow: wrong work-row digit keeps cell dimensions stable during retry lock", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    await expectActiveEditableCell(page, {
+      stepId: "workspace-preview-problem:step:0:quotient-digit",
+      digitIndex: 0,
+    });
+    await typeDigitIntoActiveCell(page, "3");
+    await wait(160);
+
+    const workRowStep = {
+      stepId: "workspace-preview-problem:step:1:multiply-result",
+      digitIndex: 0,
+    };
+    const workRowSelector = `[data-visual-snapshot="workspace-live"] [data-entry-step-id="${workRowStep.stepId}"][data-entry-digit-index="${workRowStep.digitIndex}"]`;
+
+    await expectActiveEditableCell(page, workRowStep);
+    const initialCellBox = await page.locator(workRowSelector).boundingBox();
+    assert.ok(initialCellBox, "Expected the active work-row digit cell to be measurable before retry lock.");
+
+    await typeDigitIntoActiveCell(page, "9");
+    await page.waitForSelector(`${workRowSelector}[data-entry-error="pulse"]`, {
+      timeout: 1_200,
+    });
+    await page.waitForSelector(`${workRowSelector}[data-entry-error="locked"]`, {
+      timeout: 1_400,
+    });
+    await page.waitForTimeout(120);
+
+    const retryLockedCellBox = await page.locator(workRowSelector).boundingBox();
+    assert.ok(
+      retryLockedCellBox,
+      "Expected the retry-locked work-row digit cell to remain measurable during lock.",
+    );
+    assert.ok(
+      Math.abs((retryLockedCellBox?.width ?? 0) - (initialCellBox?.width ?? 0)) <= 2,
+      `Expected retry-locked work-row cell width to stay aligned. Initial width: ${initialCellBox?.width}, locked width: ${retryLockedCellBox?.width}`,
+    );
+    assert.ok(
+      Math.abs((retryLockedCellBox?.height ?? 0) - (initialCellBox?.height ?? 0)) <= 2,
+      `Expected retry-locked work-row cell height to stay aligned. Initial height: ${initialCellBox?.height}, locked height: ${retryLockedCellBox?.height}`,
+    );
+    assert.equal(
+      await page.locator(activeEditableSelector).count(),
+      0,
+      "Expected no editable digit cell while retry lock is active after wrong work-row digit input.",
+    );
+
+    await expectActiveEditableCell(page, workRowStep);
+  } finally {
+    await context.close();
+  }
+});
+
 test("visual layout mandate: solved solution digits align to dividend digit columns", { concurrency: false }, async () => {
   const { context, page } = await createWorkspacePage();
 

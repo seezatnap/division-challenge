@@ -600,7 +600,9 @@ body {
   text-align: center;
   width: 100%;
   min-height: 1.52rem;
-  min-width: 0;
+  min-width: var(--division-cell-width);
+  box-sizing: border-box;
+  line-height: 1;
   border: 1px dotted transparent;
   border-radius: 0.35rem;
   padding: 0;
