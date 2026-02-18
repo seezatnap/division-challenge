@@ -166,6 +166,186 @@ test("page.tsx imports and renders IslaSornaToolbar", async () => {
   );
 });
 
+// ——— Session stats readout tests (#7) ———
+
+test("IslaSornaToolbar exports IslaSornaToolbarStats interface", async () => {
+  const source = await readRepoFile("src/app/isla-sorna-toolbar.tsx");
+
+  assert.ok(
+    source.includes("export interface IslaSornaToolbarStats"),
+    "Expected exported IslaSornaToolbarStats interface",
+  );
+  assert.ok(
+    source.includes("problemsSolved: number"),
+    "Expected problemsSolved field in IslaSornaToolbarStats",
+  );
+  assert.ok(
+    source.includes("currentStreak: number"),
+    "Expected currentStreak field in IslaSornaToolbarStats",
+  );
+  assert.ok(
+    source.includes("difficultyLevel: number"),
+    "Expected difficultyLevel field in IslaSornaToolbarStats",
+  );
+});
+
+test("IslaSornaToolbar accepts optional stats prop", async () => {
+  const source = await readRepoFile("src/app/isla-sorna-toolbar.tsx");
+
+  assert.ok(
+    source.includes("stats?: IslaSornaToolbarStats"),
+    "Expected optional stats prop of type IslaSornaToolbarStats",
+  );
+});
+
+test("IslaSornaToolbar renders readout elements when stats are provided", async () => {
+  const source = await readRepoFile("src/app/isla-sorna-toolbar.tsx");
+
+  assert.ok(
+    source.includes('className="toolbar-readouts"'),
+    "Expected toolbar-readouts container class",
+  );
+  assert.ok(
+    source.includes('className="toolbar-readout"'),
+    "Expected toolbar-readout class for individual stat readouts",
+  );
+  assert.ok(
+    source.includes('className="toolbar-readout-label"'),
+    "Expected toolbar-readout-label class for stat labels",
+  );
+  assert.ok(
+    source.includes('className="toolbar-readout-value"'),
+    "Expected toolbar-readout-value class for stat values",
+  );
+});
+
+test("IslaSornaToolbar conditionally renders stats only when provided", async () => {
+  const source = await readRepoFile("src/app/isla-sorna-toolbar.tsx");
+
+  assert.ok(
+    source.includes("{stats ?"),
+    "Expected conditional rendering based on stats prop",
+  );
+});
+
+test("toolbar readouts display problems solved, streak, and difficulty level", async () => {
+  const source = await readRepoFile("src/app/isla-sorna-toolbar.tsx");
+
+  assert.ok(
+    source.includes('data-stat="problems-solved"'),
+    "Expected data-stat=\"problems-solved\" attribute on readout value",
+  );
+  assert.ok(
+    source.includes('data-stat="current-streak"'),
+    "Expected data-stat=\"current-streak\" attribute on readout value",
+  );
+  assert.ok(
+    source.includes('data-stat="difficulty-level"'),
+    "Expected data-stat=\"difficulty-level\" attribute on readout value",
+  );
+  assert.ok(
+    source.includes("stats.problemsSolved"),
+    "Expected stats.problemsSolved to be rendered",
+  );
+  assert.ok(
+    source.includes("stats.currentStreak"),
+    "Expected stats.currentStreak to be rendered",
+  );
+  assert.ok(
+    source.includes("stats.difficultyLevel"),
+    "Expected stats.difficultyLevel to be rendered",
+  );
+});
+
+test("toolbar readout CSS uses dark metallic aesthetic", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  assert.ok(
+    source.includes(".toolbar-readouts"),
+    "Expected .toolbar-readouts style rule in globals.css",
+  );
+  assert.ok(
+    source.includes(".toolbar-readout"),
+    "Expected .toolbar-readout style rule in globals.css",
+  );
+  assert.ok(
+    source.includes(".toolbar-readout-label"),
+    "Expected .toolbar-readout-label style rule in globals.css",
+  );
+  assert.ok(
+    source.includes(".toolbar-readout-value"),
+    "Expected .toolbar-readout-value style rule in globals.css",
+  );
+});
+
+test("toolbar readout labels use small-caps and toolbar-text color", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  const labelRuleMatch = source.match(
+    /\.toolbar-readout-label\s*\{[^}]+\}/s,
+  );
+  assert.ok(labelRuleMatch, "Expected .toolbar-readout-label CSS rule block");
+
+  const labelRule = labelRuleMatch[0];
+  assert.ok(
+    labelRule.includes("font-variant: small-caps"),
+    "Expected small-caps font-variant on readout labels",
+  );
+  assert.ok(
+    labelRule.includes("var(--jp-toolbar-text)"),
+    "Expected --jp-toolbar-text color on readout labels",
+  );
+});
+
+test("toolbar readout values use monospace font and amber-bright color", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  const valueRuleMatch = source.match(
+    /\.toolbar-readout-value\s*\{[^}]+\}/s,
+  );
+  assert.ok(valueRuleMatch, "Expected .toolbar-readout-value CSS rule block");
+
+  const valueRule = valueRuleMatch[0];
+  assert.ok(
+    valueRule.includes("font-weight: 700"),
+    "Expected bold font-weight on readout values",
+  );
+  assert.ok(
+    valueRule.includes("--jp-amber-bright"),
+    "Expected --jp-amber-bright token used for readout value color",
+  );
+});
+
+test("page.tsx passes session stats to in-session IslaSornaToolbar", async () => {
+  const source = await readRepoFile("src/app/page.tsx");
+
+  assert.ok(
+    source.includes("problemsSolved:"),
+    "Expected problemsSolved being passed to toolbar stats prop",
+  );
+  assert.ok(
+    source.includes("currentStreak:"),
+    "Expected currentStreak being passed to toolbar stats prop",
+  );
+  assert.ok(
+    source.includes("difficultyLevel:"),
+    "Expected difficultyLevel being passed to toolbar stats prop",
+  );
+});
+
+test("pre-session toolbar does not receive stats prop", async () => {
+  const source = await readRepoFile("src/app/page.tsx");
+
+  // Find the pre-session view (before isSessionStarted check returns early)
+  const preSessionMatch = source.match(
+    /if\s*\(\s*!isSessionStarted\s*\)\s*\{[\s\S]*?<IslaSornaToolbar\s*\/>/,
+  );
+  assert.ok(
+    preSessionMatch,
+    "Expected pre-session IslaSornaToolbar rendered without props (self-closing)",
+  );
+});
+
 test("jurassic-shell has bottom padding to prevent toolbar from covering content", async () => {
   const source = await readRepoFile("src/app/globals.css");
 

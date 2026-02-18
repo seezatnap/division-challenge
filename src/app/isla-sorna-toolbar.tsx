@@ -1,10 +1,20 @@
 "use client";
 
+export interface IslaSornaToolbarStats {
+  problemsSolved: number;
+  currentStreak: number;
+  difficultyLevel: number;
+}
+
 /**
  * Persistent bottom toolbar matching the "ISLA SORNA SURVEILLANCE DEVICE"
  * bar from the JP3 Research Center comp.
  */
-export function IslaSornaToolbar() {
+export function IslaSornaToolbar(props: {
+  stats?: IslaSornaToolbarStats;
+}) {
+  const { stats } = props;
+
   return (
     <nav
       aria-label="Isla Sorna Surveillance Device"
@@ -12,6 +22,29 @@ export function IslaSornaToolbar() {
       data-ui-surface="toolbar"
     >
       <span className="toolbar-label">Isla Sorna Surveillance Device</span>
+
+      {stats ? (
+        <div className="toolbar-readouts" data-testid="toolbar-readouts">
+          <span className="toolbar-readout">
+            <span className="toolbar-readout-label">Solved</span>
+            <span className="toolbar-readout-value" data-stat="problems-solved">
+              {stats.problemsSolved}
+            </span>
+          </span>
+          <span className="toolbar-readout">
+            <span className="toolbar-readout-label">Streak</span>
+            <span className="toolbar-readout-value" data-stat="current-streak">
+              {stats.currentStreak}
+            </span>
+          </span>
+          <span className="toolbar-readout">
+            <span className="toolbar-readout-label">Lvl</span>
+            <span className="toolbar-readout-value" data-stat="difficulty-level">
+              {stats.difficultyLevel}
+            </span>
+          </span>
+        </div>
+      ) : null}
 
       <div className="toolbar-icons">
         <button
