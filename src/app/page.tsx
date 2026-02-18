@@ -49,6 +49,7 @@ import {
   readPlayerProfileSnapshot,
   writePlayerProfileSnapshot,
 } from "@/features/persistence/lib";
+import { IslaSornaSurveillanceToolbar } from "@/features/toolbar/components/isla-sorna-surveillance-toolbar";
 
 const PROVISIONAL_REWARD_IMAGE_PATH = "/window.svg";
 
@@ -677,7 +678,13 @@ export default function Home() {
 
   useEffect(() => {
     completedProblemIdRef.current = null;
-    setIsNextProblemReady(false);
+    const resetHandle = window.setTimeout(() => {
+      setIsNextProblemReady(false);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(resetHandle);
+    };
   }, [gameSession.activeProblem.id]);
 
   useEffect(() => {
@@ -729,14 +736,25 @@ export default function Home() {
       hybridLabSecondDinosaurName.length > 0 &&
       !hybridLabSecondDinosaurOptions.includes(hybridLabSecondDinosaurName)
     ) {
-      setHybridLabSecondDinosaurName("");
+      const clearSelectionHandle = window.setTimeout(() => {
+        setHybridLabSecondDinosaurName("");
+      }, 0);
+
+      return () => {
+        window.clearTimeout(clearSelectionHandle);
+      };
     }
   }, [hybridLabSecondDinosaurName, hybridLabSecondDinosaurOptions]);
 
   useEffect(() => {
     if (!selectedHybridReward) {
-      setSelectedHybridDossier(null);
-      return;
+      const clearDossierHandle = window.setTimeout(() => {
+        setSelectedHybridDossier(null);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(clearDossierHandle);
+      };
     }
 
     let didCancel = false;
@@ -745,7 +763,9 @@ export default function Home() {
       firstDinosaurName: selectedHybridReward.firstDinosaurName,
       secondDinosaurName: selectedHybridReward.secondDinosaurName,
     });
-    setSelectedHybridDossier(fallbackDossier);
+    const fallbackDossierHandle = window.setTimeout(() => {
+      setSelectedHybridDossier(fallbackDossier);
+    }, 0);
 
     void (async () => {
       try {
@@ -776,6 +796,7 @@ export default function Home() {
     return () => {
       didCancel = true;
       abortController.abort();
+      window.clearTimeout(fallbackDossierHandle);
     };
   }, [selectedHybridReward]);
 
@@ -1186,16 +1207,22 @@ export default function Home() {
       return;
     }
 
-    for (const unlockedReward of gameSession.unlockedRewards) {
-      void requestRewardImageGeneration(unlockedReward.dinosaurName);
-    }
-    for (const unlockedHybrid of gameSession.unlockedHybrids) {
-      void requestHybridImageGeneration(unlockedHybrid);
-    }
+    const syncHandle = window.setTimeout(() => {
+      for (const unlockedReward of gameSession.unlockedRewards) {
+        void requestRewardImageGeneration(unlockedReward.dinosaurName);
+      }
+      for (const unlockedHybrid of gameSession.unlockedHybrids) {
+        void requestHybridImageGeneration(unlockedHybrid);
+      }
 
-    if (gameSession.amberBalance > 0 && !gameSession.amberImagePath) {
-      void requestAmberImageGeneration();
-    }
+      if (gameSession.amberBalance > 0 && !gameSession.amberImagePath) {
+        void requestAmberImageGeneration();
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(syncHandle);
+    };
   }, [
     gameSession.amberBalance,
     gameSession.amberImagePath,
@@ -1417,6 +1444,7 @@ export default function Home() {
             </form>
           </section>
         </div>
+        <IslaSornaSurveillanceToolbar />
       </main>
     );
   }
@@ -1809,6 +1837,7 @@ export default function Home() {
             modalHost,
           )
         : null}
+      <IslaSornaSurveillanceToolbar />
     </main>
   );
 }
