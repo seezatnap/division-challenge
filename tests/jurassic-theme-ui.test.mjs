@@ -24,6 +24,10 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
   }
 
   assert.ok(source.includes("Jurassic Command Deck"), "Expected themed Jurassic heading content");
+  assert.ok(
+    source.includes('className="jurassic-content jurassic-content-session"'),
+    "Expected live-session content wrapper to expose the desktop two-column comp layout class",
+  );
   assert.equal(
     source.includes("Earth-tone surfaces, jungle overlays, and amber-glow focus states now span the live game board"),
     false,
@@ -191,6 +195,32 @@ test("global stylesheet uses a full-viewport jungle canopy body background image
   const canopyImage = await stat(path.join(repoRoot, "public/jungle-canopy-bg.jpg"));
   assert.ok(canopyImage.isFile(), "Expected jungle canopy JPG asset to exist in public/");
   assert.ok(canopyImage.size > 0, "Expected jungle canopy JPG asset to be non-empty");
+});
+
+test("desktop session layout uses comp-like left nav and right workspace proportions while preserving frame and toolbar breakpoints", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    "--jurassic-session-left-column: minmax(0, 0.92fr);",
+    "--jurassic-session-right-column: minmax(0, 1.48fr);",
+    ".jurassic-content-session {",
+    "grid-template-columns: var(--jurassic-session-left-column) var(--jurassic-session-right-column);",
+    "grid-template-areas:",
+    "\"hero detail\"",
+    "\"nav detail\"",
+    ".jurassic-content-session > .jurassic-layout {",
+    "display: contents;",
+    ".jurassic-content-session > .jurassic-layout > [data-ui-surface=\"game\"] {",
+    "grid-area: detail;",
+    ".jurassic-content-session > .jurassic-layout > .side-stack {",
+    "grid-area: nav;",
+    "padding-bottom: calc(var(--jp-frame-thickness) + 6.4rem + env(safe-area-inset-bottom));",
+    "padding-bottom: calc(var(--jp-frame-thickness) + 6.8rem + env(safe-area-inset-bottom));",
+    "width: min(78rem, calc(100% - 2rem));",
+    "width: min(78rem, calc(100% - 2.5rem));",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected desktop session layout fragment: ${fragment}`);
+  }
 });
 
 test("bus-stop workspace color styling renders cream text on green surfaces while preserving amber and error states", async () => {
