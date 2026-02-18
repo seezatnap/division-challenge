@@ -59,3 +59,6 @@ Every task below should be implemented to visually match these comps. When in do
 
 ## Follow-up tasks (from sprint review)
 - [ ] (#23) Remove remaining dark text overrides inside `.jurassic-panel` (notably classes like `.hero-title`, `.surface-title`, `.hero-copy`, `.status-chip`, `.hint-title`, `.gallery-name`, and `.game-start-label`) so panel content consistently renders in cream/white for contrast against the JP3 green background.
+
+## Follow-up tasks (from sprint review)
+- [ ] (#24) Replace the toolbar’s placeholder streak wiring (`currentStreak` currently mirrors `sessionSolvedProblems`) with a true streak metric in session state, and add test coverage showing streak can diverge from total solved after an incorrect attempt.
