@@ -112,6 +112,11 @@ test("surveillance toolbar component includes JP3 footer label, icon controls, s
   const source = await readRepoFile("src/features/workspace-ui/components/surveillance-toolbar.tsx");
 
   for (const fragment of [
+    'className="jp-surveillance-toolbar"',
+    'className="jp-surveillance-toolbar-icons"',
+    'className="jp-surveillance-toolbar-readouts"',
+    'className="jp-surveillance-toolbar-label"',
+    'className="jp-surveillance-toolbar-more"',
     "problemsSolved",
     "currentStreak",
     "difficultyLevel",
@@ -130,6 +135,7 @@ test("surveillance toolbar component includes JP3 footer label, icon controls, s
     "Fossil scanner",
     "DNA analyzer",
     "Egg monitor",
+    "jp-surveillance-icon",
     'data-ui-action="toolbar-more"',
     "MORE",
     "jp-surveillance-icon-button",
@@ -144,11 +150,24 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
   const source = await readRepoFile("src/app/globals.css");
 
   for (const fragment of [
+    "--jp-panel-bg: #1a7a2e;",
+    "--jp-panel-text: #f0edd8;",
+    "--jp-panel-border: #145a22;",
+    "--jp-frame: #6b4c2a;",
+    "--jp-toolbar: #2a2a2a;",
+    "--jp-toolbar-text: #c0c0c0;",
+    "--jp-accent-red: #cc3333;",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected JP3 token value: ${fragment}`);
+  }
+
+  for (const fragment of [
     "--jp-jungle:",
     "--jp-panel-bg:",
     "--jp-panel-text:",
     "--jp-panel-border:",
     ".jurassic-panel {",
+    "border: 1px solid var(--jp-panel-border);",
     "background: var(--jp-panel-bg);",
     "color: var(--jp-panel-text);",
     "--jp-bark: var(--jp-panel-text);",
