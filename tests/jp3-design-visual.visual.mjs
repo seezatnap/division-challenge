@@ -14,6 +14,18 @@ const repoRoot = path.resolve(testDir, "..");
 const DEFAULT_TEST_SERVER_PORT = 4174;
 const VISUAL_TEST_DIST_DIR = ".next-visual-tests";
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const GALLERY_TILE_TARGET_COUNT = 9;
+const JP3_GALLERY_DINOSAUR_NAMES = [
+  "Brachiosaurus",
+  "Tyrannosaurus Rex",
+  "Velociraptor",
+  "Triceratops",
+  "Stegosaurus",
+  "Parasaurolophus",
+  "Ankylosaurus",
+  "Spinosaurus",
+  "Compsognathus",
+];
 
 let testServerPort = DEFAULT_TEST_SERVER_PORT;
 let appBaseUrl = `http://127.0.0.1:${testServerPort}`;
@@ -250,6 +262,60 @@ async function createHomePage() {
   await page.waitForSelector('[data-ui-surface="surveillance-toolbar"]');
   await wait(700);
   return { context, page };
+}
+
+function buildGalleryRewardFixtures(rewardCount = GALLERY_TILE_TARGET_COUNT) {
+  return Array.from({ length: rewardCount }, (_, index) => {
+    const rewardNumber = index + 1;
+    const dinosaurName = JP3_GALLERY_DINOSAUR_NAMES[index] ?? `Dinosaur ${rewardNumber}`;
+
+    return {
+      rewardId: `reward-${rewardNumber}`,
+      dinosaurName,
+      imagePath: "/window.svg",
+      earnedAt: new Date(Date.UTC(2026, 0, rewardNumber)).toISOString(),
+      milestoneSolvedCount: rewardNumber * 5,
+    };
+  });
+}
+
+async function seedGalleryRewards(page, rewardCount = GALLERY_TILE_TARGET_COUNT) {
+  const seededRewards = buildGalleryRewardFixtures(rewardCount);
+  await page.waitForSelector('[data-ui-surface="gallery"]');
+  await page.evaluate((rewards) => {
+    window.dispatchEvent(
+      new CustomEvent("dino-gallery:rewards-updated", {
+        detail: { unlockedRewards: rewards },
+      }),
+    );
+  }, seededRewards);
+  await page.waitForSelector(".gallery-grid-jp3");
+  await page.waitForFunction(
+    (expectedTileCount) =>
+      document.querySelectorAll(".gallery-thumb-jp3").length >= expectedTileCount &&
+      document.querySelectorAll(".gallery-thumb-jp3 .gallery-image-jp3").length >= expectedTileCount,
+    rewardCount,
+  );
+  await wait(220);
+}
+
+function countDistinctTrackValues(values, tolerance = 8) {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const sortedValues = [...values].sort((left, right) => left - right);
+  let trackCount = 0;
+  let lastTrackValue = Number.NEGATIVE_INFINITY;
+
+  for (const value of sortedValues) {
+    if (trackCount === 0 || Math.abs(value - lastTrackValue) > tolerance) {
+      trackCount += 1;
+      lastTrackValue = value;
+    }
+  }
+
+  return trackCount;
 }
 
 function paethPredictor(left, up, upLeft) {
@@ -908,6 +974,171 @@ test(
         assert.ok(
           isDarkToolbarSample(sample),
           `Expected toolbar sample ${sampleIndex + 1} to be dark-colored, got rgba(${sample.r}, ${sample.g}, ${sample.b}, ${sample.a}).`,
+        );
+      }
+    } finally {
+      await context.close();
+    }
+  },
+);
+
+test(
+  "JP3 visual: gallery matches comp-style 3x3 thumbnail grid with dinosaur tiles",
+  { concurrency: false },
+  async () => {
+    const { context, page } = await createHomePage();
+
+    try {
+      const compPath = path.join(repoRoot, "test-comp-targets", "Jp3websitebrachi.webp");
+      assert.ok(
+        await fileExists(compPath),
+        `Expected gallery comp reference at ${compPath}.`,
+      );
+
+      await seedGalleryRewards(page, GALLERY_TILE_TARGET_COUNT);
+
+      const gridMetrics = await page.evaluate((tileTargetCount) => {
+        const gridElement = document.querySelector(".gallery-grid-jp3");
+        if (!gridElement) {
+          return null;
+        }
+
+        const tileElements = Array.from(
+          gridElement.querySelectorAll(".gallery-thumb-jp3"),
+        );
+        const imageElements = Array.from(
+          gridElement.querySelectorAll(".gallery-thumb-jp3 .gallery-image-jp3"),
+        );
+        const columnTrackValues = getComputedStyle(gridElement).gridTemplateColumns
+          .trim()
+          .split(/\s+/)
+          .filter((value) => value.length > 0 && value !== "none");
+        const sampledTiles = tileElements.slice(0, tileTargetCount).map((tileElement) => {
+          const tileBox = tileElement.getBoundingClientRect();
+          return {
+            centerX: tileBox.left + tileBox.width / 2,
+            centerY: tileBox.top + tileBox.height / 2,
+            width: tileBox.width,
+            height: tileBox.height,
+          };
+        });
+
+        return {
+          columnCount: columnTrackValues.length,
+          tileCount: tileElements.length,
+          imageCount: imageElements.length,
+          sampledTiles,
+        };
+      }, GALLERY_TILE_TARGET_COUNT);
+
+      assert.ok(gridMetrics, "Expected JP3 gallery grid to render.");
+      assert.equal(
+        gridMetrics.columnCount,
+        3,
+        `Expected gallery grid to render 3 columns, got ${gridMetrics.columnCount}.`,
+      );
+      assert.ok(
+        gridMetrics.tileCount >= GALLERY_TILE_TARGET_COUNT,
+        `Expected at least ${GALLERY_TILE_TARGET_COUNT} gallery tiles, got ${gridMetrics.tileCount}.`,
+      );
+      assert.ok(
+        gridMetrics.imageCount >= GALLERY_TILE_TARGET_COUNT,
+        `Expected at least ${GALLERY_TILE_TARGET_COUNT} gallery thumbnail images, got ${gridMetrics.imageCount}.`,
+      );
+      assert.equal(
+        gridMetrics.sampledTiles.length,
+        GALLERY_TILE_TARGET_COUNT,
+        `Expected to sample ${GALLERY_TILE_TARGET_COUNT} gallery tiles, got ${gridMetrics.sampledTiles.length}.`,
+      );
+
+      const distinctColumnCount = countDistinctTrackValues(
+        gridMetrics.sampledTiles.map((tile) => tile.centerX),
+        10,
+      );
+      const distinctRowCount = countDistinctTrackValues(
+        gridMetrics.sampledTiles.map((tile) => tile.centerY),
+        10,
+      );
+      assert.equal(
+        distinctColumnCount,
+        3,
+        `Expected sampled gallery tiles to occupy 3 visual columns, got ${distinctColumnCount}.`,
+      );
+      assert.equal(
+        distinctRowCount,
+        3,
+        `Expected sampled gallery tiles to occupy 3 visual rows, got ${distinctRowCount}.`,
+      );
+
+      for (const [index, tile] of gridMetrics.sampledTiles.entries()) {
+        assert.ok(
+          tile.width > 24 && tile.height > 24,
+          `Expected gallery tile ${index + 1} to render non-trivial dimensions, got ${tile.width}x${tile.height}.`,
+        );
+      }
+    } finally {
+      await context.close();
+    }
+  },
+);
+
+test(
+  "JP3 visual: gallery tile backgrounds stay within JP3 green range via pixel sampling",
+  { concurrency: false },
+  async () => {
+    const { context, page } = await createHomePage();
+
+    try {
+      await seedGalleryRewards(page, GALLERY_TILE_TARGET_COUNT);
+
+      await page.addStyleTag({
+        content: `
+          .gallery-thumb-jp3 > * { visibility: hidden !important; }
+        `,
+      });
+      await wait(120);
+
+      const tileCenters = await page.evaluate((tileTargetCount) => {
+        return Array.from(document.querySelectorAll(".gallery-thumb-jp3"))
+          .slice(0, tileTargetCount)
+          .map((tileElement, index) => {
+            const tileBox = tileElement.getBoundingClientRect();
+            return {
+              index: index + 1,
+              centerX: tileBox.left + tileBox.width / 2,
+              centerY: tileBox.top + tileBox.height / 2,
+            };
+          });
+      }, GALLERY_TILE_TARGET_COUNT);
+
+      assert.equal(
+        tileCenters.length,
+        GALLERY_TILE_TARGET_COUNT,
+        `Expected ${GALLERY_TILE_TARGET_COUNT} gallery tile centers, got ${tileCenters.length}.`,
+      );
+
+      const viewportScreenshot = await page.screenshot({ type: "png" });
+      const decodedScreenshot = decodePngRgba(viewportScreenshot);
+
+      for (const tileCenter of tileCenters) {
+        const centeredSample = sampleNeighborhoodMedian(
+          decodedScreenshot,
+          tileCenter.centerX,
+          tileCenter.centerY,
+          7,
+          2,
+        );
+        const greenSampleMatch = isJp3GreenSample(centeredSample)
+          ? { sample: centeredSample, offsetX: 0, offsetY: 0 }
+          : findGreenSampleNearCenter(decodedScreenshot, tileCenter.centerX, tileCenter.centerY, 18);
+
+        assert.ok(
+          greenSampleMatch,
+          `Expected gallery tile ${tileCenter.index} to include a JP3 green sample near its center.`,
+        );
+        assert.ok(
+          isJp3GreenSample(greenSampleMatch.sample),
+          `Expected gallery tile ${tileCenter.index} color sample to stay JP3 green, got rgba(${greenSampleMatch.sample.r}, ${greenSampleMatch.sample.g}, ${greenSampleMatch.sample.b}, ${greenSampleMatch.sample.a}).`,
         );
       }
     } finally {
