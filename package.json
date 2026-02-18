@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --test",
-    "test:visual": "node --test --test-concurrency=1 tests/workspace-visual-layout.visual.mjs tests/jp3-design-visual.visual.mjs"
+    "test:visual": "node --test --test-concurrency=1 tests/workspace-visual-layout.visual.mjs tests/jp3-design-visual.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.41.0",
