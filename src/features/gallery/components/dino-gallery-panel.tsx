@@ -18,6 +18,7 @@ import {
   toPrimaryRewardDossierArtifactPath,
   type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
+import { useScrollIndicatorState } from "@/features/hooks/use-scroll-indicator-state";
 
 const EMPTY_STATE_TITLE = "No dinos unlocked yet.";
 const EMPTY_STATE_COPY =
@@ -226,6 +227,10 @@ export function DinoGalleryPanel({
   const [selectedReward, setSelectedReward] = useState<UnlockedReward | null>(null);
   const [selectedRewardDossier, setSelectedRewardDossier] =
     useState<RewardDinosaurDossier | null>(null);
+  const [selectedRewardModalElement, setSelectedRewardModalElement] =
+    useState<HTMLElement | null>(null);
+  const selectedRewardModalScrollIndicators =
+    useScrollIndicatorState(selectedRewardModalElement);
   const selectedRewardDetailCard = useMemo(() => {
     if (!selectedReward || !selectedRewardDossier) {
       return null;
@@ -413,8 +418,14 @@ export function DinoGalleryPanel({
               aria-label={`${selectedReward.dinosaurName} details`}
               aria-modal="true"
               className="jp-modal gallery-detail-modal gallery-detail-modal-research-center"
+              data-scroll-indicator-down={selectedRewardModalScrollIndicators.canScrollDown ? "true" : "false"}
+              data-scroll-indicator-enabled={selectedRewardModalScrollIndicators.isScrollable ? "true" : "false"}
+              data-scroll-indicator-up={selectedRewardModalScrollIndicators.canScrollUp ? "true" : "false"}
               onClick={(event) => {
                 event.stopPropagation();
+              }}
+              ref={(element) => {
+                setSelectedRewardModalElement(element);
               }}
               role="dialog"
             >
