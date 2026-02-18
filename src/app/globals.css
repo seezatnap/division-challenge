@@ -1,19 +1,44 @@
 @import "tailwindcss";
 
 :root {
-  --jp-sand: #e7d9b8;
-  --jp-ivory: #f7efd8;
-  --jp-clay: #a97f45;
+  /* JP3 green panel palette */
+  --jp-panel-bg: #1a7a2e;
+  --jp-panel-text: #f0edd8;
+  --jp-panel-border: #145a22;
+
+  /* Wood frame */
+  --jp-frame: #6b4c2a;
+  --jp-frame-grain: repeating-linear-gradient(
+    92deg,
+    rgba(0, 0, 0, 0.06) 0px,
+    transparent 2px,
+    transparent 6px,
+    rgba(0, 0, 0, 0.04) 8px
+  );
+
+  /* Dark metallic toolbar */
+  --jp-toolbar: #2a2a2a;
+  --jp-toolbar-text: #c0c0c0;
+
+  /* Accent red (scroll arrows, action indicators) */
+  --jp-accent-red: #cc3333;
+
+  /* Preserved: amber/glow tokens for active-cell highlighting */
   --jp-amber: #d3a03a;
   --jp-amber-bright: #f4d48d;
+  --jp-glow: rgba(211, 160, 58, 0.62);
+
+  /* Legacy contextual colors (retained for non-panel elements) */
+  --jp-clay: #a97f45;
   --jp-jungle: #1f3424;
   --jp-fern: #466038;
   --jp-moss: #718951;
   --jp-bark: #2d2419;
   --jp-ink: #1b1711;
-  --jp-surface: rgba(244, 236, 214, 0.88);
-  --jp-panel-border: rgba(47, 36, 24, 0.32);
-  --jp-glow: rgba(211, 160, 58, 0.62);
+
+  /* Surface alias (now references JP3 green panel bg) */
+  --jp-surface: var(--jp-panel-bg);
+
   --background: radial-gradient(circle at 18% 10%, #fbf1db 0%, #e7d9b8 36%, #c5b08a 100%);
   --foreground: var(--jp-ink);
 }
