@@ -18,6 +18,8 @@ const PREEXISTING_SERVER_BASE_URL_CANDIDATES = [
   "http://127.0.0.1:3000",
   "http://localhost:3000",
 ];
+const ACTIVE_EDITABLE_SELECTOR =
+  '[data-ui-component="bus-stop-renderer"] [data-entry-inline="true"][contenteditable="true"]';
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const NEXT_DEV_LOCK_ERROR_FRAGMENT = "Unable to acquire lock";
@@ -438,6 +440,25 @@ function parseCssColorToRgb(colorValue) {
   return null;
 }
 
+function extractRgbColorsFromCssValue(cssValue) {
+  if (typeof cssValue !== "string") {
+    return [];
+  }
+
+  const colorMatches =
+    cssValue.match(/(?:rgba?\([^)]+\)|color\(srgb[^)]+\)|#[0-9a-f]{3,8})/gi) ?? [];
+  const parsedColors = [];
+
+  for (const colorMatch of colorMatches) {
+    const parsedColor = parseCssColorToRgb(colorMatch);
+    if (parsedColor) {
+      parsedColors.push(parsedColor);
+    }
+  }
+
+  return parsedColors;
+}
+
 function toLinearSrgbChannel(channel) {
   const normalizedChannel = channel / 255;
   if (normalizedChannel <= 0.04045) {
@@ -839,6 +860,120 @@ test("JP3 workspace text stays light on green panels with accessible contrast", 
         `Expected ${sample.selector} contrast against JP3 panel green to be at least 4.4:1; received ${sampleContrastRatio.toFixed(2)}.`,
       );
     }
+  } finally {
+    await context.close();
+  }
+});
+
+test("JP3 active input cell glow stays amber/gold against the green workspace panel", { concurrency: false }, async (t) => {
+  if (shouldSkipVisualTest(t)) {
+    return;
+  }
+
+  const { context, page } = await createStartedHomePage();
+
+  try {
+    await page.waitForSelector(ACTIVE_EDITABLE_SELECTOR, { state: "visible" });
+    await wait(220);
+
+    const activeGlowSnapshot = await page.evaluate((activeEditableSelector) => {
+      const activeCell = document.querySelector(activeEditableSelector);
+      const workspaceRenderer = document.querySelector('[data-ui-component="bus-stop-renderer"]');
+      const workspacePanel = activeCell?.closest(".workspace-paper") ?? workspaceRenderer ?? null;
+      const rootStyle = getComputedStyle(document.documentElement);
+      const activeCellStyle = activeCell ? getComputedStyle(activeCell) : null;
+
+      return {
+        hasActiveCell: Boolean(activeCell),
+        hasWorkspacePanel: Boolean(workspacePanel),
+        hasGlowAmberClass: activeCell?.classList.contains("glow-amber") ?? false,
+        dataEntryGlow: activeCell?.getAttribute("data-entry-glow") ?? "",
+        dataGlowCadence: activeCell?.getAttribute("data-glow-cadence") ?? "",
+        activeCellBorderColor: activeCellStyle?.borderColor ?? "",
+        activeCellBoxShadow: activeCellStyle?.boxShadow ?? "",
+        workspacePanelBackgroundColor: workspacePanel ? getComputedStyle(workspacePanel).backgroundColor : "",
+        panelBackgroundToken: rootStyle.getPropertyValue("--jp-panel-bg").trim(),
+        amberToken: rootStyle.getPropertyValue("--jp-amber").trim(),
+        amberBrightToken: rootStyle.getPropertyValue("--jp-amber-bright").trim(),
+      };
+    }, ACTIVE_EDITABLE_SELECTOR);
+
+    assert.equal(activeGlowSnapshot.hasActiveCell, true, "Expected one active editable workspace cell.");
+    assert.equal(activeGlowSnapshot.hasWorkspacePanel, true, "Expected active cell to render within workspace panel.");
+    assert.equal(
+      activeGlowSnapshot.hasGlowAmberClass,
+      true,
+      "Expected active editable workspace cell to keep the glow-amber class.",
+    );
+    assert.equal(
+      activeGlowSnapshot.dataEntryGlow,
+      "amber",
+      `Expected active editable workspace cell data-entry-glow=\"amber\", received ${activeGlowSnapshot.dataEntryGlow}.`,
+    );
+    assert.notEqual(
+      activeGlowSnapshot.dataGlowCadence,
+      "none",
+      "Expected active editable workspace cell to expose a non-none glow cadence.",
+    );
+
+    const panelBackgroundColor =
+      parseCssColorToRgb(activeGlowSnapshot.panelBackgroundToken) ??
+      parseCssColorToRgb(activeGlowSnapshot.workspacePanelBackgroundColor);
+    assert.ok(
+      panelBackgroundColor,
+      `Expected workspace panel background color to be parseable; received token ${activeGlowSnapshot.panelBackgroundToken} and computed color ${activeGlowSnapshot.workspacePanelBackgroundColor}.`,
+    );
+    assert.ok(
+      panelBackgroundColor.r < 80 && panelBackgroundColor.g > 100 && panelBackgroundColor.b < 80,
+      `Expected workspace panel to remain JP3 green-like; received ${JSON.stringify(panelBackgroundColor)}.`,
+    );
+
+    const amberTokenColor = parseCssColorToRgb(activeGlowSnapshot.amberToken);
+    const amberBrightTokenColor = parseCssColorToRgb(activeGlowSnapshot.amberBrightToken);
+    assert.ok(
+      amberTokenColor,
+      `Expected --jp-amber to resolve to a parseable color; received ${activeGlowSnapshot.amberToken}.`,
+    );
+    assert.ok(
+      amberBrightTokenColor,
+      `Expected --jp-amber-bright to resolve to a parseable color; received ${activeGlowSnapshot.amberBrightToken}.`,
+    );
+
+    const glowColors = [
+      ...extractRgbColorsFromCssValue(activeGlowSnapshot.activeCellBorderColor),
+      ...extractRgbColorsFromCssValue(activeGlowSnapshot.activeCellBoxShadow),
+    ];
+    assert.ok(
+      glowColors.length > 0,
+      `Expected parseable glow colors from active-cell styles; received border ${activeGlowSnapshot.activeCellBorderColor} and box-shadow ${activeGlowSnapshot.activeCellBoxShadow}.`,
+    );
+
+    const hasAmberLikeGlowColor = glowColors.some(
+      (color) => color.r > color.b && color.g > color.b && color.r >= 120 && color.g >= 95,
+    );
+    assert.ok(
+      hasAmberLikeGlowColor,
+      `Expected active glow colors to stay amber/gold-like; received ${JSON.stringify(glowColors)}.`,
+    );
+
+    const closestAmberDistance = Math.min(
+      ...glowColors.flatMap((color) => [
+        colorDistance(color, amberTokenColor),
+        colorDistance(color, amberBrightTokenColor),
+      ]),
+    );
+    assert.ok(
+      closestAmberDistance <= 210,
+      `Expected active glow colors to stay close to amber token values; closest distance was ${closestAmberDistance} for ${JSON.stringify(glowColors)}.`,
+    );
+
+    const isGlowDistinctFromGreenPanel = glowColors.some(
+      (color) => colorDistance(color, panelBackgroundColor) >= 80,
+    );
+    assert.ok(
+      isGlowDistinctFromGreenPanel,
+      `Expected active glow colors to visually separate from panel green; glow colors ${JSON.stringify(glowColors)}, panel ${JSON.stringify(panelBackgroundColor)}.`,
+    );
   } finally {
     await context.close();
   }
