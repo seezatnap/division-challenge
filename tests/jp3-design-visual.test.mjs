@@ -23,6 +23,19 @@ const ACTIVE_EDITABLE_SELECTOR =
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const NEXT_DEV_LOCK_ERROR_FRAGMENT = "Unable to acquire lock";
+const DINO_GALLERY_REWARDS_UPDATED_EVENT = "dino-gallery:rewards-updated";
+const GALLERY_THUMBNAIL_IMAGE_PATH = "/window.svg";
+const GALLERY_3_X_3_DINOSAUR_NAMES = Object.freeze([
+  "Brachiosaurus",
+  "Velociraptor",
+  "Triceratops",
+  "Stegosaurus",
+  "Parasaurolophus",
+  "Ankylosaurus",
+  "Gallimimus",
+  "Dilophosaurus",
+  "Compsognathus",
+]);
 
 let appBaseUrl = TEST_BASE_URL;
 let serverProcess = null;
@@ -190,6 +203,45 @@ async function createStartedHomePage() {
   await wait(650);
 
   return { context, page };
+}
+
+async function seedGalleryWithVisualRewards(page, rewardCount = 9) {
+  await page.evaluate(
+    ({ eventName, imagePath, rewardNames, count }) => {
+      const baseRewardTimestamp = Date.parse("2026-01-01T00:00:00.000Z");
+      const unlockedRewards = Array.from({ length: count }, (_, index) => {
+        const rewardNumber = index + 1;
+
+        return {
+          rewardId: `visual-reward-${rewardNumber}`,
+          dinosaurName: rewardNames[index % rewardNames.length],
+          imagePath,
+          earnedAt: new Date(baseRewardTimestamp + index * 86_400_000).toISOString(),
+          milestoneSolvedCount: rewardNumber * 5,
+        };
+      });
+
+      window.dispatchEvent(
+        new CustomEvent(eventName, {
+          detail: { unlockedRewards },
+        }),
+      );
+    },
+    {
+      eventName: DINO_GALLERY_REWARDS_UPDATED_EVENT,
+      imagePath: GALLERY_THUMBNAIL_IMAGE_PATH,
+      rewardNames: GALLERY_3_X_3_DINOSAUR_NAMES,
+      count: rewardCount,
+    },
+  );
+
+  await page.waitForFunction(
+    (minimumCardCount) =>
+      document.querySelectorAll('[data-ui-surface="gallery"] .gallery-shell-research-center .gallery-card')
+        .length >= minimumCardCount,
+    rewardCount,
+  );
+  await wait(150);
 }
 
 function paethPredictor(left, up, upLeft) {
@@ -497,6 +549,22 @@ function resolvePrimaryFontFamily(fontFamilyValue) {
   return normalizeFontFamily(primaryFontFamily);
 }
 
+function countDistinctCoordinateBands(values, tolerancePixels = 3) {
+  const sortedValues = [...values].sort((leftValue, rightValue) => leftValue - rightValue);
+  const bandAnchors = [];
+
+  for (const value of sortedValues) {
+    const hasExistingBand = bandAnchors.some(
+      (anchor) => Math.abs(value - anchor) <= tolerancePixels,
+    );
+    if (!hasExistingBand) {
+      bandAnchors.push(value);
+    }
+  }
+
+  return bandAnchors.length;
+}
+
 function shouldSkipVisualTest(t) {
   if (!visualTestsSkipReason) {
     return false;
@@ -767,6 +835,132 @@ test("JP3 bottom toolbar is dark and includes SURVEILLANCE DEVICE label", { conc
     assert.ok(
       toolbarColorSample.r < 95 && toolbarColorSample.g < 95 && toolbarColorSample.b < 95,
       `Expected surveillance toolbar to be dark-colored; sampled ${JSON.stringify(toolbarColorSample)}.`,
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test("JP3 gallery renders a comp-like 3x3 grid with dinosaur thumbnails on green tiles", { concurrency: false }, async (t) => {
+  if (shouldSkipVisualTest(t)) {
+    return;
+  }
+
+  const { context, page } = await createStartedHomePage();
+
+  try {
+    await seedGalleryWithVisualRewards(page, 9);
+
+    const galleryGridLocator = page.locator(
+      '[data-ui-surface="gallery"] .gallery-shell-research-center .gallery-grid',
+    );
+    await galleryGridLocator.waitFor({ state: "visible" });
+
+    const galleryGridSnapshot = await page.evaluate(() => {
+      const grid = document.querySelector('[data-ui-surface="gallery"] .gallery-shell-research-center .gallery-grid');
+      if (!grid) {
+        return null;
+      }
+
+      const computedStyle = window.getComputedStyle(grid);
+      const cards = Array.from(grid.querySelectorAll(".gallery-card"));
+      const thumbs = Array.from(grid.querySelectorAll(".gallery-thumb"));
+      const thumbnails = Array.from(grid.querySelectorAll(".gallery-image"));
+
+      const sampleCards = cards.slice(0, 9);
+      const sampleThumbs = thumbs.slice(0, 9);
+      const sampleThumbnails = thumbnails.slice(0, 9);
+
+      return {
+        columnCountFromTemplate: computedStyle.gridTemplateColumns
+          .split(/\s+/)
+          .map((value) => value.trim())
+          .filter(Boolean).length,
+        totalCardCount: cards.length,
+        totalThumbCount: thumbs.length,
+        sampleCardCoordinates: sampleCards.map((card) => {
+          const rectangle = card.getBoundingClientRect();
+          return {
+            x: rectangle.left,
+            y: rectangle.top,
+          };
+        }),
+        sampleThumbBoxes: sampleThumbs.map((thumb) => {
+          const rectangle = thumb.getBoundingClientRect();
+          return {
+            x: rectangle.left + window.scrollX,
+            y: rectangle.top + window.scrollY,
+            width: rectangle.width,
+            height: rectangle.height,
+          };
+        }),
+        sampleThumbnailAlts: sampleThumbnails.map((thumbnail) => thumbnail.getAttribute("alt") ?? ""),
+      };
+    });
+
+    assert.ok(galleryGridSnapshot, "Expected to capture gallery grid metrics.");
+    assert.ok(
+      galleryGridSnapshot.totalCardCount >= 9,
+      `Expected at least 9 gallery cards for 3x3 comp validation, received ${galleryGridSnapshot.totalCardCount}.`,
+    );
+    assert.ok(
+      galleryGridSnapshot.totalThumbCount >= 9,
+      `Expected at least 9 gallery thumbnails for 3x3 comp validation, received ${galleryGridSnapshot.totalThumbCount}.`,
+    );
+    assert.equal(
+      galleryGridSnapshot.columnCountFromTemplate,
+      3,
+      `Expected JP3 gallery grid template to resolve to 3 columns, received ${galleryGridSnapshot.columnCountFromTemplate}.`,
+    );
+
+    const columnBands = countDistinctCoordinateBands(
+      galleryGridSnapshot.sampleCardCoordinates.map((coordinate) => coordinate.x),
+    );
+    const rowBands = countDistinctCoordinateBands(
+      galleryGridSnapshot.sampleCardCoordinates.map((coordinate) => coordinate.y),
+    );
+
+    assert.equal(columnBands, 3, `Expected a 3-column gallery card arrangement, received ${columnBands} columns.`);
+    assert.equal(rowBands, 3, `Expected a 3-row gallery card arrangement for the first nine cards, received ${rowBands} rows.`);
+    assert.ok(
+      galleryGridSnapshot.sampleThumbnailAlts.every((altText) =>
+        altText.toLowerCase().includes("unlocked reward image"),
+      ),
+      `Expected gallery thumbnails to render dinosaur reward images; received alt text samples ${JSON.stringify(galleryGridSnapshot.sampleThumbnailAlts)}.`,
+    );
+
+    const viewportPngBuffer = await page.screenshot({ fullPage: true, type: "png" });
+    const screenshot = decodePngToRgba(viewportPngBuffer);
+    const tileGreenSampleSummaries = galleryGridSnapshot.sampleThumbBoxes.map((thumbBox, index) => {
+      const leftFlankSample = sampleAverageRgb(
+        screenshot,
+        thumbBox.x + thumbBox.width * 0.1,
+        thumbBox.y + thumbBox.height * 0.5,
+        2,
+      );
+      const rightFlankSample = sampleAverageRgb(
+        screenshot,
+        thumbBox.x + thumbBox.width * 0.9,
+        thumbBox.y + thumbBox.height * 0.5,
+        2,
+      );
+      const candidateSamples = [leftFlankSample, rightFlankSample];
+      const hasGreenTileSample = candidateSamples.some(
+        (sample) => sample.r < 80 && sample.g > 100 && sample.b < 80,
+      );
+
+      assert.ok(
+        hasGreenTileSample,
+        `Expected gallery tile ${index + 1} to include JP3 green background samples; received ${JSON.stringify(candidateSamples)}.`,
+      );
+
+      return candidateSamples;
+    });
+
+    assert.equal(
+      tileGreenSampleSummaries.length,
+      9,
+      `Expected nine gallery tile sample summaries, received ${tileGreenSampleSummaries.length}.`,
     );
   } finally {
     await context.close();
