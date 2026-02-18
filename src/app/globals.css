@@ -1426,7 +1426,28 @@ body {
   padding: 0.13rem 0.46rem;
 }
 
-.gallery-detail-image,
+/* ── Research Center Two-Panel Detail View ──────────────── */
+
+.detail-two-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.detail-panel-image {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gallery-detail-image {
+  width: 100%;
+  max-height: min(54vh, 22rem);
+  object-fit: contain;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.08);
+}
+
 .reward-modal-image {
   width: 100%;
   max-height: min(54vh, 22rem);
@@ -1437,6 +1458,78 @@ body {
     inset 0 0 0 1px rgba(255, 255, 255, 0.1),
     0 2px 8px rgba(0, 0, 0, 0.3);
   background: #0d3d15;
+}
+
+.detail-panel-info {
+  min-width: 0;
+}
+
+.detail-info-card {
+  border: 1px solid rgba(240, 237, 216, 0.18);
+  border-radius: 0.45rem;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 0.65rem 0.75rem;
+}
+
+.info-card-name {
+  font-family: var(--font-jurassic-display), "Times New Roman", serif;
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--jp-panel-text);
+  margin: 0;
+}
+
+.info-card-scientific {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: rgba(240, 237, 216, 0.78);
+  margin-top: 0.15rem;
+}
+
+.info-card-fields {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.18rem 0.55rem;
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.info-card-label {
+  font-weight: 700;
+  color: var(--jp-panel-text);
+  white-space: nowrap;
+}
+
+.info-card-value {
+  color: rgba(240, 237, 216, 0.88);
+  margin: 0;
+}
+
+.detail-description-section {
+  margin-top: 0.25rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(240, 237, 216, 0.12);
+  border-radius: 0.45rem;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.detail-description-section .dino-dossier-description {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: rgba(240, 237, 216, 0.85);
+}
+
+@media (min-width: 40rem) {
+  .detail-two-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    align-items: start;
+  }
+
+  .gallery-detail-image {
+    max-height: min(50vh, 20rem);
+  }
 }
 
 .reward-reveal-modal {
