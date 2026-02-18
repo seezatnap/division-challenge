@@ -14,7 +14,6 @@ import {
 } from "@/features/gallery/lib";
 import {
   buildPrimaryDinosaurDossier,
-  formatMetersAsMetersAndFeet,
   parseRewardDinosaurDossierArtifact,
   toPrimaryRewardDossierArtifactPath,
   type RewardDinosaurDossier,
@@ -23,6 +22,192 @@ import {
 const EMPTY_STATE_TITLE = "No dinos unlocked yet.";
 const EMPTY_STATE_COPY =
   "Solve your first 5 division problems to hatch a dinosaur reward and start your gallery.";
+
+interface ResearchCenterInfoCardPreset {
+  scientificName: string;
+  pronunciation: string;
+  diet: string;
+  nameMeaning: string;
+  length?: string;
+  height?: string;
+  weight?: string;
+  timePeriod: string;
+  location: string;
+  taxon: string;
+  description?: string;
+}
+
+interface ResearchCenterDetailField {
+  label: string;
+  value: string;
+}
+
+interface ResearchCenterDetailCard {
+  name: string;
+  scientificName: string;
+  description: string;
+  fields: readonly ResearchCenterDetailField[];
+}
+
+const RESEARCH_CENTER_INFO_CARD_PRESETS: Readonly<Record<string, ResearchCenterInfoCardPreset>> = {
+  brachiosaurus: {
+    scientificName: "Brachiosaurus altithorax",
+    pronunciation: "Brac - key - o - saw - rus",
+    diet: "Herbivore (Plant-Eater)",
+    nameMeaning: '"high chested arm reptile"',
+    length: "80 feet (25 m)",
+    height: "40 feet (12 m)",
+    weight: "60 tons (54,500 kilos)",
+    timePeriod: "Late Jurassic to Early Cretaceous • 150 million years ago",
+    location: "Western U.S., Southern Europe, Northern Africa",
+    taxon: "Sauropodomorpha, Sauropoda, Macronaria",
+    description:
+      "Brachiosaurus stood among the tallest land animals ever discovered, using its long forelimbs and elevated neck to browse the upper canopy where few other herbivores could feed.",
+  },
+};
+
+const FALLBACK_DIETS = [
+  "Herbivore (Plant-Eater)",
+  "Carnivore (Meat-Eater)",
+  "Omnivore (Mixed Diet)",
+] as const;
+
+const FALLBACK_NAME_MEANINGS = [
+  '"long-necked giant reptile"',
+  '"swift hunting reptile"',
+  '"armored ridge reptile"',
+  '"crested river reptile"',
+  '"high-shouldered plains reptile"',
+] as const;
+
+const FALLBACK_TIME_PERIODS = [
+  "Late Jurassic • 155 million years ago",
+  "Late Jurassic to Early Cretaceous • 150 million years ago",
+  "Early Cretaceous • 125 million years ago",
+  "Late Cretaceous • 72 million years ago",
+] as const;
+
+const FALLBACK_LOCATIONS = [
+  "Western North America",
+  "North America and Europe",
+  "South America and Africa",
+  "Asia and North America",
+] as const;
+
+const FALLBACK_TAXA = [
+  "Theropoda, Tetanurae",
+  "Sauropodomorpha, Neosauropoda",
+  "Ornithischia, Thyreophora",
+  "Ornithopoda, Iguanodontia",
+] as const;
+
+const FALLBACK_SPECIES_EPITHETS = [
+  "altus",
+  "robustus",
+  "magnificus",
+  "longus",
+  "fortis",
+] as const;
+
+function toStableHashSeed(value: string): number {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
+function normalizeName(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function toScientificName(name: string, seed: number): string {
+  const normalizedTokens = name.replace(/[^a-zA-Z\s]/g, " ").split(/\s+/).filter(Boolean);
+
+  if (normalizedTokens.length === 0) {
+    return "Unknown species";
+  }
+
+  if (normalizedTokens.length === 1) {
+    return `${normalizedTokens[0]} ${FALLBACK_SPECIES_EPITHETS[seed % FALLBACK_SPECIES_EPITHETS.length]}`;
+  }
+
+  const [genus, ...speciesTokens] = normalizedTokens;
+  return `${genus} ${speciesTokens.join(" ").toLowerCase()}`;
+}
+
+function toPronunciation(name: string): string {
+  const normalizedName = name.toLowerCase().replace(/[^a-z\s]/g, " ").trim();
+  if (normalizedName.length === 0) {
+    return "Not available";
+  }
+
+  const chunks = normalizedName
+    .split(/\s+/)
+    .flatMap((token) => token.match(/[bcdfghjklmnpqrstvwxyz]*[aeiouy]+[bcdfghjklmnpqrstvwxyz]*/g) ?? [token])
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk) => `${chunk.charAt(0).toUpperCase()}${chunk.slice(1)}`);
+
+  return chunks.join(" - ");
+}
+
+function formatMetersForCard(meters: number): string {
+  const normalizedMeters = Number.isFinite(meters) ? Math.max(0.1, meters) : 0.1;
+  const roundedMeters = Math.round(normalizedMeters * 10) / 10;
+  const roundedFeet = Math.round(roundedMeters * 3.28084);
+  const metersDisplay = Number.isInteger(roundedMeters) ? `${roundedMeters}` : roundedMeters.toFixed(1);
+  return `${roundedFeet} feet (${metersDisplay} m)`;
+}
+
+function formatWeightForCard(lengthMeters: number, heightMeters: number): string {
+  const normalizedLength = Number.isFinite(lengthMeters) ? Math.max(0.1, lengthMeters) : 0.1;
+  const normalizedHeight = Number.isFinite(heightMeters) ? Math.max(0.1, heightMeters) : 0.1;
+  const estimatedTons = Math.max(1, Math.round((normalizedLength * normalizedHeight * 0.24) * 10) / 10);
+  const tonsDisplay = Number.isInteger(estimatedTons) ? `${estimatedTons}` : estimatedTons.toFixed(1);
+  const estimatedKilos = Math.round(estimatedTons * 907.185);
+  return `${tonsDisplay} tons (${estimatedKilos.toLocaleString("en-US")} kilos)`;
+}
+
+function buildResearchCenterDetailCard(input: {
+  dinosaurName: string;
+  dossier: RewardDinosaurDossier;
+}): ResearchCenterDetailCard {
+  const name = normalizeName(input.dinosaurName || input.dossier.subjectName);
+  const preset = RESEARCH_CENTER_INFO_CARD_PRESETS[name.toLowerCase()];
+  const seed = toStableHashSeed(name.toLowerCase());
+  const scientificName = preset?.scientificName ?? toScientificName(name, seed);
+  const description = preset?.description ?? input.dossier.description;
+
+  return {
+    name,
+    scientificName,
+    description,
+    fields: [
+      { label: "Pronunciation", value: preset?.pronunciation ?? toPronunciation(name) },
+      { label: "Diet", value: preset?.diet ?? FALLBACK_DIETS[seed % FALLBACK_DIETS.length] },
+      {
+        label: "Name Meaning",
+        value: preset?.nameMeaning ?? FALLBACK_NAME_MEANINGS[seed % FALLBACK_NAME_MEANINGS.length],
+      },
+      { label: "Length", value: preset?.length ?? formatMetersForCard(input.dossier.lengthMeters) },
+      { label: "Height", value: preset?.height ?? formatMetersForCard(input.dossier.heightMeters) },
+      {
+        label: "Weight",
+        value: preset?.weight ?? formatWeightForCard(input.dossier.lengthMeters, input.dossier.heightMeters),
+      },
+      {
+        label: "Time Period",
+        value: preset?.timePeriod ?? FALLBACK_TIME_PERIODS[seed % FALLBACK_TIME_PERIODS.length],
+      },
+      { label: "Location", value: preset?.location ?? FALLBACK_LOCATIONS[seed % FALLBACK_LOCATIONS.length] },
+      { label: "Taxon", value: preset?.taxon ?? FALLBACK_TAXA[seed % FALLBACK_TAXA.length] },
+    ],
+  };
+}
 
 export interface DinoGalleryPanelProps {
   unlockedRewards?: readonly UnlockedReward[];
@@ -41,6 +226,16 @@ export function DinoGalleryPanel({
   const [selectedReward, setSelectedReward] = useState<UnlockedReward | null>(null);
   const [selectedRewardDossier, setSelectedRewardDossier] =
     useState<RewardDinosaurDossier | null>(null);
+  const selectedRewardDetailCard = useMemo(() => {
+    if (!selectedReward || !selectedRewardDossier) {
+      return null;
+    }
+
+    return buildResearchCenterDetailCard({
+      dinosaurName: selectedReward.dinosaurName,
+      dossier: selectedRewardDossier,
+    });
+  }, [selectedReward, selectedRewardDossier]);
 
   useEffect(() => {
     setGalleryRewards(sortedUnlockedRewards);
@@ -217,49 +412,56 @@ export function DinoGalleryPanel({
             <section
               aria-label={`${selectedReward.dinosaurName} details`}
               aria-modal="true"
-              className="jp-modal gallery-detail-modal"
+              className="jp-modal gallery-detail-modal gallery-detail-modal-research-center"
               onClick={(event) => {
                 event.stopPropagation();
               }}
               role="dialog"
             >
-              <p className="surface-kicker">Gallery Detail</p>
-              <h3 className="surface-title gallery-detail-title">{selectedReward.dinosaurName}</h3>
-              <p className="gallery-detail-meta">
-                Milestone {selectedReward.milestoneSolvedCount} • Earned{" "}
-                <time dateTime={selectedReward.earnedAt}>
-                  {formatGalleryEarnedDate(selectedReward.earnedAt)}
-                </time>
-              </p>
-              {selectedRewardDossier ? (
-                <section className="dino-dossier" data-ui-surface="dino-dossier">
-                  <p className="dino-dossier-dimensions">
-                    Height: {formatMetersAsMetersAndFeet(selectedRewardDossier.heightMeters)} •
-                    Length: {formatMetersAsMetersAndFeet(selectedRewardDossier.lengthMeters)}
+              <p className="surface-kicker">Research Center Entry</p>
+              {selectedRewardDetailCard ? (
+                <section
+                  className="dino-dossier dino-dossier-research-center"
+                  data-ui-surface="dino-dossier"
+                >
+                  <div className="gallery-detail-top">
+                    <figure className="gallery-detail-figure">
+                      <Image
+                        alt={`${selectedReward.dinosaurName} unlocked reward image`}
+                        className="gallery-detail-image gallery-detail-image-research-center"
+                        height={540}
+                        loading="lazy"
+                        src={selectedReward.imagePath}
+                        width={960}
+                      />
+                    </figure>
+                    <section className="gallery-detail-sheet" aria-label={`${selectedReward.dinosaurName} info card`}>
+                      <h3 className="surface-title gallery-detail-sheet-title">
+                        {selectedRewardDetailCard.name}
+                      </h3>
+                      <p className="gallery-detail-sheet-scientific">
+                        {selectedRewardDetailCard.scientificName}
+                      </p>
+                      <dl className="gallery-detail-sheet-grid">
+                        {selectedRewardDetailCard.fields.map((field) => (
+                          <div className="gallery-detail-sheet-row" key={field.label}>
+                            <dt className="gallery-detail-sheet-label">{field.label}:</dt>
+                            <dd className="gallery-detail-sheet-value">{field.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </section>
+                  </div>
+                  <p className="dino-dossier-description gallery-detail-description">
+                    {selectedRewardDetailCard.description}
                   </p>
-                  <p className="dino-dossier-description">
-                    {selectedRewardDossier.description}
-                  </p>
-                  <ul className="dino-dossier-attributes" aria-label="Dinosaur attributes">
-                    {selectedRewardDossier.attributes.map((attribute) => (
-                      <li className="dino-dossier-attribute" key={attribute}>
-                        {attribute}
-                      </li>
-                    ))}
-                  </ul>
                 </section>
               ) : null}
-              <Image
-                alt={`${selectedReward.dinosaurName} unlocked reward image`}
-                className="gallery-detail-image"
-                height={540}
-                loading="lazy"
-                src={selectedReward.imagePath}
-                width={960}
-              />
-              <button className="jp-button" onClick={closeSelectedReward} type="button">
-                Close
-              </button>
+              <div className="gallery-detail-actions">
+                <button className="jp-button" onClick={closeSelectedReward} type="button">
+                  Close
+                </button>
+              </div>
             </section>
           </div>
         </div>

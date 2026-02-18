@@ -48,9 +48,43 @@ test("gallery panel includes reward image, earned date output, empty-state copy,
     "readUnlockedRewardsFromGalleryEvent",
     "mergeUnlockedRewardsForGallery",
     'data-ui-surface="dino-dossier"',
-    "dino-dossier-attributes",
+    "gallery-detail-modal-research-center",
+    "dino-dossier-research-center",
+    "gallery-detail-top",
+    "gallery-detail-sheet",
+    "gallery-detail-description",
+    'label: "Pronunciation"',
+    'label: "Diet"',
+    'label: "Name Meaning"',
+    'label: "Length"',
+    'label: "Height"',
+    'label: "Weight"',
+    'label: "Time Period"',
+    'label: "Location"',
+    'label: "Taxon"',
+    'scientificName: "Brachiosaurus altithorax"',
   ]) {
     assert.ok(source.includes(fragment), `Expected gallery panel fragment: ${fragment}`);
+  }
+});
+
+test("research center gallery detail stylesheet includes two-panel info-card layout classes", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    ".gallery-detail-modal-research-center",
+    ".dino-dossier-research-center",
+    ".gallery-detail-top",
+    ".gallery-detail-sheet",
+    ".gallery-detail-sheet-row",
+    ".gallery-detail-sheet-label",
+    ".gallery-detail-sheet-value",
+    ".gallery-detail-description",
+    ".gallery-detail-image-research-center",
+    "@media (min-width: 42rem)",
+    "grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected gallery detail style fragment: ${fragment}`);
   }
 });
 

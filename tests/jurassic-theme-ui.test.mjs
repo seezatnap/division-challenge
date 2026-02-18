@@ -24,6 +24,10 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
   }
 
   assert.ok(source.includes("Jurassic Command Deck"), "Expected themed Jurassic heading content");
+  assert.ok(
+    source.includes('className="jurassic-content jurassic-content-session"'),
+    "Expected live-session content wrapper to expose the desktop two-column comp layout class",
+  );
   assert.equal(
     source.includes("Earth-tone surfaces, jungle overlays, and amber-glow focus states now span the live game board"),
     false,
@@ -97,6 +101,14 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-amber:",
     "--jp-glow:",
     "--jp-surface:",
+    "--jp-panel-bg: #1a7a2e;",
+    "--jp-panel-text: #f0edd8;",
+    "--jp-panel-border: #145a22;",
+    "--jp-frame: #6b4c2a;",
+    "--jp-toolbar: #2a2a2a;",
+    "--jp-toolbar-text: #c0c0c0;",
+    "--jp-accent-red: #cc3333;",
+    "--jp-surface: var(--jp-panel-bg);",
     "body::before {",
     "body::after {",
     "var(--jp-frame-thickness)",
@@ -108,6 +120,15 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "color: var(--jp-panel-text);",
     "inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 84%, black)",
     ".jurassic-panel :where(p, h1, h2, h3, h4, h5, h6, li, label, legend, time, dt, dd, figcaption)",
+    ".jurassic-panel :is(",
+    ".hero-title,",
+    ".surface-title,",
+    ".hero-copy,",
+    ".status-chip,",
+    ".hint-title,",
+    ".gallery-name,",
+    ".game-start-label",
+    "color: inherit;",
     ".motif-claw::after",
     ".motif-fossil::after",
     ".motif-track::after",
@@ -141,6 +162,9 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".hybrid-lab-actions",
     ".gallery-shell-research-center {",
     ".gallery-shell-research-center .gallery-grid {",
+    ".gallery-shell-research-center .gallery-card {",
+    ".gallery-shell-research-center .gallery-card-trigger {",
+    ".gallery-shell-research-center .gallery-card-trigger:focus-visible {",
     "grid-template-columns: repeat(3, minmax(0, 1fr));",
     ".gallery-shell-research-center .gallery-thumb {",
     "aspect-ratio: 1 / 0.86;",
@@ -161,6 +185,12 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
   ]) {
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
   }
+
+  assert.equal(
+    source.includes("--jp-panel-bg: rgba(244,236,214,0.88);"),
+    false,
+    "Expected legacy ivory panel token value to be removed from JP3 restyling",
+  );
 });
 
 test("global stylesheet uses a full-viewport jungle canopy body background image", async () => {
@@ -182,6 +212,32 @@ test("global stylesheet uses a full-viewport jungle canopy body background image
   const canopyImage = await stat(path.join(repoRoot, "public/jungle-canopy-bg.jpg"));
   assert.ok(canopyImage.isFile(), "Expected jungle canopy JPG asset to exist in public/");
   assert.ok(canopyImage.size > 0, "Expected jungle canopy JPG asset to be non-empty");
+});
+
+test("desktop session layout uses comp-like left nav and right workspace proportions while preserving frame and toolbar breakpoints", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    "--jurassic-session-left-column: minmax(0, 0.92fr);",
+    "--jurassic-session-right-column: minmax(0, 1.48fr);",
+    ".jurassic-content-session {",
+    "grid-template-columns: var(--jurassic-session-left-column) var(--jurassic-session-right-column);",
+    "grid-template-areas:",
+    "\"hero detail\"",
+    "\"nav detail\"",
+    ".jurassic-content-session > .jurassic-layout {",
+    "display: contents;",
+    ".jurassic-content-session > .jurassic-layout > [data-ui-surface=\"game\"] {",
+    "grid-area: detail;",
+    ".jurassic-content-session > .jurassic-layout > .side-stack {",
+    "grid-area: nav;",
+    "padding-bottom: calc(var(--jp-frame-thickness) + 6.4rem + env(safe-area-inset-bottom));",
+    "padding-bottom: calc(var(--jp-frame-thickness) + 6.8rem + env(safe-area-inset-bottom));",
+    "width: min(78rem, calc(100% - 2rem));",
+    "width: min(78rem, calc(100% - 2.5rem));",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected desktop session layout fragment: ${fragment}`);
+  }
 });
 
 test("bus-stop workspace color styling renders cream text on green surfaces while preserving amber and error states", async () => {
@@ -277,6 +333,7 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
 
   for (const fragment of [
     'data-ui-surface="surveillance-toolbar"',
+    'className="surveillance-toolbar-icons"',
     "ISLA SORNA SURVEILLANCE DEVICE",
     "MORE",
     'iconKind: "footprint"',
@@ -295,8 +352,11 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
     ".surveillance-toolbar-shell",
     ".surveillance-toolbar {",
     ".surveillance-toolbar-controls",
+    ".surveillance-toolbar-icons",
     ".surveillance-toolbar-label",
     ".surveillance-toolbar-icon-button",
+    ".surveillance-toolbar-icon-svg",
+    ".surveillance-toolbar-icon-text",
     ".surveillance-toolbar-readouts",
     ".surveillance-toolbar-readout",
     ".surveillance-toolbar-readout-label",
