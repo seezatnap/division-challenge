@@ -66,3 +66,6 @@ Every task below should be implemented to visually match these comps. When in do
 ## Follow-up tasks (from sprint review)
 - [ ] (#25) Move `tests/jp3-design-visual.test.mjs` into the visual-test path (`npm run test:visual`) and run it serially with other visual suites, so `npm test` stays unit-focused and avoids browser/dev-server side effects.
 - [ ] (#26) Harden preexisting-server detection in `tests/jp3-design-visual.test.mjs` to verify it is this app before reusing `:3000`; if verification fails, start the dedicated `4173` server with `NEXT_DIST_DIR=.next-visual-tests`.
+
+## Follow-up tasks (from sprint review)
+- [ ] (#27) Restore cross-platform visual-server startup by resolving the Next CLI executable per platform (`next.cmd` on Windows) in `tests/jp3-design-visual.test.mjs` and `tests/workspace-visual-layout.visual.mjs` instead of hardcoding `node_modules/.bin/next`.
