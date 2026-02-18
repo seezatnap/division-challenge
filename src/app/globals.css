@@ -2404,6 +2404,18 @@ body::after {
   color: inherit;
 }
 
+.jurassic-panel :is(
+  .hero-title,
+  .surface-title,
+  .hero-copy,
+  .status-chip,
+  .hint-title,
+  .gallery-name,
+  .game-start-label
+) {
+  color: inherit;
+}
+
 @media (min-width: 48rem) {
   .jurassic-shell {
     padding: calc(var(--jp-frame-thickness) + 0.85rem);
