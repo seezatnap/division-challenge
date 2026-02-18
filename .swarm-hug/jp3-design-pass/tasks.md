@@ -62,3 +62,7 @@ Every task below should be implemented to visually match these comps. When in do
 
 ## Follow-up tasks (from sprint review)
 - [ ] (#24) Replace the toolbar’s placeholder streak wiring (`currentStreak` currently mirrors `sessionSolvedProblems`) with a true streak metric in session state, and add test coverage showing streak can diverge from total solved after an incorrect attempt.
+
+## Follow-up tasks (from sprint review)
+- [ ] (#25) Move `tests/jp3-design-visual.test.mjs` into the visual-test path (`npm run test:visual`) and run it serially with other visual suites, so `npm test` stays unit-focused and avoids browser/dev-server side effects.
+- [ ] (#26) Harden preexisting-server detection in `tests/jp3-design-visual.test.mjs` to verify it is this app before reusing `:3000`; if verification fails, start the dedicated `4173` server with `NEXT_DIST_DIR=.next-visual-tests`.
