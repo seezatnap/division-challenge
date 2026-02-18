@@ -232,7 +232,7 @@ test("bus-stop renderer component uses inline workspace entries and avoids stand
     "tryAutoAdvanceBringDownStep",
     "validateLongDivisionStepAnswer",
     "ENTRY_ERROR_PULSE_DURATION_MS = 360",
-    "ENTRY_RETRY_LOCK_DURATION_MS = 2000",
+    "ENTRY_RETRY_LOCK_DURATION_MS = 1000",
     "dividend-digit-bring-down-origin",
     "bring-down-digit-slide",
     "work-row-enter",

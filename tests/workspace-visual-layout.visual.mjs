@@ -396,7 +396,7 @@ test("visual workflow: multi-digit rows expose one digit cell at a time with aut
   }
 });
 
-test("visual workflow: wrong digit triggers red error feedback and a 2-second retry lock", { concurrency: false }, async () => {
+test("visual workflow: wrong digit triggers red error feedback and a 1-second retry lock", { concurrency: false }, async () => {
   const { context, page } = await createWorkspacePage();
 
   try {
@@ -404,11 +404,14 @@ test("visual workflow: wrong digit triggers red error feedback and a 2-second re
       stepId: "workspace-preview-problem:step:0:quotient-digit",
       digitIndex: 0,
     };
+    const firstStepSelector = `[data-visual-snapshot="workspace-live"] [data-entry-step-id="${firstStep.stepId}"][data-entry-digit-index="${firstStep.digitIndex}"]`;
 
     await expectActiveEditableCell(page, firstStep);
+    const initialCellBox = await page.locator(firstStepSelector).boundingBox();
+    assert.ok(initialCellBox, "Expected the active quotient digit cell to be measurable before retry lock.");
     await typeDigitIntoActiveCell(page, "9");
     await page.waitForSelector(
-      `[data-entry-step-id="${firstStep.stepId}"][data-entry-digit-index="${firstStep.digitIndex}"][data-entry-error="pulse"]`,
+      `${firstStepSelector}[data-entry-error="pulse"]`,
       { timeout: 1_200 },
     );
     assert.equal(
@@ -418,10 +421,23 @@ test("visual workflow: wrong digit triggers red error feedback and a 2-second re
     );
 
     await page.waitForSelector(
-      `[data-entry-step-id="${firstStep.stepId}"][data-entry-digit-index="${firstStep.digitIndex}"][data-entry-error="locked"]`,
+      `${firstStepSelector}[data-entry-error="locked"]`,
       { timeout: 1_400 },
     );
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(120);
+    const retryLockedCellBox = await page.locator(firstStepSelector).boundingBox();
+    assert.ok(
+      retryLockedCellBox,
+      "Expected the retry-locked quotient digit cell to remain measurable during lock.",
+    );
+    assert.ok(
+      Math.abs((retryLockedCellBox?.width ?? 0) - (initialCellBox?.width ?? 0)) <= 2,
+      `Expected retry-locked quotient cell width to stay aligned. Initial width: ${initialCellBox?.width}, locked width: ${retryLockedCellBox?.width}`,
+    );
+    assert.ok(
+      Math.abs((retryLockedCellBox?.height ?? 0) - (initialCellBox?.height ?? 0)) <= 2,
+      `Expected retry-locked quotient cell height to stay aligned. Initial height: ${initialCellBox?.height}, locked height: ${retryLockedCellBox?.height}`,
+    );
     assert.equal(
       await page.locator(activeEditableSelector).count(),
       0,

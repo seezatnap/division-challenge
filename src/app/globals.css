@@ -374,6 +374,11 @@ body {
 }
 
 .quotient-digit-cell {
+  width: 100%;
+  min-width: var(--division-cell-width);
+  min-height: 2.08rem;
+  box-sizing: border-box;
+  line-height: 1;
   background: rgba(255, 255, 255, 0.45);
 }
 
