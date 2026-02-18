@@ -139,24 +139,30 @@ async function resolveHeadlessShellExecutablePath() {
   throw new Error("Unable to resolve a Chromium headless-shell executable.");
 }
 
+async function waitForChildExit(childProcess, timeoutMilliseconds) {
+  if (childProcess.exitCode !== null) {
+    return true;
+  }
+
+  return Promise.race([
+    new Promise((resolve) => {
+      childProcess.once("exit", () => resolve(true));
+    }),
+    wait(timeoutMilliseconds).then(() => childProcess.exitCode !== null),
+  ]);
+}
+
 async function stopServerProcess() {
   if (!serverProcess || serverProcess.exitCode !== null) {
     return;
   }
 
   serverProcess.kill("SIGTERM");
-  const didExitGracefully = await Promise.race([
-    new Promise((resolve) => {
-      serverProcess.once("exit", () => resolve(true));
-    }),
-    wait(5_000).then(() => false),
-  ]);
+  const didExitGracefully = await waitForChildExit(serverProcess, 5_000);
 
   if (!didExitGracefully) {
     serverProcess.kill("SIGKILL");
-    await new Promise((resolve) => {
-      serverProcess.once("exit", resolve);
-    });
+    await waitForChildExit(serverProcess, 5_000);
   }
 }
 
@@ -509,7 +515,8 @@ test.before(async () => {
     setAppBaseUrl(preexistingServerBaseUrl);
   } else {
     setAppBaseUrl(TEST_BASE_URL);
-    serverProcess = spawn("npm", ["run", "dev", "--", "--port", "4173", "--hostname", "127.0.0.1"], {
+    const nextDevExecutable = path.join(repoRoot, "node_modules", ".bin", "next");
+    serverProcess = spawn(nextDevExecutable, ["dev", "--port", "4173", "--hostname", "127.0.0.1"], {
       cwd: repoRoot,
       env: {
         ...process.env,
