@@ -1291,6 +1291,74 @@ body::after {
   color: color-mix(in srgb, var(--jp-jungle) 68%, var(--jp-bark));
 }
 
+.gallery-shell-research-center {
+  max-width: 21rem;
+}
+
+.gallery-shell-research-center .gallery-grid {
+  gap: 0.42rem 0.38rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.gallery-shell-research-center .gallery-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.gallery-shell-research-center .gallery-card-trigger {
+  display: grid;
+  gap: 0.22rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.gallery-shell-research-center .gallery-card-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--jp-accent-red) 88%, white);
+  outline-offset: 2px;
+  border-radius: 0.28rem;
+}
+
+.gallery-shell-research-center .gallery-thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 0.86;
+  border-radius: 0.28rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 80%, black);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-panel-bg) 42%, #55d321) 0%,
+      color-mix(in srgb, var(--jp-panel-bg) 55%, #34bf1b) 100%
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(240, 237, 216, 0.14),
+    inset 0 -0.15rem 0.3rem rgba(4, 24, 7, 0.3);
+  padding: 0.2rem;
+}
+
+.gallery-shell-research-center .gallery-image {
+  object-fit: contain;
+  object-position: center;
+  width: 100%;
+  height: 100%;
+}
+
+.gallery-shell-research-center .gallery-name {
+  margin-top: 0.05rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--jp-panel-text) 92%, white);
+}
+
+.gallery-shell-research-center .gallery-meta {
+  display: none;
+}
+
 .jp-modal-backdrop {
   position: fixed;
   inset: 0;
