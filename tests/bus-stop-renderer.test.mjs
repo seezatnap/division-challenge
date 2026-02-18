@@ -329,6 +329,7 @@ test("home page wires dino coach guidance to the active step context", async () 
     "onActiveStepFocusChange={handleActiveStepFocusChange}",
     'data-feedback-tone={activeCoachMessage.tone}',
     'data-feedback-outcome={activeCoachMessage.outcome}',
+    'className="coach-readout"',
     "data-feedback-key={entry.message.messageKey}",
     "{entry.message.text}",
     "{activeCoachMessage.note}",
