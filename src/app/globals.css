@@ -262,8 +262,8 @@ body {
   inset: auto -16% -34% -16%;
   height: 74%;
   background:
-    radial-gradient(circle at 25% 30%, rgba(70, 96, 56, 0.18) 0%, transparent 44%),
-    radial-gradient(circle at 70% 40%, rgba(113, 137, 81, 0.16) 0%, transparent 42%);
+    radial-gradient(circle at 25% 30%, rgba(180, 220, 160, 0.1) 0%, transparent 44%),
+    radial-gradient(circle at 70% 40%, rgba(200, 240, 180, 0.08) 0%, transparent 42%);
 }
 
 .motif-claw::after {
@@ -274,7 +274,7 @@ body {
   background: repeating-linear-gradient(
     128deg,
     transparent 0 14px,
-    rgba(169, 127, 69, 0.2) 14px 17px,
+    rgba(240, 237, 216, 0.07) 14px 17px,
     transparent 17px 34px
   );
   transform: rotate(4deg);
@@ -288,7 +288,7 @@ body {
   background:
     repeating-radial-gradient(
       circle,
-      rgba(169, 127, 69, 0.22) 0 2px,
+      rgba(240, 237, 216, 0.08) 0 2px,
       transparent 2px 12px
     );
 }
@@ -299,9 +299,9 @@ body {
   width: 115%;
   height: 4.75rem;
   background-image:
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%),
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%),
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%);
+    radial-gradient(ellipse at center, rgba(0, 40, 10, 0.18) 0 34%, transparent 35%),
+    radial-gradient(ellipse at center, rgba(0, 40, 10, 0.18) 0 34%, transparent 35%),
+    radial-gradient(ellipse at center, rgba(0, 40, 10, 0.18) 0 34%, transparent 35%);
   background-size: 2.5rem 1.7rem;
   background-position:
     0 0,
@@ -410,7 +410,7 @@ body {
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: rgba(240, 237, 216, 0.72);
+  color: color-mix(in srgb, var(--jp-panel-text) 72%, transparent);
 }
 
 .bus-stop-renderer {
@@ -466,7 +466,7 @@ body {
   min-width: 0;
   text-align: center;
   border-radius: 0.5rem;
-  border: 1px dashed rgba(240, 237, 216, 0.3);
+  border: 1px dashed color-mix(in srgb, var(--jp-panel-text) 32%, transparent);
   padding: 0.35rem 0.45rem;
   font-family: var(--font-jurassic-mono), "Courier New", monospace;
   font-size: 1rem;
@@ -526,7 +526,7 @@ body {
 }
 
 .inline-entry-quotient.inline-entry-pending {
-  border-color: rgba(169, 127, 69, 0.45);
+  border-color: color-mix(in srgb, var(--jp-panel-text) 38%, transparent);
 }
 
 .inline-entry-quotient.inline-entry-pending:focus-visible {
@@ -551,8 +551,8 @@ body {
 }
 
 .bracket-stack {
-  border-left: var(--division-bracket-stroke-width) solid rgba(240, 237, 216, 0.6);
-  border-top: var(--division-bracket-stroke-width) solid rgba(240, 237, 216, 0.6);
+  border-left: var(--division-bracket-stroke-width) solid color-mix(in srgb, var(--jp-panel-text) 72%, transparent);
+  border-top: var(--division-bracket-stroke-width) solid color-mix(in srgb, var(--jp-panel-text) 72%, transparent);
   border-top-left-radius: 0.35rem;
   padding: 0.35rem 0 0.25rem var(--division-bracket-inline-start);
 }
@@ -631,7 +631,7 @@ body {
 }
 
 .dividend-digit-bring-down-origin {
-  color: color-mix(in srgb, var(--jp-amber) 68%, var(--jp-bark));
+  color: color-mix(in srgb, var(--jp-amber) 68%, var(--jp-panel-bg));
   animation: dividend-digit-bring-down-origin 420ms ease-out 1;
 }
 
@@ -728,7 +728,7 @@ body {
   left: 0;
   right: 0;
   bottom: -0.12rem;
-  border-bottom: 0.12rem solid rgba(240, 237, 216, 0.5);
+  border-bottom: 0.12rem solid color-mix(in srgb, var(--jp-panel-text) 55%, transparent);
   pointer-events: none;
 }
 
@@ -746,7 +746,7 @@ body {
 }
 
 .inline-entry-work-row.inline-entry-pending {
-  border-color: rgba(240, 237, 216, 0.28);
+  border-color: color-mix(in srgb, var(--jp-panel-text) 28%, transparent);
   background: rgba(0, 0, 0, 0.1);
 }
 
@@ -762,7 +762,7 @@ body {
   pointer-events: none;
   font-family: var(--font-jurassic-mono), "Courier New", monospace;
   font-size: 1.04rem;
-  color: color-mix(in srgb, var(--jp-amber) 64%, var(--jp-bark));
+  color: color-mix(in srgb, var(--jp-amber) 64%, var(--jp-panel-bg));
   text-shadow: 0 0 0.4rem rgba(244, 212, 141, 0.45);
   animation: bring-down-digit-slide 420ms cubic-bezier(0.25, 0.72, 0.24, 1) 1;
 }
@@ -844,7 +844,7 @@ body {
 }
 
 .inline-entry-lock-in[data-entry-lock-pulse="subtraction-result"]::after {
-  border-color: rgba(113, 137, 81, 0.56);
+  border-color: color-mix(in srgb, var(--jp-panel-text) 60%, transparent);
 }
 
 .inline-entry-lock-in[data-entry-lock-pulse="bring-down"]::after {
@@ -1022,43 +1022,53 @@ body {
 }
 
 .hint-stack {
-  border: 1px solid rgba(240, 237, 216, 0.18);
+  border: 2px solid var(--jp-panel-border);
   border-radius: 0.45rem;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 2px 2px 0 rgba(0, 0, 0, 0.18),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.06);
   padding: 0.9rem;
 }
 
 .hint-stack[data-feedback-tone="encouragement"] {
-  border-color: rgba(240, 237, 216, 0.24);
+  border-color: var(--jp-panel-border);
 }
 
 .hint-stack[data-feedback-tone="retry"] {
   border-color: rgba(204, 51, 51, 0.5);
-  background: rgba(204, 51, 51, 0.12);
+  background: rgba(204, 51, 51, 0.14);
+  box-shadow:
+    inset 2px 2px 0 rgba(0, 0, 0, 0.18),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .hint-stack[data-feedback-tone="celebration"] {
   border-color: rgba(211, 160, 58, 0.56);
   box-shadow:
-    inset 0 0 0 1px rgba(244, 212, 141, 0.2),
+    inset 2px 2px 0 rgba(0, 0, 0, 0.14),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.06),
     0 0 1.1rem rgba(211, 160, 58, 0.15);
 }
 
 .hint-title {
-  font-family: var(--font-jurassic-display), "Times New Roman", serif;
-  font-size: 1.15rem;
-  color: var(--jp-panel-text);
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(240, 237, 216, 0.72);
 }
 
 .hint-status {
   margin-top: 0.5rem;
   display: inline-flex;
   border-radius: 999px;
-  border: 1px solid rgba(240, 237, 216, 0.25);
-  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--jp-panel-border);
+  background: rgba(0, 0, 0, 0.18);
   padding: 0.16rem 0.58rem;
-  font-size: 0.7rem;
-  letter-spacing: 0.03em;
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   font-weight: 700;
   color: var(--jp-panel-text);
@@ -1083,9 +1093,10 @@ body {
 .coach-item {
   border-left: 0.22rem solid rgba(211, 160, 58, 0.6);
   padding-left: 0.55rem;
-  font-size: 0.86rem;
-  line-height: 1.35;
-  color: rgba(240, 237, 216, 0.88);
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--jp-panel-text);
 }
 
 .coach-item[data-feedback-tone="retry"] {
@@ -1100,7 +1111,9 @@ body {
 
 .hint-note {
   margin-top: 0.75rem;
-  font-size: 0.81rem;
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 0.76rem;
+  line-height: 1.4;
   color: rgba(240, 237, 216, 0.7);
 }
 
@@ -1191,55 +1204,76 @@ body {
   color: rgba(240, 237, 216, 0.72);
 }
 
+/* ── JP3 Research Center Thumbnail Grid ─────────────────── */
+
 .gallery-grid {
   display: grid;
-  gap: 0.7rem;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.35rem;
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .gallery-card {
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 0.45rem;
-  background: rgba(0, 0, 0, 0.1);
-  padding: 0.62rem;
+  position: relative;
+  border: 2px solid #145a22;
+  border-radius: 0.2rem;
+  background: #2d8a2d;
+  aspect-ratio: 1;
+  overflow: hidden;
 }
 
 .gallery-card-trigger {
   width: 100%;
+  height: 100%;
   border: 0;
   background: transparent;
   padding: 0;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .gallery-card-trigger:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--jp-amber) 72%, white);
-  outline-offset: 2px;
-  border-radius: 0.65rem;
+  outline-offset: -2px;
+  border-radius: 0.2rem;
 }
 
 .gallery-thumb {
   overflow: hidden;
   position: relative;
-  border-radius: 0.35rem;
-  height: 4.8rem;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  background: rgba(0, 0, 0, 0.15);
+  width: 80%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  border: none;
+  background: transparent;
 }
 
 .gallery-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
 .gallery-name {
-  margin-top: 0.55rem;
-  font-size: 0.88rem;
+  margin-top: 0.2rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  color: var(--jp-panel-text);
+  color: #f0edd8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  padding: 0 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .gallery-meta {
@@ -1734,6 +1768,32 @@ body {
 .player-start-panel {
   max-width: 34rem;
   margin-inline: auto;
+  margin-top: 2rem;
+}
+
+/* ── Research Center Title Treatment ─────────────────────── */
+
+.research-center-header {
+  text-align: center;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(240, 237, 216, 0.18);
+  margin-bottom: 0.5rem;
+}
+
+.research-center-title {
+  font-family: var(--font-jurassic-display), "Times New Roman", serif;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--jp-panel-text);
+  letter-spacing: 0.02em;
+}
+
+.research-center-subtitle {
+  margin-top: 0.55rem;
+  font-size: clamp(0.85rem, 1.6vw, 0.95rem);
+  line-height: 1.4;
+  color: rgba(240, 237, 216, 0.78);
 }
 
 .game-start-label {
@@ -1749,6 +1809,29 @@ body {
   font-size: 0.84rem;
   background: rgba(0, 0, 0, 0.2);
   color: var(--jp-panel-text);
+}
+
+/* Field-station terminal input: cream text on dark-green field */
+.game-start-input.terminal-input {
+  background: #0d3d15;
+  border: 2px solid #145a22;
+  color: #f0edd8;
+  font-family: var(--font-jurassic-mono), "IBM Plex Mono", "Courier New", monospace;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  padding: 0.62rem 0.8rem;
+}
+
+.game-start-input.terminal-input::placeholder {
+  color: rgba(240, 237, 216, 0.4);
+  font-style: italic;
+}
+
+.game-start-input.terminal-input:focus-visible {
+  outline: 2px solid rgba(211, 160, 58, 0.72);
+  outline-offset: 1px;
+  border-color: #1a7a2e;
+  box-shadow: 0 0 0.6rem rgba(211, 160, 58, 0.18);
 }
 
 .game-start-input:focus-visible {
@@ -1872,6 +1955,44 @@ body {
   color: var(--jp-toolbar-text);
   white-space: nowrap;
   user-select: none;
+}
+
+.toolbar-readouts {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.75rem;
+}
+
+.toolbar-readout {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.2rem;
+  background: linear-gradient(180deg, rgba(60, 60, 60, 0.6) 0%, rgba(30, 30, 30, 0.8) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.toolbar-readout-label {
+  font-family: var(--font-jurassic-body), "Trebuchet MS", sans-serif;
+  font-variant: small-caps;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--jp-toolbar-text);
+  opacity: 0.7;
+  user-select: none;
+}
+
+.toolbar-readout-value {
+  font-family: var(--font-jurassic-mono), "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--jp-amber-bright, #f4d48d);
+  letter-spacing: 0.04em;
+  min-width: 1.1em;
+  text-align: center;
 }
 
 .toolbar-icons {
