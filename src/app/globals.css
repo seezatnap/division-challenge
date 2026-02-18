@@ -188,7 +188,7 @@ body {
   z-index: 40;
   width: min(72rem, calc(100vw - 1.2rem));
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(0.45rem, 2vw, 1.1rem);
   border: 1px solid color-mix(in srgb, var(--jp-toolbar-text) 30%, #111);
@@ -216,6 +216,49 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.36rem;
+}
+
+.jp-surveillance-toolbar-readouts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.28rem;
+  min-width: clamp(11rem, 28vw, 14.8rem);
+}
+
+.jp-surveillance-readout {
+  display: grid;
+  gap: 0.05rem;
+  padding: 0.2rem 0.3rem 0.23rem;
+  border-radius: 0.24rem;
+  border: 1px solid color-mix(in srgb, var(--jp-toolbar-text) 26%, #050505);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-toolbar) 58%, #3f3f3f),
+      color-mix(in srgb, var(--jp-toolbar) 90%, #0a0a0a)
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+}
+
+.jp-surveillance-readout-label {
+  font-size: 0.45rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: color-mix(in srgb, var(--jp-toolbar-text) 74%, #9ba0a8);
+}
+
+.jp-surveillance-readout-value {
+  font-family: var(--font-jurassic-mono), "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--jp-toolbar-text) 94%, #f8f8f8);
+  text-shadow: 0 0 0.28rem rgba(248, 248, 248, 0.22);
 }
 
 .jp-surveillance-icon-button {
@@ -261,6 +304,7 @@ body {
 
 .jp-surveillance-toolbar-label {
   margin: 0;
+  justify-self: center;
   text-align: center;
   text-transform: uppercase;
   font-variant: small-caps;
@@ -1998,12 +2042,18 @@ body {
     grid-template-columns: 1fr auto;
     grid-template-areas:
       "label more"
-      "icons more";
+      "icons more"
+      "stats more";
     row-gap: 0.3rem;
   }
 
   .jp-surveillance-toolbar-icons {
     grid-area: icons;
+  }
+
+  .jp-surveillance-toolbar-readouts {
+    grid-area: stats;
+    min-width: 0;
   }
 
   .jp-surveillance-toolbar-label {
