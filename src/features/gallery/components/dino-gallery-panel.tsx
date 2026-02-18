@@ -149,7 +149,11 @@ export function DinoGalleryPanel({
 
   if (galleryRewards.length === 0) {
     return (
-      <div className="gallery-shell" data-gallery-state="empty">
+      <div
+        className="gallery-shell gallery-shell-research-center"
+        data-gallery-layout="research-center-grid"
+        data-gallery-state="empty"
+      >
         <p className="gallery-empty-title">{EMPTY_STATE_TITLE}</p>
         <p className="gallery-empty-copy">{EMPTY_STATE_COPY}</p>
       </div>
@@ -157,7 +161,11 @@ export function DinoGalleryPanel({
   }
 
   return (
-    <div className="gallery-shell" data-gallery-state="unlocked">
+    <div
+      className="gallery-shell gallery-shell-research-center"
+      data-gallery-layout="research-center-grid"
+      data-gallery-state="unlocked"
+    >
       {refreshStatus ? (
         <p className="gallery-refresh-status" role="status">
           {refreshStatus}

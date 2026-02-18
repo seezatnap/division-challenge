@@ -36,6 +36,8 @@ test("gallery panel includes reward image, earned date output, empty-state copy,
   for (const fragment of [
     "No dinos unlocked yet.",
     "Solve your first 5 division problems",
+    "gallery-shell-research-center",
+    'data-gallery-layout="research-center-grid"',
     "<Image",
     "<time dateTime={reward.earnedAt}>",
     'aria-haspopup="dialog"',
