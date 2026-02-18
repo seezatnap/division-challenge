@@ -83,8 +83,16 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
 
   for (const fragment of [
     "--jp-jungle:",
+    "--jp-panel-bg:",
+    "--jp-panel-text:",
+    "--jp-panel-border:",
+    "--jp-frame:",
+    "--jp-frame-grain:",
+    "--jp-toolbar:",
+    "--jp-toolbar-text:",
+    "--jp-accent-red:",
     "--jp-amber:",
-    "--jp-surface:",
+    "--jp-glow:",
     ".motif-claw::after",
     ".motif-fossil::after",
     ".motif-track::after",
@@ -119,4 +127,7 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
   ]) {
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
   }
+
+  assert.equal(source.includes("--jp-sand:"), false, "Legacy sand token should be removed");
+  assert.equal(source.includes("--jp-ivory:"), false, "Legacy ivory token should be removed");
 });

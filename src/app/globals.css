@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --jp-sand: #e7d9b8;
-  --jp-ivory: #f7efd8;
+  --jp-panel-bg: #1a7a2e;
+  --jp-panel-text: #f0edd8;
+  --jp-panel-border: #145a22;
+  --jp-frame: #6b4c2a;
+  --jp-frame-grain:
+    repeating-linear-gradient(
+      142deg,
+      rgba(255, 255, 255, 0.08) 0 2px,
+      rgba(0, 0, 0, 0.12) 2px 4px,
+      rgba(255, 255, 255, 0.04) 4px 7px
+    );
+  --jp-toolbar: #2a2a2a;
+  --jp-toolbar-text: #c0c0c0;
+  --jp-accent-red: #cc3333;
   --jp-clay: #a97f45;
   --jp-amber: #d3a03a;
   --jp-amber-bright: #f4d48d;
@@ -11,11 +23,10 @@
   --jp-moss: #718951;
   --jp-bark: #2d2419;
   --jp-ink: #1b1711;
-  --jp-surface: rgba(244, 236, 214, 0.88);
-  --jp-panel-border: rgba(47, 36, 24, 0.32);
+  --jp-surface: var(--jp-panel-bg);
   --jp-glow: rgba(211, 160, 58, 0.62);
-  --background: radial-gradient(circle at 18% 10%, #fbf1db 0%, #e7d9b8 36%, #c5b08a 100%);
-  --foreground: var(--jp-ink);
+  --background: radial-gradient(circle at 18% 10%, #2f5d32 0%, #1c3f28 40%, #101b14 100%);
+  --foreground: var(--jp-panel-text);
 }
 
 @theme inline {
