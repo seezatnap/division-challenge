@@ -1734,6 +1734,32 @@ body {
 .player-start-panel {
   max-width: 34rem;
   margin-inline: auto;
+  margin-top: 2rem;
+}
+
+/* ── Research Center Title Treatment ─────────────────────── */
+
+.research-center-header {
+  text-align: center;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(240, 237, 216, 0.18);
+  margin-bottom: 0.5rem;
+}
+
+.research-center-title {
+  font-family: var(--font-jurassic-display), "Times New Roman", serif;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--jp-panel-text);
+  letter-spacing: 0.02em;
+}
+
+.research-center-subtitle {
+  margin-top: 0.55rem;
+  font-size: clamp(0.85rem, 1.6vw, 0.95rem);
+  line-height: 1.4;
+  color: rgba(240, 237, 216, 0.78);
 }
 
 .game-start-label {
@@ -1749,6 +1775,29 @@ body {
   font-size: 0.84rem;
   background: rgba(0, 0, 0, 0.2);
   color: var(--jp-panel-text);
+}
+
+/* Field-station terminal input: cream text on dark-green field */
+.game-start-input.terminal-input {
+  background: #0d3d15;
+  border: 2px solid #145a22;
+  color: #f0edd8;
+  font-family: var(--font-jurassic-mono), "IBM Plex Mono", "Courier New", monospace;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  padding: 0.62rem 0.8rem;
+}
+
+.game-start-input.terminal-input::placeholder {
+  color: rgba(240, 237, 216, 0.4);
+  font-style: italic;
+}
+
+.game-start-input.terminal-input:focus-visible {
+  outline: 2px solid rgba(211, 160, 58, 0.72);
+  outline-offset: 1px;
+  border-color: #1a7a2e;
+  box-shadow: 0 0 0.6rem rgba(211, 160, 58, 0.18);
 }
 
 .game-start-input:focus-visible {
