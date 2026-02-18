@@ -101,6 +101,11 @@ async function fileExists(filePath) {
   }
 }
 
+function resolveNextDevExecutablePath() {
+  const nextExecutableName = process.platform === "win32" ? "next.cmd" : "next";
+  return path.join(repoRoot, "node_modules", ".bin", nextExecutableName);
+}
+
 async function resolveHeadlessShellExecutablePath() {
   const browsersDirectory = path.join(repoRoot, ".playwright-browsers");
   const browserDirectories = await readdir(browsersDirectory, { withFileTypes: true });
@@ -280,7 +285,7 @@ test.before(async () => {
     setWorkspaceBaseUrl(preexistingServerBaseUrl);
   } else {
     setWorkspaceBaseUrl(TEST_WORKSPACE_BASE_URL);
-    const nextDevExecutable = path.join(repoRoot, "node_modules", ".bin", "next");
+    const nextDevExecutable = resolveNextDevExecutablePath();
     serverProcess = spawn(nextDevExecutable, ["dev", "--port", "4173", "--hostname", "127.0.0.1"], {
       cwd: repoRoot,
       env: {
