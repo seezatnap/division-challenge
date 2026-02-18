@@ -68,6 +68,7 @@ interface LiveGameSessionState {
   steps: readonly LongDivisionStep[];
   sessionSolvedProblems: number;
   sessionAttemptedProblems: number;
+  currentStreak: number;
   totalProblemsSolved: number;
   totalProblemsAttempted: number;
   amberBalance: number;
@@ -532,6 +533,7 @@ const initialLiveGameSessionState: LiveGameSessionState = {
   steps: workspacePreviewSolution.steps,
   sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
   sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
+  currentStreak: 0,
   totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
   totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
   amberBalance: 0,
@@ -552,6 +554,7 @@ function createFreshLiveGameSessionState(): LiveGameSessionState {
     steps: workspacePreviewSolution.steps,
     sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
     sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
+    currentStreak: 0,
     totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
     totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
     amberBalance: 0,
@@ -632,6 +635,10 @@ function hydrateLiveGameSessionState(
 ): LiveGameSessionState {
   return {
     ...persistedState,
+    currentStreak:
+      typeof persistedState.currentStreak === "number"
+        ? toNonNegativeInteger(persistedState.currentStreak)
+        : 0,
     amberBalance:
       typeof persistedState.amberBalance === "number"
         ? toNonNegativeInteger(persistedState.amberBalance)
@@ -670,6 +677,7 @@ export default function Home() {
     useState<RewardDinosaurDossier | null>(null);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
+  const hadErrorInCurrentProblemRef = useRef(false);
   const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -678,6 +686,7 @@ export default function Home() {
 
   useEffect(() => {
     completedProblemIdRef.current = null;
+    hadErrorInCurrentProblemRef.current = false;
     setIsNextProblemReady(false);
   }, [gameSession.activeProblem.id]);
 
@@ -845,6 +854,7 @@ export default function Home() {
         }
 
         completedProblemIdRef.current = null;
+        hadErrorInCurrentProblemRef.current = false;
         setIsNextProblemReady(false);
         setActivePlayerName(normalizedPlayerName);
         setPlayerNameDraft(normalizedPlayerName);
@@ -1213,12 +1223,16 @@ export default function Home() {
     const nextTotalProblemsSolved = currentState.totalProblemsSolved + 1;
     const { problem: nextProblem, steps: nextSteps } =
       resolveNextLiveProblem(nextTotalProblemsSolved);
+    const solvedWithoutErrors = !hadErrorInCurrentProblemRef.current;
 
     setGameSession({
       activeProblem: nextProblem,
       steps: nextSteps,
       sessionSolvedProblems: currentState.sessionSolvedProblems + 1,
       sessionAttemptedProblems: currentState.sessionAttemptedProblems + 1,
+      currentStreak: solvedWithoutErrors
+        ? currentState.currentStreak + 1
+        : 0,
       totalProblemsSolved: nextTotalProblemsSolved,
       totalProblemsAttempted: currentState.totalProblemsAttempted + 1,
       amberBalance:
@@ -1329,6 +1343,10 @@ export default function Home() {
 
   const handleWorkspaceStepValidation = useCallback(
     (validation: LongDivisionStepValidationResult) => {
+      if (validation.outcome === "incorrect") {
+        hadErrorInCurrentProblemRef.current = true;
+      }
+
       if (!validation.didAdvance || validation.outcome !== "complete") {
         return;
       }
@@ -1814,7 +1832,7 @@ export default function Home() {
       <IslaSornaToolbar
         stats={{
           problemsSolved: gameSession.sessionSolvedProblems,
-          currentStreak: gameSession.sessionSolvedProblems,
+          currentStreak: gameSession.currentStreak,
           difficultyLevel: gameSession.activeProblem.difficultyLevel,
         }}
       />
