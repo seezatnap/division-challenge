@@ -101,6 +101,14 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-amber:",
     "--jp-glow:",
     "--jp-surface:",
+    "--jp-panel-bg: #1a7a2e;",
+    "--jp-panel-text: #f0edd8;",
+    "--jp-panel-border: #145a22;",
+    "--jp-frame: #6b4c2a;",
+    "--jp-toolbar: #2a2a2a;",
+    "--jp-toolbar-text: #c0c0c0;",
+    "--jp-accent-red: #cc3333;",
+    "--jp-surface: var(--jp-panel-bg);",
     "body::before {",
     "body::after {",
     "var(--jp-frame-thickness)",
@@ -154,6 +162,9 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".hybrid-lab-actions",
     ".gallery-shell-research-center {",
     ".gallery-shell-research-center .gallery-grid {",
+    ".gallery-shell-research-center .gallery-card {",
+    ".gallery-shell-research-center .gallery-card-trigger {",
+    ".gallery-shell-research-center .gallery-card-trigger:focus-visible {",
     "grid-template-columns: repeat(3, minmax(0, 1fr));",
     ".gallery-shell-research-center .gallery-thumb {",
     "aspect-ratio: 1 / 0.86;",
@@ -174,6 +185,12 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
   ]) {
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
   }
+
+  assert.equal(
+    source.includes("--jp-panel-bg: rgba(244,236,214,0.88);"),
+    false,
+    "Expected legacy ivory panel token value to be removed from JP3 restyling",
+  );
 });
 
 test("global stylesheet uses a full-viewport jungle canopy body background image", async () => {
@@ -316,6 +333,7 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
 
   for (const fragment of [
     'data-ui-surface="surveillance-toolbar"',
+    'className="surveillance-toolbar-icons"',
     "ISLA SORNA SURVEILLANCE DEVICE",
     "MORE",
     'iconKind: "footprint"',
@@ -334,8 +352,11 @@ test("surveillance toolbar renders JP3 footer affordances with icon controls and
     ".surveillance-toolbar-shell",
     ".surveillance-toolbar {",
     ".surveillance-toolbar-controls",
+    ".surveillance-toolbar-icons",
     ".surveillance-toolbar-label",
     ".surveillance-toolbar-icon-button",
+    ".surveillance-toolbar-icon-svg",
+    ".surveillance-toolbar-icon-text",
     ".surveillance-toolbar-readouts",
     ".surveillance-toolbar-readout",
     ".surveillance-toolbar-readout-label",
