@@ -1499,6 +1499,149 @@ body::after {
   color: color-mix(in srgb, var(--jp-jungle) 72%, var(--jp-bark));
 }
 
+.gallery-detail-modal-research-center {
+  width: min(52rem, 96vw);
+  border-color: color-mix(in srgb, var(--jp-panel-border) 72%, black);
+  background:
+    linear-gradient(
+      176deg,
+      color-mix(in srgb, var(--jp-panel-bg) 84%, #31a544) 0%,
+      color-mix(in srgb, var(--jp-panel-border) 92%, #051309) 100%
+    ),
+    repeating-linear-gradient(
+      180deg,
+      rgba(240, 237, 216, 0.05) 0 1.9rem,
+      rgba(240, 237, 216, 0) 1.9rem 3.8rem
+    );
+  color: color-mix(in srgb, var(--jp-panel-text) 95%, white);
+  box-shadow:
+    0 1rem 2.3rem rgba(4, 15, 7, 0.68),
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 86%, black),
+    inset 0 0.1rem 0 color-mix(in srgb, var(--jp-panel-text) 22%, transparent);
+}
+
+.gallery-detail-modal-research-center .surface-kicker {
+  margin: 0;
+  color: color-mix(in srgb, var(--jp-panel-text) 74%, #d8e6c5);
+}
+
+.dino-dossier-research-center {
+  border-color: color-mix(in srgb, var(--jp-panel-border) 80%, black);
+  border-radius: 0.82rem;
+  background:
+    linear-gradient(170deg, rgba(18, 80, 29, 0.6), rgba(7, 33, 13, 0.58)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+  padding: 0.64rem;
+  gap: 0.68rem;
+}
+
+.gallery-detail-top {
+  display: grid;
+  gap: 0.62rem;
+  align-items: start;
+}
+
+.gallery-detail-figure {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 76%, black);
+  border-radius: 0.55rem;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-panel-bg) 66%, #4bc745),
+      color-mix(in srgb, var(--jp-panel-border) 86%, #05210d)
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(240, 237, 216, 0.12),
+    inset 0 -0.2rem 0.35rem rgba(4, 18, 7, 0.3);
+  padding: 0.35rem;
+}
+
+.gallery-detail-sheet {
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 84%, black);
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(164deg, rgba(11, 62, 22, 0.7), rgba(4, 27, 11, 0.74)),
+    radial-gradient(circle at 78% 18%, rgba(240, 237, 216, 0.16), transparent 55%);
+  padding: 0.44rem 0.5rem;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.gallery-detail-sheet-title {
+  margin: 0;
+  color: color-mix(in srgb, var(--jp-panel-text) 97%, white);
+  font-size: clamp(1.02rem, 2.1vw, 1.24rem);
+}
+
+.gallery-detail-sheet-scientific {
+  margin: 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  color: color-mix(in srgb, var(--jp-panel-text) 86%, #dbe7c5);
+}
+
+.gallery-detail-sheet-grid {
+  margin: 0;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.gallery-detail-sheet-row {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.28rem;
+  align-items: baseline;
+}
+
+.gallery-detail-sheet-label {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--jp-panel-text) 97%, white);
+}
+
+.gallery-detail-sheet-value {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--jp-panel-text) 89%, #dce9c6);
+}
+
+.gallery-detail-description {
+  margin: 0;
+  padding: 0.5rem 0.54rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 80%, black);
+  border-radius: 0.42rem;
+  background:
+    linear-gradient(178deg, rgba(9, 55, 19, 0.66), rgba(4, 28, 11, 0.7)),
+    repeating-linear-gradient(
+      180deg,
+      rgba(240, 237, 216, 0.045) 0 1.45rem,
+      rgba(240, 237, 216, 0) 1.45rem 2.9rem
+    );
+  font-size: 0.79rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--jp-panel-text) 90%, #dce7c8);
+}
+
+.gallery-detail-image-research-center {
+  width: 100%;
+  max-height: none;
+  height: auto;
+  aspect-ratio: 5 / 4;
+  object-fit: contain;
+  border: 0;
+  border-radius: 0.42rem;
+  display: block;
+}
+
+.gallery-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .dino-dossier {
   border: 1px solid rgba(70, 96, 56, 0.3);
   border-radius: 0.78rem;
@@ -1544,6 +1687,12 @@ body::after {
   object-fit: cover;
   border-radius: 0.78rem;
   border: 1px solid rgba(45, 36, 25, 0.25);
+}
+
+@media (min-width: 42rem) {
+  .gallery-detail-top {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
 }
 
 .reward-reveal-modal {
