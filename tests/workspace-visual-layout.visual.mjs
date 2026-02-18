@@ -396,6 +396,51 @@ test("visual workflow: multi-digit rows expose one digit cell at a time with aut
   }
 });
 
+test("visual workflow: wrong digit triggers red error feedback and a 2-second retry lock", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const firstStep = {
+      stepId: "workspace-preview-problem:step:0:quotient-digit",
+      digitIndex: 0,
+    };
+
+    await expectActiveEditableCell(page, firstStep);
+    await typeDigitIntoActiveCell(page, "9");
+    await page.waitForSelector(
+      `[data-entry-step-id="${firstStep.stepId}"][data-entry-digit-index="${firstStep.digitIndex}"][data-entry-error="pulse"]`,
+      { timeout: 1_200 },
+    );
+    assert.equal(
+      await page.locator(activeEditableSelector).count(),
+      0,
+      "Expected no editable digit cell while retry lock is active after a wrong digit.",
+    );
+
+    await page.waitForSelector(
+      `[data-entry-step-id="${firstStep.stepId}"][data-entry-digit-index="${firstStep.digitIndex}"][data-entry-error="locked"]`,
+      { timeout: 1_400 },
+    );
+    await page.waitForTimeout(700);
+    assert.equal(
+      await page.locator(activeEditableSelector).count(),
+      0,
+      "Expected retry lock to remain active shortly after the wrong-digit feedback pulse.",
+    );
+
+    await expectActiveEditableCell(page, firstStep);
+    await expectFocusedEditableCell(page, firstStep);
+    await typeDigitIntoActiveCell(page, "3");
+    await wait(170);
+    await expectActiveEditableCell(page, {
+      stepId: "workspace-preview-problem:step:1:multiply-result",
+      digitIndex: 0,
+    });
+  } finally {
+    await context.close();
+  }
+});
+
 test("visual layout mandate: solved solution digits align to dividend digit columns", { concurrency: false }, async () => {
   const { context, page } = await createWorkspacePage();
 

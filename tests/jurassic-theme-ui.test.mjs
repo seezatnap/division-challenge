@@ -17,6 +17,7 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
   for (const surface of [
     'data-ui-surface="game"',
     'data-ui-surface="gallery"',
+    'data-ui-surface="hybrid-gallery"',
     'data-ui-surface="player-start"',
   ]) {
     assert.ok(source.includes(surface), `Expected ${surface} to be defined`);
@@ -45,6 +46,18 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
   assert.ok(
     source.includes("Profiles are auto-saved in this browser by lowercase player name."),
     "Expected player-start copy to describe lowercase localStorage profile behavior",
+  );
+  assert.ok(
+    source.includes('data-ui-action="trade-amber-for-dino"'),
+    "Expected amber trade action wiring in the gallery surface",
+  );
+  assert.ok(
+    source.includes('data-ui-action="open-hybrid-lab"'),
+    "Expected hybrid lab action wiring in the gallery surface",
+  );
+  assert.ok(
+    source.includes('data-ui-surface="hybrid-lab-modal"'),
+    "Expected hybrid lab modal surface to be rendered from the home page",
   );
 });
 
@@ -90,6 +103,11 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".hint-stack[data-feedback-tone=\"retry\"]",
     ".hint-stack[data-feedback-tone=\"celebration\"]",
     ".hint-status",
+    ".amber-bank",
+    ".amber-actions",
+    ".hybrid-lab-modal",
+    ".hybrid-lab-select",
+    ".hybrid-lab-actions",
     ".coach-item[data-feedback-tone=\"retry\"]",
     "@keyframes amber-pulse",
     "@keyframes amber-pulse-bring-down",

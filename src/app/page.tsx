@@ -1,6 +1,15 @@
- "use client";
+"use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import Image from "next/image";
+import { createPortal } from "react-dom";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 import {
   generateDivisionProblem,
@@ -13,6 +22,7 @@ import {
   type ActiveInputLane,
   type DivisionProblem,
   type LongDivisionStep,
+  type UnlockedHybridReward,
   type UnlockedReward,
 } from "@/features/contracts";
 import { EarnedRewardRevealPanel } from "@/features/rewards/components/earned-reward-reveal-panel";
@@ -24,8 +34,8 @@ import {
   REWARD_UNLOCK_INTERVAL,
   getDinosaurForRewardNumber,
   getMilestoneSolvedCountForRewardNumber,
-  getRewardNumberForSolvedCount,
 } from "@/features/rewards/lib/dinosaurs";
+import { NANO_BANANA_PRO_IMAGE_MODEL } from "@/features/rewards/lib/gemini";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
 import {
   normalizePlayerProfileName,
@@ -52,7 +62,10 @@ interface LiveGameSessionState {
   sessionAttemptedProblems: number;
   totalProblemsSolved: number;
   totalProblemsAttempted: number;
+  amberBalance: number;
+  amberImagePath: string | null;
   unlockedRewards: readonly UnlockedReward[];
+  unlockedHybrids: readonly UnlockedHybridReward[];
 }
 
 interface ActiveRewardRevealState {
@@ -71,7 +84,10 @@ const INITIAL_TOTAL_PROBLEMS_SOLVED = 0;
 const INITIAL_TOTAL_PROBLEMS_ATTEMPTED = 0;
 const INITIAL_SESSION_PROBLEMS_SOLVED = 0;
 const INITIAL_SESSION_PROBLEMS_ATTEMPTED = 0;
-const NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS = [3, 4] as const;
+const AMBER_EARNED_PER_SOLVED_PROBLEM = 1;
+const AMBER_COST_PER_DINO_UNLOCK = 5;
+const AMBER_COST_PER_HYBRID_CREATION = 2;
+const AMBER_REWARD_ASSET_NAME = "Amber Resonance Crystal";
 const LIVE_PROBLEM_MIN_DIVISOR = 3;
 const LIVE_PROBLEM_MAX_DIVISOR = 12;
 const LIVE_PROBLEM_DIVIDEND_DIGITS = 4;
@@ -116,6 +132,161 @@ function toRewardImagePathFromMimeType(
   return `/rewards/${toRewardImageSlug(dinosaurName)}.${toRewardImageExtensionFromMimeType(mimeType)}`;
 }
 
+function toNonNegativeInteger(value: unknown): number {
+  if (!Number.isFinite(value) || !Number.isInteger(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Number(value));
+}
+
+function toTrimmedValue(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmedValue = value.trim();
+  return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
+function normalizeHybridPair(input: {
+  firstDinosaurName: string;
+  secondDinosaurName: string;
+}): { firstDinosaurName: string; secondDinosaurName: string } {
+  const normalizedPair = [
+    input.firstDinosaurName.trim(),
+    input.secondDinosaurName.trim(),
+  ].sort((leftName, rightName) => leftName.localeCompare(rightName, "en", { sensitivity: "base" }));
+
+  return {
+    firstDinosaurName: normalizedPair[0],
+    secondDinosaurName: normalizedPair[1],
+  };
+}
+
+function createHybridPairKey(input: {
+  firstDinosaurName: string;
+  secondDinosaurName: string;
+}): string {
+  const normalizedPair = normalizeHybridPair(input);
+  return `${normalizedPair.firstDinosaurName.toLowerCase()}::${normalizedPair.secondDinosaurName.toLowerCase()}`;
+}
+
+function createHybridGenerationAssetName(input: {
+  firstDinosaurName: string;
+  secondDinosaurName: string;
+}): string {
+  const normalizedPair = normalizeHybridPair(input);
+  return `Hybrid ${normalizedPair.firstDinosaurName} + ${normalizedPair.secondDinosaurName}`;
+}
+
+function createHybridDisplayName(input: {
+  firstDinosaurName: string;
+  secondDinosaurName: string;
+}): string {
+  const normalizedPair = normalizeHybridPair(input);
+  return `${normalizedPair.firstDinosaurName} × ${normalizedPair.secondDinosaurName}`;
+}
+
+function createHybridId(pairKey: string): string {
+  const sanitizedPairKey = pairKey.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return `hybrid-${sanitizedPairKey || "entry"}`;
+}
+
+function isUnlockedHybridReward(value: unknown): value is UnlockedHybridReward {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<UnlockedHybridReward>;
+  return (
+    typeof candidate.hybridId === "string" &&
+    typeof candidate.hybridName === "string" &&
+    typeof candidate.pairKey === "string" &&
+    typeof candidate.firstDinosaurName === "string" &&
+    typeof candidate.secondDinosaurName === "string" &&
+    typeof candidate.generationAssetName === "string" &&
+    typeof candidate.imagePath === "string" &&
+    typeof candidate.createdAt === "string"
+  );
+}
+
+function resolveUnlockedPrimaryDinosaurNames(unlockedRewards: readonly UnlockedReward[]): string[] {
+  const uniqueNames = new Set<string>();
+  for (const unlockedReward of unlockedRewards) {
+    const normalizedName = unlockedReward.dinosaurName.trim();
+    if (normalizedName.length === 0) {
+      continue;
+    }
+
+    uniqueNames.add(normalizedName);
+  }
+
+  return Array.from(uniqueNames).sort((leftName, rightName) =>
+    leftName.localeCompare(rightName, "en", { sensitivity: "base" }),
+  );
+}
+
+function resolveAvailableHybridSecondDinosaurNames(input: {
+  firstDinosaurName: string;
+  unlockedPrimaryDinosaurNames: readonly string[];
+  unlockedHybrids: readonly UnlockedHybridReward[];
+}): string[] {
+  const normalizedFirstDinosaurName = input.firstDinosaurName.trim();
+  if (normalizedFirstDinosaurName.length === 0) {
+    return [];
+  }
+
+  const unlockedHybridPairKeys = new Set(
+    input.unlockedHybrids.map((hybridReward) => hybridReward.pairKey.toLowerCase()),
+  );
+
+  return input.unlockedPrimaryDinosaurNames.filter((candidateDinosaurName) => {
+    if (candidateDinosaurName === normalizedFirstDinosaurName) {
+      return false;
+    }
+
+    return !unlockedHybridPairKeys.has(
+      createHybridPairKey({
+        firstDinosaurName: normalizedFirstDinosaurName,
+        secondDinosaurName: candidateDinosaurName,
+      }),
+    );
+  });
+}
+
+function hasAnyAvailableHybridPairs(
+  unlockedPrimaryDinosaurNames: readonly string[],
+  unlockedHybrids: readonly UnlockedHybridReward[],
+): boolean {
+  if (unlockedPrimaryDinosaurNames.length < 2) {
+    return false;
+  }
+
+  const unlockedHybridPairKeys = new Set(
+    unlockedHybrids.map((hybridReward) => hybridReward.pairKey.toLowerCase()),
+  );
+
+  for (let leftIndex = 0; leftIndex < unlockedPrimaryDinosaurNames.length; leftIndex += 1) {
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < unlockedPrimaryDinosaurNames.length;
+      rightIndex += 1
+    ) {
+      const pairKey = createHybridPairKey({
+        firstDinosaurName: unlockedPrimaryDinosaurNames[leftIndex],
+        secondDinosaurName: unlockedPrimaryDinosaurNames[rightIndex],
+      });
+
+      if (!unlockedHybridPairKeys.has(pairKey)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function isPersistedPlayerProfileSnapshot(
   value: unknown,
 ): value is PersistedPlayerProfileSnapshot {
@@ -155,6 +326,32 @@ function isPersistedPlayerProfileSnapshot(
   if (!Array.isArray(snapshot.gameSession.unlockedRewards)) {
     return false;
   }
+  if (
+    "amberBalance" in snapshot.gameSession &&
+    typeof snapshot.gameSession.amberBalance !== "number"
+  ) {
+    return false;
+  }
+  if (
+    "amberImagePath" in snapshot.gameSession &&
+    snapshot.gameSession.amberImagePath !== null &&
+    typeof snapshot.gameSession.amberImagePath !== "string"
+  ) {
+    return false;
+  }
+  if (
+    "unlockedHybrids" in snapshot.gameSession &&
+    !Array.isArray(snapshot.gameSession.unlockedHybrids)
+  ) {
+    return false;
+  }
+  if (Array.isArray(snapshot.gameSession.unlockedHybrids)) {
+    for (const unlockedHybrid of snapshot.gameSession.unlockedHybrids) {
+      if (!isUnlockedHybridReward(unlockedHybrid)) {
+        return false;
+      }
+    }
+  }
   if (!snapshot.activeRewardReveal || typeof snapshot.activeRewardReveal !== "object") {
     return false;
   }
@@ -181,16 +378,12 @@ function isPersistedPlayerProfileSnapshot(
   return true;
 }
 
-function resolveNextRewardNumber(totalProblemsSolved: number): number {
-  return getRewardNumberForSolvedCount(totalProblemsSolved, REWARD_UNLOCK_INTERVAL) + 1;
-}
-
-function resolveNextRewardTarget(totalProblemsSolved: number): {
+function resolveNextRewardTarget(unlockedRewardsCount: number): {
   rewardNumber: number;
   dinosaurName: string;
   milestoneSolvedCount: number;
 } {
-  const rewardNumber = resolveNextRewardNumber(totalProblemsSolved);
+  const rewardNumber = Math.max(0, unlockedRewardsCount) + 1;
   const dinosaurName = getDinosaurForRewardNumber(rewardNumber);
 
   return {
@@ -201,22 +394,6 @@ function resolveNextRewardTarget(totalProblemsSolved: number): {
       REWARD_UNLOCK_INTERVAL,
     ),
   };
-}
-
-function resolveProblemNumberWithinRewardInterval(totalProblemsSolved: number): number {
-  return (totalProblemsSolved % REWARD_UNLOCK_INTERVAL) + 1;
-}
-
-function shouldTriggerNearMilestonePrefetch(totalProblemsSolved: number): boolean {
-  const problemNumberWithinRewardInterval =
-    resolveProblemNumberWithinRewardInterval(totalProblemsSolved);
-
-  return (
-    problemNumberWithinRewardInterval ===
-      NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS[0] ||
-    problemNumberWithinRewardInterval ===
-      NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS[1]
-  );
 }
 
 function createUnlockedReward(
@@ -234,6 +411,39 @@ function createUnlockedReward(
       rewardNumber,
       REWARD_UNLOCK_INTERVAL,
     ),
+  };
+}
+
+function createUnlockedHybridReward(input: {
+  firstDinosaurName: string;
+  secondDinosaurName: string;
+  createdAt: string;
+}): UnlockedHybridReward {
+  const normalizedPair = normalizeHybridPair({
+    firstDinosaurName: input.firstDinosaurName,
+    secondDinosaurName: input.secondDinosaurName,
+  });
+  const pairKey = createHybridPairKey({
+    firstDinosaurName: normalizedPair.firstDinosaurName,
+    secondDinosaurName: normalizedPair.secondDinosaurName,
+  });
+  const generationAssetName = createHybridGenerationAssetName({
+    firstDinosaurName: normalizedPair.firstDinosaurName,
+    secondDinosaurName: normalizedPair.secondDinosaurName,
+  });
+
+  return {
+    hybridId: createHybridId(pairKey),
+    hybridName: createHybridDisplayName({
+      firstDinosaurName: normalizedPair.firstDinosaurName,
+      secondDinosaurName: normalizedPair.secondDinosaurName,
+    }),
+    pairKey,
+    firstDinosaurName: normalizedPair.firstDinosaurName,
+    secondDinosaurName: normalizedPair.secondDinosaurName,
+    generationAssetName,
+    imagePath: PROVISIONAL_REWARD_IMAGE_PATH,
+    createdAt: input.createdAt,
   };
 }
 
@@ -316,11 +526,14 @@ const initialLiveGameSessionState: LiveGameSessionState = {
   sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
   totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
   totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
+  amberBalance: 0,
+  amberImagePath: null,
   unlockedRewards: [],
+  unlockedHybrids: [],
 };
 
 const initialActiveRewardRevealState: ActiveRewardRevealState = {
-  ...resolveNextRewardTarget(INITIAL_TOTAL_PROBLEMS_SOLVED),
+  ...resolveNextRewardTarget(0),
   initialStatus: "missing",
   initialImagePath: null,
 };
@@ -333,7 +546,95 @@ function createFreshLiveGameSessionState(): LiveGameSessionState {
     sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
     totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
     totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
+    amberBalance: 0,
+    amberImagePath: null,
     unlockedRewards: [],
+    unlockedHybrids: [],
+  };
+}
+
+function normalizeUnlockedHybridRewardsForSession(
+  unlockedHybrids: unknown,
+): UnlockedHybridReward[] {
+  if (!Array.isArray(unlockedHybrids)) {
+    return [];
+  }
+
+  const unlockedHybridByPairKey = new Map<string, UnlockedHybridReward>();
+  for (const unlockedHybrid of unlockedHybrids) {
+    if (!isUnlockedHybridReward(unlockedHybrid)) {
+      continue;
+    }
+
+    const firstDinosaurName = toTrimmedValue(unlockedHybrid.firstDinosaurName);
+    const secondDinosaurName = toTrimmedValue(unlockedHybrid.secondDinosaurName);
+    const createdAt = toTrimmedValue(unlockedHybrid.createdAt);
+    const imagePath = toTrimmedValue(unlockedHybrid.imagePath);
+    const generationAssetName = toTrimmedValue(unlockedHybrid.generationAssetName);
+    if (
+      !firstDinosaurName ||
+      !secondDinosaurName ||
+      !createdAt ||
+      !imagePath ||
+      !generationAssetName
+    ) {
+      continue;
+    }
+
+    const pairKey = createHybridPairKey({
+      firstDinosaurName,
+      secondDinosaurName,
+    });
+    const normalizedPair = normalizeHybridPair({
+      firstDinosaurName,
+      secondDinosaurName,
+    });
+
+    unlockedHybridByPairKey.set(pairKey, {
+      hybridId: toTrimmedValue(unlockedHybrid.hybridId) ?? createHybridId(pairKey),
+      hybridName:
+        toTrimmedValue(unlockedHybrid.hybridName) ??
+        createHybridDisplayName({
+          firstDinosaurName: normalizedPair.firstDinosaurName,
+          secondDinosaurName: normalizedPair.secondDinosaurName,
+        }),
+      pairKey,
+      firstDinosaurName: normalizedPair.firstDinosaurName,
+      secondDinosaurName: normalizedPair.secondDinosaurName,
+      generationAssetName,
+      imagePath,
+      createdAt,
+    });
+  }
+
+  return Array.from(unlockedHybridByPairKey.values()).sort((leftHybrid, rightHybrid) => {
+    const createdAtDelta = Date.parse(rightHybrid.createdAt) - Date.parse(leftHybrid.createdAt);
+    if (!Number.isNaN(createdAtDelta) && createdAtDelta !== 0) {
+      return createdAtDelta;
+    }
+
+    return leftHybrid.hybridName.localeCompare(rightHybrid.hybridName, "en", {
+      sensitivity: "base",
+    });
+  });
+}
+
+function hydrateLiveGameSessionState(
+  persistedState: LiveGameSessionState,
+): LiveGameSessionState {
+  return {
+    ...persistedState,
+    amberBalance:
+      typeof persistedState.amberBalance === "number"
+        ? toNonNegativeInteger(persistedState.amberBalance)
+        : toNonNegativeInteger(persistedState.totalProblemsSolved),
+    amberImagePath:
+      persistedState.amberImagePath === null
+        ? null
+        : toTrimmedValue(persistedState.amberImagePath),
+    unlockedHybrids: normalizeUnlockedHybridRewardsForSession(
+      (persistedState as Partial<LiveGameSessionState>).unlockedHybrids,
+    ),
   };
 }
 
@@ -351,6 +652,12 @@ export default function Home() {
   const [rewardGenerationNotice, setRewardGenerationNotice] =
     useState<string | null>(null);
   const [isNextProblemReady, setIsNextProblemReady] = useState(false);
+  const [isHybridLabOpen, setIsHybridLabOpen] = useState(false);
+  const [hybridLabFirstDinosaurName, setHybridLabFirstDinosaurName] = useState("");
+  const [hybridLabSecondDinosaurName, setHybridLabSecondDinosaurName] = useState("");
+  const [hybridLabError, setHybridLabError] = useState<string | null>(null);
+  const [selectedHybridReward, setSelectedHybridReward] =
+    useState<UnlockedHybridReward | null>(null);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
   const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -378,6 +685,75 @@ export default function Home() {
     };
   }, [isNextProblemReady, isSessionStarted]);
 
+  const unlockedPrimaryDinosaurNames = useMemo(
+    () => resolveUnlockedPrimaryDinosaurNames(gameSession.unlockedRewards),
+    [gameSession.unlockedRewards],
+  );
+  const hybridLabSecondDinosaurOptions = useMemo(
+    () =>
+      resolveAvailableHybridSecondDinosaurNames({
+        firstDinosaurName: hybridLabFirstDinosaurName,
+        unlockedPrimaryDinosaurNames,
+        unlockedHybrids: gameSession.unlockedHybrids,
+      }),
+    [
+      gameSession.unlockedHybrids,
+      hybridLabFirstDinosaurName,
+      unlockedPrimaryDinosaurNames,
+    ],
+  );
+  const hasAvailableHybridPairs = useMemo(
+    () =>
+      hasAnyAvailableHybridPairs(
+        unlockedPrimaryDinosaurNames,
+        gameSession.unlockedHybrids,
+      ),
+    [gameSession.unlockedHybrids, unlockedPrimaryDinosaurNames],
+  );
+  const canUnlockNextDinosaurWithAmber =
+    gameSession.amberBalance >= AMBER_COST_PER_DINO_UNLOCK;
+  const hasEnoughAmberForHybrid = gameSession.amberBalance >= AMBER_COST_PER_HYBRID_CREATION;
+  const modalHost = typeof document !== "undefined" ? document.body : null;
+
+  useEffect(() => {
+    if (
+      hybridLabSecondDinosaurName.length > 0 &&
+      !hybridLabSecondDinosaurOptions.includes(hybridLabSecondDinosaurName)
+    ) {
+      setHybridLabSecondDinosaurName("");
+    }
+  }, [hybridLabSecondDinosaurName, hybridLabSecondDinosaurOptions]);
+
+  useEffect(() => {
+    if (!isHybridLabOpen && !selectedHybridReward) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      if (selectedHybridReward) {
+        setSelectedHybridReward(null);
+        return;
+      }
+
+      setIsHybridLabOpen(false);
+      setHybridLabError(null);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isHybridLabOpen, selectedHybridReward]);
+
   const handleStartSession = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -393,15 +769,19 @@ export default function Home() {
         );
 
         if (persistedProfile && isPersistedPlayerProfileSnapshot(persistedProfile.snapshot)) {
-          setGameSession(persistedProfile.snapshot.gameSession);
+          const hydratedSession = hydrateLiveGameSessionState(
+            persistedProfile.snapshot.gameSession,
+          );
+          setGameSession(hydratedSession);
           setActiveRewardReveal(persistedProfile.snapshot.activeRewardReveal);
           setSessionStartStatus(
             `Loaded ${persistedProfile.playerName}'s profile from this browser.`,
           );
         } else {
-          setGameSession(createFreshLiveGameSessionState());
+          const freshSession = createFreshLiveGameSessionState();
+          setGameSession(freshSession);
           setActiveRewardReveal({
-            ...resolveNextRewardTarget(INITIAL_TOTAL_PROBLEMS_SOLVED),
+            ...resolveNextRewardTarget(freshSession.unlockedRewards.length),
             initialStatus: "missing",
             initialImagePath: null,
           });
@@ -443,14 +823,14 @@ export default function Home() {
     }
   }, [activePlayerName, activeRewardReveal, gameSession, isSessionStarted]);
 
-  const syncRewardImageStatus = useCallback(async (dinosaurName: string) => {
-    const normalizedDinosaurName = dinosaurName.trim();
-    if (normalizedDinosaurName.length === 0) {
+  const syncRewardImageStatus = useCallback(async (assetName: string) => {
+    const normalizedAssetName = assetName.trim();
+    if (normalizedAssetName.length === 0) {
       return;
     }
 
     const statusSnapshot = await fetchEarnedRewardImageStatus({
-      dinosaurName: normalizedDinosaurName,
+      dinosaurName: normalizedAssetName,
     });
     const readyImagePath = statusSnapshot.imagePath;
     if (statusSnapshot.status !== "ready" || !readyImagePath) {
@@ -461,7 +841,7 @@ export default function Home() {
       let didChange = false;
       const nextUnlockedRewards = currentState.unlockedRewards.map((reward) => {
         if (
-          reward.dinosaurName !== normalizedDinosaurName ||
+          reward.dinosaurName !== normalizedAssetName ||
           reward.imagePath === readyImagePath
         ) {
           return reward;
@@ -485,7 +865,7 @@ export default function Home() {
     });
 
     setActiveRewardReveal((currentReveal) => {
-      if (currentReveal.dinosaurName !== normalizedDinosaurName) {
+      if (currentReveal.dinosaurName !== normalizedAssetName) {
         return currentReveal;
       }
 
@@ -497,11 +877,75 @@ export default function Home() {
     });
   }, []);
 
-  const requestRewardImageGeneration = useCallback(
-    async (dinosaurName: string) => {
-      const normalizedDinosaurName = dinosaurName.trim();
-      if (normalizedDinosaurName.length === 0) {
+  const syncAmberImageStatus = useCallback(async () => {
+    const statusSnapshot = await fetchEarnedRewardImageStatus({
+      dinosaurName: AMBER_REWARD_ASSET_NAME,
+    });
+    const readyImagePath = statusSnapshot.imagePath;
+    if (statusSnapshot.status !== "ready" || !readyImagePath) {
+      return;
+    }
+
+    setGameSession((currentState) => {
+      if (currentState.amberImagePath === readyImagePath) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        amberImagePath: readyImagePath,
+      };
+    });
+  }, []);
+
+  const syncHybridImageStatus = useCallback(
+    async (hybridReward: UnlockedHybridReward) => {
+      const statusSnapshot = await fetchEarnedRewardImageStatus({
+        dinosaurName: hybridReward.generationAssetName,
+      });
+      const readyImagePath = statusSnapshot.imagePath;
+      if (statusSnapshot.status !== "ready" || !readyImagePath) {
         return;
+      }
+
+      setGameSession((currentState) => {
+        let didChange = false;
+        const nextUnlockedHybrids = currentState.unlockedHybrids.map((entry) => {
+          if (
+            entry.pairKey !== hybridReward.pairKey ||
+            entry.imagePath === readyImagePath
+          ) {
+            return entry;
+          }
+
+          didChange = true;
+          return {
+            ...entry,
+            imagePath: readyImagePath,
+          };
+        });
+
+        if (!didChange) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          unlockedHybrids: nextUnlockedHybrids,
+        };
+      });
+    },
+    [],
+  );
+
+  const requestGeneratedImage = useCallback(
+    async (input: {
+      assetName: string;
+      modelOverride?: string;
+    }): Promise<{ resolvedAssetName: string; resolvedImagePath: string } | null> => {
+      const normalizedAssetName = input.assetName.trim();
+      if (normalizedAssetName.length === 0) {
+        return null;
       }
 
       try {
@@ -512,7 +956,10 @@ export default function Home() {
             Accept: "application/json",
           },
           body: JSON.stringify({
-            dinosaurName: normalizedDinosaurName,
+            dinosaurName: normalizedAssetName,
+            ...(input.modelOverride
+              ? { modelOverride: input.modelOverride }
+              : {}),
           }),
         });
         const responseBody = (await response.json().catch(() => null)) as
@@ -532,64 +979,148 @@ export default function Home() {
             responseBody?.error?.message ??
             `Reward generation request failed with status ${response.status}.`;
           setRewardGenerationNotice(errorMessage);
-          return;
+          return null;
         }
 
-        const resolvedDinosaurName =
-          responseBody?.data?.dinosaurName?.trim() || normalizedDinosaurName;
+        const resolvedAssetName =
+          responseBody?.data?.dinosaurName?.trim() || normalizedAssetName;
         const resolvedImagePath = toRewardImagePathFromMimeType(
-          resolvedDinosaurName,
+          resolvedAssetName,
           responseBody?.data?.mimeType?.trim() ?? null,
         );
 
-        setGameSession((currentState) => {
-          let didChange = false;
-          const nextUnlockedRewards = currentState.unlockedRewards.map((reward) => {
-            if (
-              reward.dinosaurName !== resolvedDinosaurName ||
-              reward.imagePath === resolvedImagePath
-            ) {
-              return reward;
-            }
-
-            didChange = true;
-            return {
-              ...reward,
-              imagePath: resolvedImagePath,
-            };
-          });
-
-          if (!didChange) {
-            return currentState;
-          }
-
-          return {
-            ...currentState,
-            unlockedRewards: nextUnlockedRewards,
-          };
-        });
-
-        setActiveRewardReveal((currentReveal) => {
-          if (currentReveal.dinosaurName !== resolvedDinosaurName) {
-            return currentReveal;
-          }
-
-          return {
-            ...currentReveal,
-            initialStatus: "ready",
-            initialImagePath: resolvedImagePath,
-          };
-        });
-
-        await syncRewardImageStatus(resolvedDinosaurName);
-        setRewardGenerationNotice(null);
+        return {
+          resolvedAssetName,
+          resolvedImagePath,
+        };
       } catch {
         setRewardGenerationNotice(
           "Reward generation request failed before reaching the server.",
         );
+        return null;
       }
     },
-    [syncRewardImageStatus],
+    [],
+  );
+
+  const requestRewardImageGeneration = useCallback(
+    async (assetName: string) => {
+      const generationResult = await requestGeneratedImage({
+        assetName,
+      });
+      if (!generationResult) {
+        return;
+      }
+
+      setGameSession((currentState) => {
+        let didChange = false;
+        const nextUnlockedRewards = currentState.unlockedRewards.map((reward) => {
+          if (
+            reward.dinosaurName !== generationResult.resolvedAssetName ||
+            reward.imagePath === generationResult.resolvedImagePath
+          ) {
+            return reward;
+          }
+
+          didChange = true;
+          return {
+            ...reward,
+            imagePath: generationResult.resolvedImagePath,
+          };
+        });
+
+        if (!didChange) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          unlockedRewards: nextUnlockedRewards,
+        };
+      });
+
+      setActiveRewardReveal((currentReveal) => {
+        if (currentReveal.dinosaurName !== generationResult.resolvedAssetName) {
+          return currentReveal;
+        }
+
+        return {
+          ...currentReveal,
+          initialStatus: "ready",
+          initialImagePath: generationResult.resolvedImagePath,
+        };
+      });
+
+      await syncRewardImageStatus(generationResult.resolvedAssetName);
+      setRewardGenerationNotice(null);
+    },
+    [requestGeneratedImage, syncRewardImageStatus],
+  );
+
+  const requestAmberImageGeneration = useCallback(async () => {
+    const generationResult = await requestGeneratedImage({
+      assetName: AMBER_REWARD_ASSET_NAME,
+      modelOverride: NANO_BANANA_PRO_IMAGE_MODEL,
+    });
+    if (!generationResult) {
+      return;
+    }
+
+    setGameSession((currentState) => {
+      if (currentState.amberImagePath === generationResult.resolvedImagePath) {
+        return currentState;
+      }
+
+      return {
+        ...currentState,
+        amberImagePath: generationResult.resolvedImagePath,
+      };
+    });
+
+    await syncAmberImageStatus();
+    setRewardGenerationNotice(null);
+  }, [requestGeneratedImage, syncAmberImageStatus]);
+
+  const requestHybridImageGeneration = useCallback(
+    async (hybridReward: UnlockedHybridReward) => {
+      const generationResult = await requestGeneratedImage({
+        assetName: hybridReward.generationAssetName,
+      });
+      if (!generationResult) {
+        return;
+      }
+
+      setGameSession((currentState) => {
+        let didChange = false;
+        const nextUnlockedHybrids = currentState.unlockedHybrids.map((entry) => {
+          if (
+            entry.pairKey !== hybridReward.pairKey ||
+            entry.imagePath === generationResult.resolvedImagePath
+          ) {
+            return entry;
+          }
+
+          didChange = true;
+          return {
+            ...entry,
+            imagePath: generationResult.resolvedImagePath,
+          };
+        });
+
+        if (!didChange) {
+          return currentState;
+        }
+
+        return {
+          ...currentState,
+          unlockedHybrids: nextUnlockedHybrids,
+        };
+      });
+
+      await syncHybridImageStatus(hybridReward);
+      setRewardGenerationNotice(null);
+    },
+    [requestGeneratedImage, syncHybridImageStatus],
   );
 
   useEffect(() => {
@@ -600,34 +1131,29 @@ export default function Home() {
     for (const unlockedReward of gameSession.unlockedRewards) {
       void requestRewardImageGeneration(unlockedReward.dinosaurName);
     }
-  }, [gameSession.unlockedRewards, isSessionStarted, requestRewardImageGeneration]);
+    for (const unlockedHybrid of gameSession.unlockedHybrids) {
+      void requestHybridImageGeneration(unlockedHybrid);
+    }
+
+    if (gameSession.amberBalance > 0 && !gameSession.amberImagePath) {
+      void requestAmberImageGeneration();
+    }
+  }, [
+    gameSession.amberBalance,
+    gameSession.amberImagePath,
+    gameSession.unlockedHybrids,
+    gameSession.unlockedRewards,
+    isSessionStarted,
+    requestAmberImageGeneration,
+    requestHybridImageGeneration,
+    requestRewardImageGeneration,
+  ]);
 
   const advanceToNextProblem = useCallback(() => {
     const currentState = gameSessionRef.current;
     const nextTotalProblemsSolved = currentState.totalProblemsSolved + 1;
-    const nextUnlockedRewards = [...currentState.unlockedRewards];
-    const nextEarnedRewardNumber = getRewardNumberForSolvedCount(
-      nextTotalProblemsSolved,
-      REWARD_UNLOCK_INTERVAL,
-    );
-    let unlockedRewardForGeneration: UnlockedReward | null = null;
-
-    if (nextEarnedRewardNumber > nextUnlockedRewards.length) {
-      const unlockedReward = createUnlockedReward(
-        nextEarnedRewardNumber,
-        new Date().toISOString(),
-      );
-      nextUnlockedRewards.push(unlockedReward);
-      unlockedRewardForGeneration = unlockedReward;
-    }
-
     const { problem: nextProblem, steps: nextSteps } =
       resolveNextLiveProblem(nextTotalProblemsSolved);
-    const prefetchTargetDinosaurName = shouldTriggerNearMilestonePrefetch(
-      nextTotalProblemsSolved,
-    )
-      ? resolveNextRewardTarget(nextTotalProblemsSolved).dinosaurName
-      : null;
 
     setGameSession({
       activeProblem: nextProblem,
@@ -636,25 +1162,111 @@ export default function Home() {
       sessionAttemptedProblems: currentState.sessionAttemptedProblems + 1,
       totalProblemsSolved: nextTotalProblemsSolved,
       totalProblemsAttempted: currentState.totalProblemsAttempted + 1,
-      unlockedRewards: nextUnlockedRewards,
+      amberBalance:
+        currentState.amberBalance + AMBER_EARNED_PER_SOLVED_PROBLEM,
+      amberImagePath: currentState.amberImagePath,
+      unlockedRewards: currentState.unlockedRewards,
+      unlockedHybrids: currentState.unlockedHybrids,
     });
 
     setIsNextProblemReady(false);
+    if (!currentState.amberImagePath) {
+      void requestAmberImageGeneration();
+    }
+  }, [requestAmberImageGeneration]);
 
-    if (unlockedRewardForGeneration) {
-      setActiveRewardReveal({
-        dinosaurName: unlockedRewardForGeneration.dinosaurName,
-        milestoneSolvedCount: unlockedRewardForGeneration.milestoneSolvedCount,
-        initialStatus: "generating",
-        initialImagePath: null,
-      });
-      void requestRewardImageGeneration(unlockedRewardForGeneration.dinosaurName);
+  const handleTradeAmberForDinosaur = useCallback(() => {
+    const currentState = gameSessionRef.current;
+    if (currentState.amberBalance < AMBER_COST_PER_DINO_UNLOCK) {
+      setRewardGenerationNotice(
+        `You need ${AMBER_COST_PER_DINO_UNLOCK} amber to unlock a dinosaur.`,
+      );
+      return;
     }
 
-    if (prefetchTargetDinosaurName) {
-      void requestRewardImageGeneration(prefetchTargetDinosaurName);
-    }
+    const rewardNumber = currentState.unlockedRewards.length + 1;
+    const unlockedReward = createUnlockedReward(rewardNumber, new Date().toISOString());
+
+    setGameSession({
+      ...currentState,
+      amberBalance: currentState.amberBalance - AMBER_COST_PER_DINO_UNLOCK,
+      unlockedRewards: [...currentState.unlockedRewards, unlockedReward],
+    });
+    setActiveRewardReveal({
+      dinosaurName: unlockedReward.dinosaurName,
+      milestoneSolvedCount: unlockedReward.milestoneSolvedCount,
+      initialStatus: "generating",
+      initialImagePath: null,
+    });
+    setRewardGenerationNotice(null);
+    void requestRewardImageGeneration(unlockedReward.dinosaurName);
   }, [requestRewardImageGeneration]);
+
+  const openHybridLab = useCallback(() => {
+    setHybridLabError(null);
+    setHybridLabFirstDinosaurName("");
+    setHybridLabSecondDinosaurName("");
+    setSelectedHybridReward(null);
+    setIsHybridLabOpen(true);
+  }, []);
+
+  const closeHybridLab = useCallback(() => {
+    setHybridLabError(null);
+    setHybridLabFirstDinosaurName("");
+    setHybridLabSecondDinosaurName("");
+    setIsHybridLabOpen(false);
+  }, []);
+
+  const handleCreateHybrid = useCallback(() => {
+    const currentState = gameSessionRef.current;
+    const firstDinosaurName = hybridLabFirstDinosaurName.trim();
+    const secondDinosaurName = hybridLabSecondDinosaurName.trim();
+    if (firstDinosaurName.length === 0 || secondDinosaurName.length === 0) {
+      setHybridLabError("Choose two dinosaurs before running the fusion.");
+      return;
+    }
+
+    if (firstDinosaurName === secondDinosaurName) {
+      setHybridLabError("Choose two different dinosaurs for a hybrid.");
+      return;
+    }
+
+    if (currentState.amberBalance < AMBER_COST_PER_HYBRID_CREATION) {
+      setHybridLabError(
+        `You need ${AMBER_COST_PER_HYBRID_CREATION} amber to create a hybrid.`,
+      );
+      return;
+    }
+
+    const pairKey = createHybridPairKey({
+      firstDinosaurName,
+      secondDinosaurName,
+    });
+    if (currentState.unlockedHybrids.some((entry) => entry.pairKey === pairKey)) {
+      setHybridLabError("That hybrid pair is already in your gallery.");
+      return;
+    }
+
+    const unlockedHybridReward = createUnlockedHybridReward({
+      firstDinosaurName,
+      secondDinosaurName,
+      createdAt: new Date().toISOString(),
+    });
+
+    setGameSession({
+      ...currentState,
+      amberBalance: currentState.amberBalance - AMBER_COST_PER_HYBRID_CREATION,
+      unlockedHybrids: [...currentState.unlockedHybrids, unlockedHybridReward],
+    });
+    setHybridLabError(null);
+    setIsHybridLabOpen(false);
+    setRewardGenerationNotice(null);
+    void requestHybridImageGeneration(unlockedHybridReward);
+  }, [
+    hybridLabFirstDinosaurName,
+    hybridLabSecondDinosaurName,
+    requestHybridImageGeneration,
+  ]);
 
   const handleWorkspaceStepValidation = useCallback(
     (validation: LongDivisionStepValidationResult) => {
@@ -692,7 +1304,7 @@ export default function Home() {
 
           <section
             aria-labelledby="player-start-heading"
-            className="jurassic-panel motif-track player-start-panel"
+            className="jurassic-panel player-start-panel"
             data-ui-surface="player-start"
           >
             <div className="surface-header">
@@ -774,7 +1386,7 @@ export default function Home() {
               </div>
               <p className="status-chip">
                 Live target: {activeLaneLabel} | Player: {activePlayerName} | Solved:{" "}
-                {gameSession.totalProblemsSolved}
+                {gameSession.totalProblemsSolved} | Amber: {gameSession.amberBalance}
               </p>
             </div>
 
@@ -815,7 +1427,116 @@ export default function Home() {
                 </div>
               </div>
 
+              <section className="amber-bank" data-ui-surface="amber-bank">
+                <div className="amber-bank-thumb">
+                  <Image
+                    alt="Amber currency crystal"
+                    className="amber-bank-image"
+                    height={120}
+                    loading="lazy"
+                    src={gameSession.amberImagePath ?? PROVISIONAL_REWARD_IMAGE_PATH}
+                    width={120}
+                  />
+                </div>
+                <div className="amber-bank-copy">
+                  <p className="amber-bank-balance">Amber: {gameSession.amberBalance}</p>
+                  <p className="amber-bank-note">
+                    Each solved problem adds +{AMBER_EARNED_PER_SOLVED_PROBLEM} amber.
+                  </p>
+                </div>
+              </section>
+
+              <div className="amber-actions">
+                <button
+                  className="jp-button"
+                  data-ui-action="trade-amber-for-dino"
+                  disabled={!canUnlockNextDinosaurWithAmber}
+                  onClick={handleTradeAmberForDinosaur}
+                  type="button"
+                >
+                  Trade {AMBER_COST_PER_DINO_UNLOCK} Amber For Dino
+                </button>
+                <button
+                  className="jp-button jp-button-secondary"
+                  data-ui-action="open-hybrid-lab"
+                  disabled={unlockedPrimaryDinosaurNames.length < 2}
+                  onClick={openHybridLab}
+                  type="button"
+                >
+                  Open Hybrid Lab ({AMBER_COST_PER_HYBRID_CREATION} Amber)
+                </button>
+              </div>
+
+              <p className="amber-actions-note">
+                Next unlock: {resolveNextRewardTarget(gameSession.unlockedRewards.length).dinosaurName}
+              </p>
+
               <DinoGalleryPanel unlockedRewards={gameSession.unlockedRewards} />
+            </section>
+
+            <section
+              aria-labelledby="hybrid-gallery-surface-heading"
+              className="jurassic-panel motif-track"
+              data-ui-surface="hybrid-gallery"
+            >
+              <div className="surface-header">
+                <div>
+                  <p className="surface-kicker">Hybrid Gallery</p>
+                  <h2 className="surface-title" id="hybrid-gallery-surface-heading">
+                    Fusion Species
+                  </h2>
+                </div>
+                <p className="status-chip">
+                  Unlocked pairs: {gameSession.unlockedHybrids.length}
+                </p>
+              </div>
+
+              {gameSession.unlockedHybrids.length === 0 ? (
+                <div className="gallery-shell" data-gallery-state="empty">
+                  <p className="gallery-empty-title">No hybrids created yet.</p>
+                  <p className="gallery-empty-copy">
+                    Spend {AMBER_COST_PER_HYBRID_CREATION} amber in the Hybrid Lab to fuse two
+                    unlocked dinosaurs.
+                  </p>
+                </div>
+              ) : (
+                <div className="gallery-grid">
+                  {gameSession.unlockedHybrids.map((hybridReward) => (
+                    <article className="gallery-card" key={hybridReward.hybridId}>
+                      <button
+                        aria-haspopup="dialog"
+                        className="gallery-card-trigger"
+                        onClick={() => {
+                          setSelectedHybridReward(hybridReward);
+                        }}
+                        type="button"
+                      >
+                        <div className="gallery-thumb">
+                          <Image
+                            alt={`${hybridReward.hybridName} hybrid image`}
+                            className="gallery-image"
+                            height={352}
+                            loading="lazy"
+                            src={hybridReward.imagePath}
+                            width={640}
+                          />
+                        </div>
+                        <p className="gallery-name">{hybridReward.hybridName}</p>
+                        <p className="gallery-meta">
+                          Created{" "}
+                          <time dateTime={hybridReward.createdAt}>
+                            {new Intl.DateTimeFormat("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }).format(new Date(hybridReward.createdAt))}
+                          </time>
+                        </p>
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section
@@ -849,6 +1570,169 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {isHybridLabOpen && modalHost
+        ? createPortal(
+            <div
+              className="jp-modal-backdrop"
+              data-ui-surface="hybrid-lab-modal"
+              onClick={closeHybridLab}
+              role="presentation"
+            >
+              <div className="jp-modal-aura">
+                <section
+                  aria-label="Hybrid Lab"
+                  aria-modal="true"
+                  className="jp-modal hybrid-lab-modal"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                  role="dialog"
+                >
+                  <p className="surface-kicker">Hybrid Lab</p>
+                  <h3 className="surface-title">DNA Fusion</h3>
+                  <p className="hybrid-lab-copy">
+                    Spend {AMBER_COST_PER_HYBRID_CREATION} amber to generate one hybrid per dinosaur pair.
+                  </p>
+                  <p className="hybrid-lab-copy">
+                    Amber available: <strong>{gameSession.amberBalance}</strong>
+                  </p>
+                  {!hasAvailableHybridPairs ? (
+                    <p className="hybrid-lab-copy">
+                      None available. You&apos;ve already created all hybrids from unlocked dinosaurs.
+                    </p>
+                  ) : null}
+
+                  <label className="hybrid-lab-label" htmlFor="hybrid-lab-first-dino">
+                    First dinosaur
+                  </label>
+                  <select
+                    className="hybrid-lab-select"
+                    id="hybrid-lab-first-dino"
+                    onChange={(event) => {
+                      setHybridLabFirstDinosaurName(event.target.value);
+                      setHybridLabSecondDinosaurName("");
+                      setHybridLabError(null);
+                    }}
+                    value={hybridLabFirstDinosaurName}
+                  >
+                    <option value="">Choose a dinosaur</option>
+                    {unlockedPrimaryDinosaurNames.map((dinosaurName) => (
+                      <option key={dinosaurName} value={dinosaurName}>
+                        {dinosaurName}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label className="hybrid-lab-label" htmlFor="hybrid-lab-second-dino">
+                    Second dinosaur
+                  </label>
+                  {hybridLabFirstDinosaurName.length === 0 ? (
+                    <p className="hybrid-lab-copy">Choose the first dinosaur to continue.</p>
+                  ) : hybridLabSecondDinosaurOptions.length === 0 ? (
+                    <p className="hybrid-lab-copy">
+                      None available. You&apos;ve already created all hybrids for {hybridLabFirstDinosaurName}.
+                    </p>
+                  ) : (
+                    <select
+                      className="hybrid-lab-select"
+                      id="hybrid-lab-second-dino"
+                      onChange={(event) => {
+                        setHybridLabSecondDinosaurName(event.target.value);
+                        setHybridLabError(null);
+                      }}
+                      value={hybridLabSecondDinosaurName}
+                    >
+                      <option value="">Choose a dinosaur</option>
+                      {hybridLabSecondDinosaurOptions.map((dinosaurName) => (
+                        <option key={dinosaurName} value={dinosaurName}>
+                          {dinosaurName}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {hybridLabError ? (
+                    <p className="game-start-error" role="alert">
+                      {hybridLabError}
+                    </p>
+                  ) : null}
+
+                  <div className="hybrid-lab-actions">
+                    <button className="jp-button jp-button-secondary" onClick={closeHybridLab} type="button">
+                      Close
+                    </button>
+                    <button
+                      className="jp-button"
+                      data-ui-action="create-hybrid"
+                      disabled={
+                        !hasAvailableHybridPairs ||
+                        hybridLabFirstDinosaurName.length === 0 ||
+                        hybridLabSecondDinosaurName.length === 0 ||
+                        !hasEnoughAmberForHybrid
+                      }
+                      onClick={handleCreateHybrid}
+                      type="button"
+                    >
+                      Create Hybrid
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </div>,
+            modalHost,
+          )
+        : null}
+
+      {selectedHybridReward && modalHost
+        ? createPortal(
+            <div
+              className="jp-modal-backdrop"
+              data-ui-surface="hybrid-detail-modal"
+              onClick={() => {
+                setSelectedHybridReward(null);
+              }}
+              role="presentation"
+            >
+              <div className="jp-modal-aura">
+                <section
+                  aria-label={`${selectedHybridReward.hybridName} details`}
+                  aria-modal="true"
+                  className="jp-modal gallery-detail-modal"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                  role="dialog"
+                >
+                  <p className="surface-kicker">Hybrid Detail</p>
+                  <h3 className="surface-title gallery-detail-title">{selectedHybridReward.hybridName}</h3>
+                  <p className="gallery-detail-meta">
+                    Built from {selectedHybridReward.firstDinosaurName} +{" "}
+                    {selectedHybridReward.secondDinosaurName}
+                  </p>
+                  <Image
+                    alt={`${selectedHybridReward.hybridName} hybrid image`}
+                    className="gallery-detail-image"
+                    height={540}
+                    loading="lazy"
+                    src={selectedHybridReward.imagePath}
+                    width={960}
+                  />
+                  <button
+                    className="jp-button"
+                    onClick={() => {
+                      setSelectedHybridReward(null);
+                    }}
+                    type="button"
+                  >
+                    Close
+                  </button>
+                </section>
+              </div>
+            </div>,
+            modalHost,
+          )
+        : null}
     </main>
   );
 }

@@ -25,6 +25,7 @@ import {
   createLiveWorkspaceTypingState,
   resolveInlineWorkspaceEntryValue,
   sanitizeInlineWorkspaceEntryValue,
+  type BusStopWorkRow,
   tryAutoAdvanceBringDownStep,
   type LiveWorkspaceEntryInputTransition,
   type LiveWorkspaceTypingState,
@@ -34,6 +35,8 @@ import {
 const LOCK_IN_ANIMATION_DURATION_MS = 280;
 const BRING_DOWN_ANIMATION_DURATION_MS = 420;
 const WORK_ROW_REVEAL_ANIMATION_DURATION_MS = 340;
+const ENTRY_ERROR_PULSE_DURATION_MS = 360;
+const ENTRY_RETRY_LOCK_DURATION_MS = 2000;
 const NON_DIGIT_KEY_PATTERN = /^\D$/;
 const EMPTY_DRAFT_ENTRY_VALUES: WorkspaceDraftEntryValues = {};
 
@@ -61,6 +64,8 @@ interface WorkspaceInlineEntryProps {
   isInteractive: boolean;
   isAutoEntry: boolean;
   isLockingIn: boolean;
+  isErrorPulse: boolean;
+  isRetryLocked: boolean;
   style?: CSSProperties;
   onInput?: (event: FormEvent<HTMLSpanElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLSpanElement>) => void;
@@ -79,12 +84,28 @@ interface ActiveEditableEntryLocator {
   digitIndex: number;
 }
 
+interface CollapsedWorkRow {
+  row: BusStopWorkRow;
+  bringDownCompanion: BusStopWorkRow | null;
+}
+
+type DivisionNotationStyle = CSSProperties & {
+  "--division-column-count"?: number;
+  "--work-value-start-column"?: number;
+  "--work-value-column-span"?: number;
+};
+
 function buildInlineEntryClassName({
   lane,
   isFilled,
   isActive,
   isLockingIn,
-}: Pick<WorkspaceInlineEntryProps, "lane" | "isFilled" | "isActive" | "isLockingIn">): string {
+  isErrorPulse,
+  isRetryLocked,
+}: Pick<
+  WorkspaceInlineEntryProps,
+  "lane" | "isFilled" | "isActive" | "isLockingIn" | "isErrorPulse" | "isRetryLocked"
+>): string {
   const classes = [
     "inline-entry",
     lane === "quotient"
@@ -94,6 +115,8 @@ function buildInlineEntryClassName({
     lane === "quotient" && !isFilled ? "quotient-digit-empty" : "",
     isActive ? "inline-entry-active glow-amber" : "",
     isLockingIn ? "inline-entry-lock-in" : "",
+    isErrorPulse ? "inline-entry-error-pulse" : "",
+    isRetryLocked ? "inline-entry-retry-lock" : "",
   ];
 
   return classes.filter(Boolean).join(" ");
@@ -115,6 +138,37 @@ function resolveActiveDigitIndex(currentValue: string, expectedDigitCount: numbe
   return Math.min(currentValue.length, expectedDigitCount - 1);
 }
 
+function collapseBringDownWorkRows(workRows: readonly BusStopWorkRow[]): CollapsedWorkRow[] {
+  const collapsedRows: CollapsedWorkRow[] = [];
+
+  for (const row of workRows) {
+    if (row.kind !== "bring-down") {
+      collapsedRows.push({
+        row,
+        bringDownCompanion: null,
+      });
+      continue;
+    }
+
+    const previousCollapsedRow = collapsedRows.at(-1);
+    if (
+      previousCollapsedRow &&
+      previousCollapsedRow.row.kind === "subtraction-result" &&
+      !previousCollapsedRow.bringDownCompanion
+    ) {
+      previousCollapsedRow.bringDownCompanion = row;
+      continue;
+    }
+
+    collapsedRows.push({
+      row,
+      bringDownCompanion: null,
+    });
+  }
+
+  return collapsedRows;
+}
+
 function WorkspaceInlineEntry({
   stepId,
   lane,
@@ -127,21 +181,32 @@ function WorkspaceInlineEntry({
   isInteractive,
   isAutoEntry,
   isLockingIn,
+  isErrorPulse,
+  isRetryLocked,
   style,
   onInput,
   onKeyDown,
   onPaste,
 }: WorkspaceInlineEntryProps) {
-  const isEditable = isInteractive && !isFilled && !isAutoEntry && Boolean(targetId);
+  const isEditable = isInteractive && !isFilled && !isAutoEntry && !isRetryLocked && Boolean(targetId);
 
   return (
     <span
       aria-label={isEditable ? "Inline workspace entry" : undefined}
-      className={buildInlineEntryClassName({ lane, isFilled, isActive, isLockingIn })}
+      aria-invalid={isErrorPulse ? true : undefined}
+      className={buildInlineEntryClassName({
+        lane,
+        isFilled,
+        isActive,
+        isLockingIn,
+        isErrorPulse,
+        isRetryLocked,
+      })}
       contentEditable={isEditable}
       data-entry-active={isActive ? "true" : "false"}
       data-entry-auto={isAutoEntry ? "true" : "false"}
       data-entry-animation={isLockingIn ? "lock-in" : "none"}
+      data-entry-error={isErrorPulse ? "pulse" : isRetryLocked ? "locked" : "none"}
       data-entry-glow={isActive ? "amber" : "none"}
       data-entry-inline="true"
       data-entry-lane={lane}
@@ -228,6 +293,26 @@ export function BusStopLongDivisionRenderer({
   });
   const rowRevealStepIds =
     rowRevealAnimationState.stepIdentity === stepIdentity ? rowRevealAnimationState.stepIds : {};
+  const [entryErrorPulseState, setEntryErrorPulseState] = useState<{
+    stepIdentity: string;
+    stepIds: Record<string, true>;
+  }>({
+    stepIdentity,
+    stepIds: {},
+  });
+  const errorPulseStepIds =
+    entryErrorPulseState.stepIdentity === stepIdentity ? entryErrorPulseState.stepIds : {};
+  const [entryRetryLockState, setEntryRetryLockState] = useState<{
+    stepIdentity: string;
+    stepIds: Record<string, true>;
+  }>({
+    stepIdentity,
+    stepIds: {},
+  });
+  const retryLockedStepIds =
+    entryRetryLockState.stepIdentity === stepIdentity ? entryRetryLockState.stepIds : {};
+  const errorPulseTimeoutByStepIdRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const retryLockTimeoutByStepIdRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const effectiveRevealedStepCount = liveTypingEnabled
     ? liveTypingState.revealedStepCount
@@ -247,7 +332,11 @@ export function BusStopLongDivisionRenderer({
     [divisor, dividend, steps, effectiveRevealedStepCount],
   );
   const dividendDigits = useMemo(() => Array.from(renderModel.dividendText), [renderModel.dividendText]);
-  const notationGridStyle = useMemo<CSSProperties>(
+  const collapsedWorkRows = useMemo(
+    () => collapseBringDownWorkRows(renderModel.workRows),
+    [renderModel.workRows],
+  );
+  const notationGridStyle = useMemo<DivisionNotationStyle>(
     () => ({
       "--division-column-count": renderModel.columnCount,
     }),
@@ -303,6 +392,9 @@ export function BusStopLongDivisionRenderer({
     if (!liveTypingEnabled || !renderModel.activeStepId || !renderModel.activeTargetId) {
       return null;
     }
+    if (retryLockedStepIds[renderModel.activeStepId]) {
+      return null;
+    }
 
     const activeQuotientCell = renderModel.quotientCells.find((cell) => cell.isActive);
     if (activeQuotientCell?.targetId) {
@@ -347,6 +439,7 @@ export function BusStopLongDivisionRenderer({
     renderModel.workRows,
     draftEntryValues,
     stepById,
+    retryLockedStepIds,
   ]);
   const activeEditableEntryIdentity = useMemo(
     () =>
@@ -373,6 +466,22 @@ export function BusStopLongDivisionRenderer({
     timeoutHandles.clear();
   }, []);
 
+  const clearEntryErrorPulseTimeouts = useCallback(() => {
+    const timeoutHandles = errorPulseTimeoutByStepIdRef.current;
+    for (const timeoutHandle of timeoutHandles.values()) {
+      clearTimeout(timeoutHandle);
+    }
+    timeoutHandles.clear();
+  }, []);
+
+  const clearEntryRetryLockTimeouts = useCallback(() => {
+    const timeoutHandles = retryLockTimeoutByStepIdRef.current;
+    for (const timeoutHandle of timeoutHandles.values()) {
+      clearTimeout(timeoutHandle);
+    }
+    timeoutHandles.clear();
+  }, []);
+
   useEffect(() => {
     liveTypingStateRef.current = liveTypingState;
   }, [liveTypingState]);
@@ -387,8 +496,15 @@ export function BusStopLongDivisionRenderer({
       timeoutHandles.clear();
       clearRowRevealAnimationTimeouts();
       clearBringDownAnimationTimeout();
+      clearEntryErrorPulseTimeouts();
+      clearEntryRetryLockTimeouts();
     };
-  }, [clearBringDownAnimationTimeout, clearRowRevealAnimationTimeouts]);
+  }, [
+    clearBringDownAnimationTimeout,
+    clearEntryErrorPulseTimeouts,
+    clearEntryRetryLockTimeouts,
+    clearRowRevealAnimationTimeouts,
+  ]);
 
   useEffect(() => {
     if (!liveTypingEnabled || !activeEditableEntryLocator) {
@@ -436,7 +552,15 @@ export function BusStopLongDivisionRenderer({
   useEffect(() => {
     clearBringDownAnimationTimeout();
     clearRowRevealAnimationTimeouts();
-  }, [clearBringDownAnimationTimeout, clearRowRevealAnimationTimeouts, stepIdentity]);
+    clearEntryErrorPulseTimeouts();
+    clearEntryRetryLockTimeouts();
+  }, [
+    clearBringDownAnimationTimeout,
+    clearEntryErrorPulseTimeouts,
+    clearEntryRetryLockTimeouts,
+    clearRowRevealAnimationTimeouts,
+    stepIdentity,
+  ]);
 
   const clearBringDownAnimationState = useCallback(() => {
     setBringDownAnimationState((currentState) => {
@@ -540,6 +664,92 @@ export function BusStopLongDivisionRenderer({
 
     rowRevealTimeoutByStepIdRef.current.set(timeoutKey, timeoutHandle);
   }, [stepIdentity]);
+
+  const triggerEntryErrorFeedback = useCallback(
+    (stepId: string) => {
+      const timeoutKey = `${stepIdentity}:${stepId}`;
+      const existingPulseTimeout = errorPulseTimeoutByStepIdRef.current.get(timeoutKey);
+      const existingRetryLockTimeout = retryLockTimeoutByStepIdRef.current.get(timeoutKey);
+
+      if (existingPulseTimeout) {
+        clearTimeout(existingPulseTimeout);
+      }
+
+      if (existingRetryLockTimeout) {
+        clearTimeout(existingRetryLockTimeout);
+      }
+
+      setEntryErrorPulseState((currentState) => {
+        const currentStepIds =
+          currentState.stepIdentity === stepIdentity ? currentState.stepIds : {};
+        return {
+          stepIdentity,
+          stepIds: {
+            ...currentStepIds,
+            [stepId]: true,
+          },
+        };
+      });
+
+      setEntryRetryLockState((currentState) => {
+        const currentStepIds =
+          currentState.stepIdentity === stepIdentity ? currentState.stepIds : {};
+        return {
+          stepIdentity,
+          stepIds: {
+            ...currentStepIds,
+            [stepId]: true,
+          },
+        };
+      });
+
+      const pulseTimeout = setTimeout(() => {
+        setEntryErrorPulseState((currentState) => {
+          const currentStepIds =
+            currentState.stepIdentity === stepIdentity ? currentState.stepIds : {};
+          if (!currentStepIds[stepId]) {
+            return {
+              stepIdentity,
+              stepIds: currentStepIds,
+            };
+          }
+
+          const nextStepIds = { ...currentStepIds };
+          delete nextStepIds[stepId];
+          return {
+            stepIdentity,
+            stepIds: nextStepIds,
+          };
+        });
+        errorPulseTimeoutByStepIdRef.current.delete(timeoutKey);
+      }, ENTRY_ERROR_PULSE_DURATION_MS);
+
+      const retryLockTimeout = setTimeout(() => {
+        setEntryRetryLockState((currentState) => {
+          const currentStepIds =
+            currentState.stepIdentity === stepIdentity ? currentState.stepIds : {};
+          if (!currentStepIds[stepId]) {
+            return {
+              stepIdentity,
+              stepIds: currentStepIds,
+            };
+          }
+
+          const nextStepIds = { ...currentStepIds };
+          delete nextStepIds[stepId];
+          return {
+            stepIdentity,
+            stepIds: nextStepIds,
+          };
+        });
+        retryLockTimeoutByStepIdRef.current.delete(timeoutKey);
+      }, ENTRY_RETRY_LOCK_DURATION_MS);
+
+      errorPulseTimeoutByStepIdRef.current.set(timeoutKey, pulseTimeout);
+      retryLockTimeoutByStepIdRef.current.set(timeoutKey, retryLockTimeout);
+    },
+    [stepIdentity],
+  );
 
   const applyCommittedTransition = useCallback(
     (transition: LiveWorkspaceEntryInputTransition) => {
@@ -674,13 +884,18 @@ export function BusStopLongDivisionRenderer({
       const expectedDigit = expectedDigits[activeDigitIndex] ?? "";
       event.currentTarget.textContent = "";
 
-      if (nextDigit.length === 0 || nextDigit !== expectedDigit) {
+      if (nextDigit.length === 0) {
+        return;
+      }
+
+      if (nextDigit !== expectedDigit) {
+        triggerEntryErrorFeedback(stepId);
         return;
       }
 
       applyStepDigitPrefixTransition(stepId, expectedDigits, activeDigitIndex + 1);
     },
-    [applyStepDigitPrefixTransition],
+    [applyStepDigitPrefixTransition, triggerEntryErrorFeedback],
   );
 
   const handleInlineDigitKeyDown = useCallback(
@@ -734,6 +949,9 @@ export function BusStopLongDivisionRenderer({
       }
 
       if (acceptedDigitCount === 0) {
+        if (pastedDigits.length > 0) {
+          triggerEntryErrorFeedback(stepId);
+        }
         return;
       }
 
@@ -743,7 +961,7 @@ export function BusStopLongDivisionRenderer({
         activeDigitIndex + acceptedDigitCount,
       );
     },
-    [applyStepDigitPrefixTransition],
+    [applyStepDigitPrefixTransition, triggerEntryErrorFeedback],
   );
 
   return (
@@ -782,15 +1000,24 @@ export function BusStopLongDivisionRenderer({
                 expectedDigits,
                 activeDigitIndex,
               };
+              const isCellRetryLocked = Boolean(retryLockedStepIds[cell.stepId]);
+              const isCellErrorPulse = Boolean(errorPulseStepIds[cell.stepId]);
 
               return (
                 <WorkspaceInlineEntry
                   digitIndex={0}
+                  isErrorPulse={isCellErrorPulse}
                   isActive={cell.isActive && activeDigitIndex === 0}
                   isAutoEntry={false}
                   isFilled={cell.isFilled}
-                  isInteractive={liveTypingEnabled && cell.isActive && activeDigitIndex === 0}
+                  isInteractive={
+                    liveTypingEnabled &&
+                    cell.isActive &&
+                    activeDigitIndex === 0 &&
+                    !isCellRetryLocked
+                  }
                   isLockingIn={Boolean(lockingStepIds[cell.stepId])}
+                  isRetryLocked={isCellRetryLocked}
                   key={cell.stepId}
                   lane="quotient"
                   onInput={
@@ -854,7 +1081,7 @@ export function BusStopLongDivisionRenderer({
             </p>
 
             <ol className="work-rows">
-              {renderModel.workRows.length === 0 ? (
+              {collapsedWorkRows.length === 0 ? (
                 <li className="work-row work-row-placeholder">
                   <span aria-hidden="true" className="work-row-op">
                     &nbsp;
@@ -862,8 +1089,10 @@ export function BusStopLongDivisionRenderer({
                   <span className="work-row-value">...</span>
                 </li>
               ) : (
-                renderModel.workRows.map((row) => {
-                  const isRowTransitioning = Boolean(rowRevealStepIds[row.stepId]);
+                collapsedWorkRows.map(({ row, bringDownCompanion }) => {
+                  const isRowTransitioning =
+                    Boolean(rowRevealStepIds[row.stepId]) ||
+                    Boolean(bringDownCompanion && rowRevealStepIds[bringDownCompanion.stepId]);
                   const resolvedRowValue = resolveInlineWorkspaceEntryValue({
                     stepId: row.stepId,
                     lockedValue: row.value,
@@ -888,15 +1117,43 @@ export function BusStopLongDivisionRenderer({
                     resolvedDigitCount,
                   );
                   const isAutoEntryRow = row.kind === "bring-down" && liveTypingEnabled;
-                  const workValueEndColumn = row.columnIndex + 1;
-                  const workValueStartColumn = Math.max(
-                    workValueEndColumn - resolvedDigitCount + 1,
+                  const isRowRetryLocked = Boolean(retryLockedStepIds[row.stepId]);
+                  const isRowErrorPulse = Boolean(errorPulseStepIds[row.stepId]);
+                  const primaryValueEndColumn = row.columnIndex + 1;
+                  const primaryValueStartColumn = Math.max(
+                    primaryValueEndColumn - resolvedDigitCount + 1,
                     1,
                   );
-                  const workRowValueShellStyle: CSSProperties = {
+                  const companionColumnIndex = bringDownCompanion
+                    ? bringDownCompanion.columnIndex + 1
+                    : null;
+                  const workValueStartColumn =
+                    companionColumnIndex === null
+                      ? primaryValueStartColumn
+                      : Math.min(primaryValueStartColumn, companionColumnIndex);
+                  const workValueEndColumn =
+                    companionColumnIndex === null
+                      ? primaryValueEndColumn
+                      : Math.max(primaryValueEndColumn, companionColumnIndex);
+                  const workValueColumnSpan = Math.max(
+                    workValueEndColumn - workValueStartColumn + 1,
+                    1,
+                  );
+                  const primaryColumnOffset = primaryValueStartColumn - workValueStartColumn;
+                  const workRowValueShellStyle: DivisionNotationStyle = {
                     "--work-value-start-column": workValueStartColumn,
-                    "--work-value-column-span": resolvedDigitCount,
+                    "--work-value-column-span": workValueColumnSpan,
                   };
+                  const bringDownResolvedValue = bringDownCompanion
+                    ? resolveInlineWorkspaceEntryValue({
+                        stepId: bringDownCompanion.stepId,
+                        lockedValue: bringDownCompanion.value,
+                        isFilled: bringDownCompanion.isFilled,
+                        draftEntryValues,
+                      })
+                    : "";
+                  const isBringDownAnimationRunning =
+                    bringDownCompanion?.stepId === bringDownAnimationStepId;
 
                   return (
                     <li
@@ -910,7 +1167,7 @@ export function BusStopLongDivisionRenderer({
                       </span>
                       <div
                         className="work-row-value-shell"
-                        data-bring-down-animation={bringDownAnimationStepId === row.stepId ? "running" : "idle"}
+                        data-bring-down-animation={isBringDownAnimationRunning ? "running" : "idle"}
                         style={workRowValueShellStyle}
                       >
                         {Array.from({ length: resolvedDigitCount }, (_, digitIndex) => {
@@ -926,11 +1183,17 @@ export function BusStopLongDivisionRenderer({
                           return (
                             <WorkspaceInlineEntry
                               digitIndex={digitIndex}
+                              isErrorPulse={isRowErrorPulse && digitIndex === activeDigitIndex}
                               isActive={row.isActive && digitIndex === activeDigitIndex}
                               isAutoEntry={isAutoEntryRow}
                               isFilled={row.isFilled || isResolvedDigitFilled}
-                              isInteractive={liveTypingEnabled && isFocusedPendingDigit}
+                              isInteractive={
+                                liveTypingEnabled &&
+                                isFocusedPendingDigit &&
+                                !isRowRetryLocked
+                              }
                               isLockingIn={Boolean(lockingStepIds[row.stepId])}
+                              isRetryLocked={isRowRetryLocked && digitIndex === activeDigitIndex}
                               key={`${row.stepId}:digit:${digitIndex}`}
                               lane="work-row"
                               onInput={
@@ -950,13 +1213,37 @@ export function BusStopLongDivisionRenderer({
                               }
                               stepId={row.stepId}
                               stepKind={row.kind}
-                              style={{ gridColumnStart: digitIndex + 1 }}
+                              style={{
+                                gridColumnStart: primaryColumnOffset + digitIndex + 1,
+                              }}
                               targetId={row.targetId}
                               value={rowDigits[digitIndex] ?? ""}
                             />
                           );
                         })}
-                        {bringDownAnimationStepId === row.stepId ? (
+                        {bringDownCompanion && companionColumnIndex !== null ? (
+                          <WorkspaceInlineEntry
+                            digitIndex={0}
+                            isErrorPulse={Boolean(errorPulseStepIds[bringDownCompanion.stepId])}
+                            isActive={bringDownCompanion.isActive}
+                            isAutoEntry={liveTypingEnabled}
+                            isFilled={bringDownCompanion.isFilled}
+                            isInteractive={false}
+                            isLockingIn={Boolean(lockingStepIds[bringDownCompanion.stepId])}
+                            isRetryLocked={Boolean(retryLockedStepIds[bringDownCompanion.stepId])}
+                            key={`${bringDownCompanion.stepId}:digit:0`}
+                            lane="work-row"
+                            stepId={bringDownCompanion.stepId}
+                            stepKind={bringDownCompanion.kind}
+                            style={{
+                              gridColumnStart:
+                                companionColumnIndex - workValueStartColumn + 1,
+                            }}
+                            targetId={bringDownCompanion.targetId}
+                            value={bringDownResolvedValue}
+                          />
+                        ) : null}
+                        {isBringDownAnimationRunning ? (
                           <span aria-hidden="true" className="bring-down-digit-slide">
                             {activeBringDownAnimationSource?.digit ?? "\u00a0"}
                           </span>

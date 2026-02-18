@@ -31,6 +31,7 @@ export class GeminiImageGenerationError extends Error {
 
 export interface GeminiImageGenerationRequest {
   dinosaurName: string;
+  modelOverride?: string;
 }
 
 export interface GeminiGeneratedImage {
@@ -228,6 +229,14 @@ export function parseGeminiImageGenerationRequest(payload: unknown): GeminiImage
     );
   }
 
+  const modelOverride = getTrimmedNonEmptyString(payload.modelOverride);
+  if (modelOverride) {
+    return {
+      dinosaurName,
+      modelOverride,
+    };
+  }
+
   return { dinosaurName };
 }
 
@@ -367,7 +376,8 @@ export async function generateGeminiDinosaurImage(
   }
 
   const apiKey = getTrimmedNonEmptyString(config.apiKey);
-  const model = getTrimmedNonEmptyString(config.model);
+  const configuredModel = getTrimmedNonEmptyString(config.model);
+  const model = getTrimmedNonEmptyString(request.modelOverride) ?? configuredModel;
 
   if (!apiKey || !model) {
     throw new GeminiImageGenerationError(

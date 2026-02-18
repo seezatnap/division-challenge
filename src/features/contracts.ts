@@ -82,10 +82,22 @@ export interface UnlockedReward {
   milestoneSolvedCount: number;
 }
 
+export interface UnlockedHybridReward {
+  hybridId: string;
+  hybridName: string;
+  pairKey: string;
+  firstDinosaurName: string;
+  secondDinosaurName: string;
+  generationAssetName: string;
+  imagePath: string;
+  createdAt: IsoDateString;
+}
+
 export interface DivisionGameState {
   activeProblem: DivisionProblem | null;
   steps: LongDivisionStep[];
   activeInputTarget: ActiveInputTarget | null;
   progress: PlayerProgressState;
   unlockedRewards: UnlockedReward[];
+  unlockedHybrids?: UnlockedHybridReward[];
 }

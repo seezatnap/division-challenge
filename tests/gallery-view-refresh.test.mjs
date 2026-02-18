@@ -123,6 +123,14 @@ test("home page uses the reusable DinoGalleryPanel with unlocked reward data", a
     source.includes("<DinoGalleryPanel unlockedRewards={gameSession.unlockedRewards} />"),
     "Expected home page to render DinoGalleryPanel with unlocked reward data",
   );
+  assert.ok(
+    source.includes('data-ui-surface="hybrid-gallery"'),
+    "Expected home page to render a dedicated hybrid gallery surface",
+  );
+  assert.ok(
+    source.includes("gameSession.unlockedHybrids"),
+    "Expected home page to wire hybrid gallery data from session state",
+  );
 });
 
 test("earned reward reveal panel dispatches gallery refresh updates after reveal", async () => {

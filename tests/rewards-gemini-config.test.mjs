@@ -78,3 +78,23 @@ test("buildJurassicParkCinematicPrompt includes reusable Jurassic cinematic guid
   assert.match(prompt, /family-friendly/);
   assert.match(prompt, /no gore/);
 });
+
+test("buildRewardImagePrompt switches to amber-specific guidance for amber assets", async () => {
+  const { buildRewardImagePrompt } = await rewardsGeminiModule;
+
+  const prompt = buildRewardImagePrompt("Amber Resonance Crystal");
+
+  assert.match(prompt, /Amber Resonance Crystal/);
+  assert.match(prompt, /amber crystal/i);
+  assert.match(prompt, /hero product still/i);
+});
+
+test("buildRewardImagePrompt switches to hybrid-specific guidance for hybrid assets", async () => {
+  const { buildRewardImagePrompt } = await rewardsGeminiModule;
+
+  const prompt = buildRewardImagePrompt("Hybrid Tyrannosaurus Rex + Velociraptor");
+
+  assert.match(prompt, /Hybrid Tyrannosaurus Rex \+ Velociraptor/);
+  assert.match(prompt, /dinosaur hybrid/i);
+  assert.match(prompt, /family-friendly/i);
+});
