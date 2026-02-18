@@ -206,6 +206,43 @@ test("bus-stop workspace color styling renders cream text on green surfaces whil
   );
 });
 
+test("dino coach sidebar uses an inset field-station readout treatment with cream monospace messaging", async () => {
+  const cssSource = await readRepoFile("src/app/globals.css");
+  const panelSource = await readRepoFile(
+    "src/features/workspace-ui/components/live-division-workspace-panel.tsx",
+  );
+
+  for (const fragment of [
+    ".hint-stack {",
+    "color-mix(in srgb, var(--jp-panel-border) 90%, #08190d)",
+    "inset 0 0 0 2px color-mix(in srgb, var(--jp-panel-border) 70%, black)",
+    ".hint-title {",
+    "font-size: 0.78rem;",
+    ".hint-status {",
+    "font-family: var(--font-jurassic-mono), \"Courier New\", monospace;",
+    ".coach-list {",
+    "list-style: none;",
+    ".coach-item {",
+    "color: color-mix(in srgb, var(--jp-panel-text) 94%, white);",
+    ".coach-item[data-feedback-tone=\"retry\"] {",
+    ".coach-item[data-feedback-tone=\"celebration\"] {",
+    ".hint-note {",
+    "color: color-mix(in srgb, var(--jp-panel-text) 74%, #d2ceb8);",
+  ]) {
+    assert.ok(cssSource.includes(fragment), `Expected Dino Coach readout styling fragment: ${fragment}`);
+  }
+
+  for (const fragment of [
+    "className=\"hint-stack\"",
+    "data-feedback-tone={activeCoachMessage.tone}",
+    "className=\"hint-title\">Dino Coach</h3>",
+    "className=\"coach-item\"",
+    "className=\"hint-note\"",
+  ]) {
+    assert.ok(panelSource.includes(fragment), `Expected Dino Coach panel fragment: ${fragment}`);
+  }
+});
+
 test("surveillance toolbar renders JP3 footer affordances with icon controls and MORE link", async () => {
   const pageSource = await readRepoFile("src/app/page.tsx");
   const toolbarSource = await readRepoFile(
