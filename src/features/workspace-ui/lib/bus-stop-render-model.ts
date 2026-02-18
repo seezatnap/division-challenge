@@ -127,7 +127,7 @@ function toDividendDigits(dividend: number): number[] {
 
 function resolveInitialReplayState(dividendDigits: readonly number[], divisor: number): ActiveStepReplayState {
   const normalizedDividendDigits = dividendDigits.length > 0 ? dividendDigits : [0];
-  let workingStartColumnIndex = 0;
+  const workingStartColumnIndex = 0;
   let workingEndColumnIndex = 0;
   let workingNumber = normalizedDividendDigits[0] ?? 0;
 
