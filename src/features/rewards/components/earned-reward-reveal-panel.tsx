@@ -201,6 +201,7 @@ function EarnedRewardRevealPanelContent({
     }
 
     didAutoOpenRevealModalRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- auto-open reveal modal once when image is ready
     setIsRevealModalOpen(true);
   }, [imagePath, phase]);
 

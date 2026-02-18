@@ -17,8 +17,11 @@ test("home page requires player name to start and wires localStorage profile per
   for (const fragment of [
     'data-ui-surface="player-start"',
     'data-ui-action="start-session"',
+    "The Research Center",
+    "Use the field-station terminal to initialize your Isla Sorna division log.",
     "Player Name",
     "Profiles are auto-saved in this browser by lowercase player name.",
+    "game-start-input-terminal",
     "normalizePlayerProfileName",
     "readPlayerProfileSnapshot",
     "writePlayerProfileSnapshot",

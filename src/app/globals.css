@@ -1860,37 +1860,99 @@ body {
 }
 
 .player-start-panel {
-  max-width: 34rem;
+  max-width: 40rem;
   margin-inline: auto;
+}
+
+.player-start-header {
+  margin-bottom: 0.35rem;
+}
+
+.player-start-research-intro {
+  width: 100%;
+  border-radius: 0.82rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 76%, black);
+  padding: 0.85rem 0.9rem;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-panel-border) 55%, #0b2611),
+      color-mix(in srgb, var(--jp-panel-border) 76%, #040f08)
+    ),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 8px,
+      color-mix(in srgb, var(--jp-panel-text) 8%, transparent) 8px 10px
+    );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 82%, black),
+    inset 0 1px 0 color-mix(in srgb, var(--jp-panel-text) 16%, transparent),
+    0 0.45rem 0.9rem rgba(4, 23, 9, 0.34);
+}
+
+.player-start-kicker {
+  color: color-mix(in srgb, var(--jp-panel-text) 82%, #f8e4a7);
+}
+
+.player-start-title {
+  margin-top: 0.2rem;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  color: var(--jp-panel-text);
+  text-shadow: 0 1px 0 rgba(7, 28, 12, 0.85);
+}
+
+.player-start-subtitle {
+  margin-top: 0.5rem;
+  max-width: 42ch;
+  font-size: 0.84rem;
+  line-height: 1.38;
+  color: color-mix(in srgb, var(--jp-panel-text) 88%, #d6d8bf);
 }
 
 .game-start-label {
   font-size: 0.78rem;
   font-weight: 700;
-  color: color-mix(in srgb, var(--jp-bark) 86%, black);
+  color: color-mix(in srgb, var(--jp-panel-text) 88%, #f4f8e8);
 }
 
 .game-start-input {
-  border-radius: 0.62rem;
-  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 86%, black);
-  padding: 0.52rem 0.7rem;
+  border-radius: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 72%, black);
+  padding: 0.56rem 0.72rem;
   font-size: 0.84rem;
-  background: color-mix(in srgb, var(--jp-panel-bg) 82%, black);
+  font-family: var(--font-jurassic-mono), "IBM Plex Mono", monospace;
+  letter-spacing: 0.04em;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-panel-border) 50%, #0a2510),
+      color-mix(in srgb, var(--jp-panel-border) 78%, #030f07)
+    );
+  color: var(--jp-panel-text);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 82%, black),
+    inset 0 1px 0 color-mix(in srgb, var(--jp-panel-text) 14%, transparent);
+}
+
+.game-start-input-terminal {
   color: var(--jp-panel-text);
 }
 
 .game-start-input::placeholder {
-  color: color-mix(in srgb, var(--jp-panel-text) 66%, transparent);
+  color: color-mix(in srgb, var(--jp-panel-text) 58%, transparent);
 }
 
 .game-start-input:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--jp-amber) 72%, white);
   outline-offset: 1px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-text) 24%, transparent),
+    0 0 0.9rem color-mix(in srgb, var(--jp-amber) 30%, transparent);
 }
 
 .game-start-helper {
   font-size: 0.76rem;
-  color: color-mix(in srgb, var(--jp-jungle) 72%, var(--jp-bark));
+  color: color-mix(in srgb, var(--jp-panel-text) 78%, #d4dec0);
 }
 
 .game-start-error {

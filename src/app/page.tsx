@@ -678,6 +678,7 @@ export default function Home() {
 
   useEffect(() => {
     completedProblemIdRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset transient readiness when problem id changes
     setIsNextProblemReady(false);
   }, [gameSession.activeProblem.id]);
 
@@ -730,12 +731,14 @@ export default function Home() {
       hybridLabSecondDinosaurName.length > 0 &&
       !hybridLabSecondDinosaurOptions.includes(hybridLabSecondDinosaurName)
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- normalize stale secondary selection after options update
       setHybridLabSecondDinosaurName("");
     }
   }, [hybridLabSecondDinosaurName, hybridLabSecondDinosaurOptions]);
 
   useEffect(() => {
     if (!selectedHybridReward) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear selected dossier when no reward is selected
       setSelectedHybridDossier(null);
       return;
     }
@@ -1188,6 +1191,7 @@ export default function Home() {
     }
 
     for (const unlockedReward of gameSession.unlockedRewards) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- queued prefetch updates image status state
       void requestRewardImageGeneration(unlockedReward.dinosaurName);
     }
     for (const unlockedHybrid of gameSession.unlockedHybrids) {
@@ -1366,12 +1370,15 @@ export default function Home() {
             className="jurassic-panel player-start-panel"
             data-ui-surface="player-start"
           >
-            <div className="surface-header">
-              <div>
-                <p className="surface-kicker">Player Profile</p>
-                <h2 className="surface-title" id="player-start-heading">
-                  Start Sequencing
+            <div className="surface-header player-start-header">
+              <div className="player-start-research-intro">
+                <p className="surface-kicker player-start-kicker">Player Profile</p>
+                <h2 className="surface-title player-start-title" id="player-start-heading">
+                  The Research Center
                 </h2>
+                <p className="player-start-subtitle">
+                  Use the field-station terminal to initialize your Isla Sorna division log.
+                </p>
               </div>
             </div>
 
@@ -1381,7 +1388,7 @@ export default function Home() {
               </label>
               <input
                 autoComplete="name"
-                className="game-start-input"
+                className="game-start-input game-start-input-terminal"
                 id="game-start-player-name"
                 name="playerName"
                 onChange={(event) => {
