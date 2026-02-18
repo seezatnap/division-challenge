@@ -362,6 +362,114 @@ function colorDistance(leftColor, rightColor) {
   );
 }
 
+function clampRgbChannel(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function parseCssColorToRgb(colorValue) {
+  if (typeof colorValue !== "string") {
+    return null;
+  }
+
+  const normalizedColorValue = colorValue.trim().toLowerCase();
+  if (!normalizedColorValue) {
+    return null;
+  }
+
+  const fullHexMatch = normalizedColorValue.match(/^#([0-9a-f]{6})$/i);
+  if (fullHexMatch) {
+    const hexValue = fullHexMatch[1];
+    return {
+      r: Number.parseInt(hexValue.slice(0, 2), 16),
+      g: Number.parseInt(hexValue.slice(2, 4), 16),
+      b: Number.parseInt(hexValue.slice(4, 6), 16),
+    };
+  }
+
+  const shortHexMatch = normalizedColorValue.match(/^#([0-9a-f]{3})$/i);
+  if (shortHexMatch) {
+    const [rHex, gHex, bHex] = shortHexMatch[1].split("");
+    return {
+      r: Number.parseInt(`${rHex}${rHex}`, 16),
+      g: Number.parseInt(`${gHex}${gHex}`, 16),
+      b: Number.parseInt(`${bHex}${bHex}`, 16),
+    };
+  }
+
+  const commaRgbMatch = normalizedColorValue.match(
+    /^rgba?\(\s*(-?[0-9]+(?:\.[0-9]+)?)\s*,\s*(-?[0-9]+(?:\.[0-9]+)?)\s*,\s*(-?[0-9]+(?:\.[0-9]+)?)(?:\s*,\s*[0-9]+(?:\.[0-9]+)?\s*)?\)$/i,
+  );
+  if (commaRgbMatch) {
+    return {
+      r: clampRgbChannel(Number.parseFloat(commaRgbMatch[1])),
+      g: clampRgbChannel(Number.parseFloat(commaRgbMatch[2])),
+      b: clampRgbChannel(Number.parseFloat(commaRgbMatch[3])),
+    };
+  }
+
+  const spaceRgbMatch = normalizedColorValue.match(
+    /^rgba?\(\s*(-?[0-9]+(?:\.[0-9]+)?)\s+(-?[0-9]+(?:\.[0-9]+)?)\s+(-?[0-9]+(?:\.[0-9]+)?)(?:\s*\/\s*[0-9]+(?:\.[0-9]+)?%?\s*)?\)$/i,
+  );
+  if (spaceRgbMatch) {
+    return {
+      r: clampRgbChannel(Number.parseFloat(spaceRgbMatch[1])),
+      g: clampRgbChannel(Number.parseFloat(spaceRgbMatch[2])),
+      b: clampRgbChannel(Number.parseFloat(spaceRgbMatch[3])),
+    };
+  }
+
+  const srgbColorMatch = normalizedColorValue.match(
+    /^color\(srgb\s+(-?[0-9]+(?:\.[0-9]+)?)\s+(-?[0-9]+(?:\.[0-9]+)?)\s+(-?[0-9]+(?:\.[0-9]+)?)(?:\s*\/\s*[0-9]+(?:\.[0-9]+)?)?\)$/i,
+  );
+  if (srgbColorMatch) {
+    return {
+      r: clampRgbChannel(Number.parseFloat(srgbColorMatch[1]) * 255),
+      g: clampRgbChannel(Number.parseFloat(srgbColorMatch[2]) * 255),
+      b: clampRgbChannel(Number.parseFloat(srgbColorMatch[3]) * 255),
+    };
+  }
+
+  return null;
+}
+
+function toLinearSrgbChannel(channel) {
+  const normalizedChannel = channel / 255;
+  if (normalizedChannel <= 0.04045) {
+    return normalizedChannel / 12.92;
+  }
+
+  return ((normalizedChannel + 0.055) / 1.055) ** 2.4;
+}
+
+function relativeLuminance(color) {
+  return (
+    0.2126 * toLinearSrgbChannel(color.r) +
+    0.7152 * toLinearSrgbChannel(color.g) +
+    0.0722 * toLinearSrgbChannel(color.b)
+  );
+}
+
+function contrastRatio(leftColor, rightColor) {
+  const leftLuminance = relativeLuminance(leftColor);
+  const rightLuminance = relativeLuminance(rightColor);
+  const brighterLuminance = Math.max(leftLuminance, rightLuminance);
+  const darkerLuminance = Math.min(leftLuminance, rightLuminance);
+  return (brighterLuminance + 0.05) / (darkerLuminance + 0.05);
+}
+
+function normalizeFontFamily(fontFamilyValue) {
+  return String(fontFamilyValue)
+    .replace(/["']/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function resolvePrimaryFontFamily(fontFamilyValue) {
+  const [primaryFontFamily = ""] = String(fontFamilyValue).split(",");
+  return normalizeFontFamily(primaryFontFamily);
+}
+
 function shouldSkipVisualTest(t) {
   if (!visualTestsSkipReason) {
     return false;
@@ -632,6 +740,182 @@ test("JP3 bottom toolbar is dark and includes SURVEILLANCE DEVICE label", { conc
       toolbarColorSample.r < 95 && toolbarColorSample.g < 95 && toolbarColorSample.b < 95,
       `Expected surveillance toolbar to be dark-colored; sampled ${JSON.stringify(toolbarColorSample)}.`,
     );
+  } finally {
+    await context.close();
+  }
+});
+
+test("JP3 workspace text stays light on green panels with accessible contrast", { concurrency: false }, async (t) => {
+  if (shouldSkipVisualTest(t)) {
+    return;
+  }
+
+  const { context, page } = await createStartedHomePage();
+
+  try {
+    const workspaceTypographySnapshot = await page.evaluate(() => {
+      const workspaceRenderer = document.querySelector('[data-ui-component="bus-stop-renderer"]');
+      const workspacePanel = workspaceRenderer?.closest(".workspace-paper") ?? null;
+      const rootStyle = getComputedStyle(document.documentElement);
+      const workspaceTextSelectors = [
+        ".workspace-label",
+        ".divisor-cell",
+        ".dividend-digit",
+        ".work-row-op",
+        ".work-row-value",
+      ];
+
+      const textSamples = workspaceTextSelectors.map((selector) => {
+        const element = workspaceRenderer?.querySelector(selector);
+        if (!element) {
+          return {
+            selector,
+            found: false,
+            text: "",
+            color: "",
+          };
+        }
+
+        return {
+          selector,
+          found: true,
+          text: (element.textContent ?? "").trim(),
+          color: getComputedStyle(element).color,
+        };
+      });
+
+      return {
+        panelBackgroundToken: rootStyle.getPropertyValue("--jp-panel-bg").trim(),
+        panelTextToken: rootStyle.getPropertyValue("--jp-panel-text").trim(),
+        workspacePanelBackgroundColor: workspacePanel ? getComputedStyle(workspacePanel).backgroundColor : "",
+        textSamples,
+      };
+    });
+
+    const panelBackgroundColor = parseCssColorToRgb(workspaceTypographySnapshot.panelBackgroundToken);
+    assert.ok(
+      panelBackgroundColor,
+      `Expected --jp-panel-bg to resolve to a parseable color; received ${workspaceTypographySnapshot.panelBackgroundToken}.`,
+    );
+    assert.ok(
+      panelBackgroundColor.r < 80 && panelBackgroundColor.g > 100 && panelBackgroundColor.b < 80,
+      `Expected --jp-panel-bg to remain JP3 green; received ${JSON.stringify(panelBackgroundColor)}.`,
+    );
+
+    const panelTextTokenColor = parseCssColorToRgb(workspaceTypographySnapshot.panelTextToken);
+    assert.ok(
+      panelTextTokenColor,
+      `Expected --jp-panel-text to resolve to a parseable color; received ${workspaceTypographySnapshot.panelTextToken}.`,
+    );
+    assert.ok(
+      panelTextTokenColor.r > 180 && panelTextTokenColor.g > 180 && panelTextTokenColor.b > 150,
+      `Expected --jp-panel-text to remain light-colored for contrast; received ${JSON.stringify(panelTextTokenColor)}.`,
+    );
+
+    const discoveredSamples = workspaceTypographySnapshot.textSamples.filter((sample) => sample.found);
+    assert.ok(
+      discoveredSamples.length >= 4,
+      `Expected at least four workspace text samples; received ${discoveredSamples.length}.`,
+    );
+
+    for (const sample of discoveredSamples) {
+      const textColor = parseCssColorToRgb(sample.color);
+      assert.ok(textColor, `Expected parseable color for ${sample.selector}; received ${sample.color}.`);
+
+      const sampleContrastRatio = contrastRatio(textColor, panelBackgroundColor);
+      assert.ok(
+        textColor.r > 160 && textColor.g > 160 && textColor.b > 140,
+        `Expected ${sample.selector} to render light-colored text; received ${JSON.stringify(textColor)}.`,
+      );
+      assert.ok(
+        sampleContrastRatio >= 4.4,
+        `Expected ${sample.selector} contrast against JP3 panel green to be at least 4.4:1; received ${sampleContrastRatio.toFixed(2)}.`,
+      );
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("JP3 typography keeps serif headings and sans-serif body copy", { concurrency: false }, async (t) => {
+  if (shouldSkipVisualTest(t)) {
+    return;
+  }
+
+  const { context, page } = await createStartedHomePage();
+
+  try {
+    const typographySnapshot = await page.evaluate(() => {
+      const bodyStyle = getComputedStyle(document.body);
+      const rootStyle = getComputedStyle(document.documentElement);
+      const headingSelectors = [
+        ".hero-title",
+        '[data-ui-surface="game"] .surface-title',
+        '[data-ui-surface="gallery"] .surface-title',
+      ];
+      const bodySelectors = [
+        '[data-ui-surface="game"] .surface-kicker',
+        ".hint-note",
+        ".amber-actions-note",
+      ];
+
+      const readFontSample = (selector) => {
+        const element = document.querySelector(selector);
+        return {
+          selector,
+          found: Boolean(element),
+          fontFamily: element ? getComputedStyle(element).fontFamily : "",
+        };
+      };
+
+      return {
+        displayFontVariable:
+          bodyStyle.getPropertyValue("--font-jurassic-display").trim() ||
+          rootStyle.getPropertyValue("--font-jurassic-display").trim(),
+        bodyFontVariable:
+          bodyStyle.getPropertyValue("--font-jurassic-body").trim() ||
+          rootStyle.getPropertyValue("--font-jurassic-body").trim(),
+        headingSamples: headingSelectors.map(readFontSample),
+        bodySamples: bodySelectors.map(readFontSample),
+      };
+    });
+
+    const displayPrimaryFamily = resolvePrimaryFontFamily(typographySnapshot.displayFontVariable);
+    const bodyPrimaryFamily = resolvePrimaryFontFamily(typographySnapshot.bodyFontVariable);
+    assert.ok(
+      displayPrimaryFamily.length > 0,
+      "Expected --font-jurassic-display to resolve to a non-empty font family.",
+    );
+    assert.ok(
+      bodyPrimaryFamily.length > 0,
+      "Expected --font-jurassic-body to resolve to a non-empty font family.",
+    );
+
+    for (const sample of typographySnapshot.headingSamples) {
+      assert.ok(sample.found, `Expected heading selector to exist for typography check: ${sample.selector}.`);
+      const normalizedHeadingFontFamily = normalizeFontFamily(sample.fontFamily);
+      assert.ok(
+        normalizedHeadingFontFamily.includes(displayPrimaryFamily),
+        `Expected ${sample.selector} to use the display serif family (${displayPrimaryFamily}); received ${sample.fontFamily}.`,
+      );
+      assert.ok(
+        normalizedHeadingFontFamily.includes("serif"),
+        `Expected ${sample.selector} to include serif fallback; received ${sample.fontFamily}.`,
+      );
+    }
+
+    for (const sample of typographySnapshot.bodySamples) {
+      assert.ok(sample.found, `Expected body selector to exist for typography check: ${sample.selector}.`);
+      const normalizedBodyFontFamily = normalizeFontFamily(sample.fontFamily);
+      assert.ok(
+        normalizedBodyFontFamily.includes(bodyPrimaryFamily),
+        `Expected ${sample.selector} to use the body sans-serif family (${bodyPrimaryFamily}); received ${sample.fontFamily}.`,
+      );
+      assert.ok(
+        normalizedBodyFontFamily.includes("sans-serif"),
+        `Expected ${sample.selector} to include sans-serif fallback; received ${sample.fontFamily}.`,
+      );
+    }
   } finally {
     await context.close();
   }
