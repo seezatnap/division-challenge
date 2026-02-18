@@ -172,6 +172,7 @@ function toDossierFromArtifactPayload(payload: unknown): RewardDinosaurDossier |
     attributes,
     description,
     sourceDinosaurs,
+    infoCard: null,
   };
 }
 

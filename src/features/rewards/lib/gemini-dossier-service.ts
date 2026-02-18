@@ -247,6 +247,7 @@ function normalizeGeminiDossierPayload(
     attributes,
     description,
     sourceDinosaurs,
+    infoCard: fallbackDossier.infoCard,
   };
 }
 
