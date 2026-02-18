@@ -85,3 +85,102 @@ test("global stylesheet defines egg-hatching and reveal animation styles", async
     assert.ok(source.includes(fragment), `Expected reward styling fragment: ${fragment}`);
   }
 });
+
+test("earned reward panel uses JP3 green panel + wood frame aesthetic", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  // Earned reward panel should use JP3 green background and wood frame border
+  assert.ok(
+    source.includes(".earned-reward-panel"),
+    "Expected .earned-reward-panel rule in stylesheet",
+  );
+
+  // Extract the earned-reward-panel block to verify JP3 styling
+  const panelRuleStart = source.indexOf(".earned-reward-panel {");
+  const panelRuleEnd = source.indexOf("}", panelRuleStart);
+  const panelRule = source.slice(panelRuleStart, panelRuleEnd + 1);
+
+  assert.ok(
+    panelRule.includes("var(--jp-panel-bg)"),
+    "Expected earned-reward-panel to use --jp-panel-bg green background",
+  );
+  assert.ok(
+    panelRule.includes("var(--jp-frame)"),
+    "Expected earned-reward-panel to use --jp-frame wood border color",
+  );
+  assert.ok(
+    panelRule.includes("var(--jp-panel-text)"),
+    "Expected earned-reward-panel to use --jp-panel-text cream text color",
+  );
+  assert.ok(
+    panelRule.includes("var(--jp-frame-grain)"),
+    "Expected earned-reward-panel to use wood grain texture overlay",
+  );
+});
+
+test("reward reveal image uses bordered frame matching comp dinosaur portrait", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  // Reward reveal image should have JP3 dark-green bordered frame
+  const imageRuleStart = source.indexOf(".reward-reveal-image {");
+  const imageRuleEnd = source.indexOf("}", imageRuleStart);
+  const imageRule = source.slice(imageRuleStart, imageRuleEnd + 1);
+
+  assert.ok(
+    imageRule.includes("var(--jp-panel-border)"),
+    "Expected reward-reveal-image to use --jp-panel-border for bordered frame",
+  );
+  assert.ok(
+    imageRule.includes("box-shadow"),
+    "Expected reward-reveal-image to have box-shadow for inset portrait effect",
+  );
+
+  // Reward reveal figure should have portrait-area styling
+  const figureRuleStart = source.indexOf(".reward-reveal-figure {");
+  const figureRuleEnd = source.indexOf("}", figureRuleStart);
+  const figureRule = source.slice(figureRuleStart, figureRuleEnd + 1);
+
+  assert.ok(
+    figureRule.includes("var(--jp-panel-border)"),
+    "Expected reward-reveal-figure to use --jp-panel-border for portrait area border",
+  );
+  assert.ok(
+    figureRule.includes("padding"),
+    "Expected reward-reveal-figure to have padding for portrait area framing",
+  );
+});
+
+test("reward reveal modal uses JP3 wood frame border aesthetic", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  const modalRuleStart = source.indexOf(".reward-reveal-modal {");
+  const modalRuleEnd = source.indexOf("}", modalRuleStart);
+  const modalRule = source.slice(modalRuleStart, modalRuleEnd + 1);
+
+  assert.ok(
+    modalRule.includes("var(--jp-frame)"),
+    "Expected reward-reveal-modal to use --jp-frame wood border",
+  );
+  assert.ok(
+    modalRule.includes("var(--jp-frame-grain)"),
+    "Expected reward-reveal-modal to use wood grain texture overlay",
+  );
+});
+
+test("reward modal image uses bordered frame matching comp dinosaur portrait", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  // The shared .gallery-detail-image, .reward-modal-image rule
+  const sharedRuleStart = source.indexOf(".gallery-detail-image,");
+  const sharedRuleEnd = source.indexOf("}", sharedRuleStart);
+  const sharedRule = source.slice(sharedRuleStart, sharedRuleEnd + 1);
+
+  assert.ok(
+    sharedRule.includes("var(--jp-panel-border)"),
+    "Expected reward-modal-image to use --jp-panel-border for bordered frame",
+  );
+  assert.ok(
+    sharedRule.includes("box-shadow"),
+    "Expected reward-modal-image to have box-shadow for portrait frame effect",
+  );
+});
