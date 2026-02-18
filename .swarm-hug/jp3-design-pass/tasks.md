@@ -55,7 +55,7 @@ Every task below should be implemented to visually match these comps. When in do
 ## Polish & Integration
 
 - [x] (#21) Run the full existing test suite (`npm test` and `npm run test:visual`) and fix any regressions caused by the design pass, ensuring all workspace interaction, game logic, persistence, and reward pipeline tests still pass [5 pts] (blocked by #8, #9, #10, #13, #14, #15, #20) (A) (A)
-- [ ] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A)
+- [x] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A) (A)
 
 ## Follow-up tasks (from sprint review)
 - [x] (#23) Fix toolbar `currentStreak` stat to track actual consecutive-correct-answer streak instead of reusing `sessionSolvedProblems` (blocked by #7) (C)
@@ -66,4 +66,7 @@ Every task below should be implemented to visually match these comps. When in do
 - [x] (#26) Restore `tests/gallery-detail-two-panel.test.mjs` lost during merge (file exists in commit 748ca55 but is missing from HEAD) (blocked by #11) (B)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#27) Resolve the unresolved merge conflict markers in `src/app/page.tsx` (lines 1838–1848) — task #24 was marked complete but conflict markers remain; accept the `IslaSornaToolbar` stashed changes and remove the conflict markers (blocked by #23)
+- [x] (#27) Resolve the unresolved merge conflict markers in `src/app/page.tsx` (lines 1838–1848) — task #24 was marked complete but conflict markers remain; accept the `IslaSornaToolbar` stashed changes and remove the conflict markers (blocked by #23) (A)
+
+## Follow-up tasks (from sprint review)
+- [ ] (#28) Investigate `test-results/.last-run.json` showing `"status": "failed"` with empty `failedTests` array — re-run the full test suite (`npm test`) and ensure all tests pass cleanly with `"status": "passed"` (blocked by #27)
