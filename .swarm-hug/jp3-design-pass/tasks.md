@@ -55,7 +55,7 @@ Every task below should be implemented to visually match these comps. When in do
 ## Polish & Integration
 
 - [x] (#21) Run the full existing test suite (`npm test` and `npm run test:visual`) and fix any regressions caused by the design pass, ensuring all workspace interaction, game logic, persistence, and reward pipeline tests still pass [5 pts] (blocked by #8, #9, #10, #13, #14, #15, #20) (A) (A)
-- [ ] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A)
+- [A] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A)
 
 ## Follow-up tasks (from sprint review)
 - [x] (#23) Remove remaining dark text overrides inside `.jurassic-panel` (notably classes like `.hero-title`, `.surface-title`, `.hero-copy`, `.status-chip`, `.hint-title`, `.gallery-name`, and `.game-start-label`) so panel content consistently renders in cream/white for contrast against the JP3 green background. (B)
@@ -64,8 +64,8 @@ Every task below should be implemented to visually match these comps. When in do
 - [x] (#24) Replace the toolbar’s placeholder streak wiring (`currentStreak` currently mirrors `sessionSolvedProblems`) with a true streak metric in session state, and add test coverage showing streak can diverge from total solved after an incorrect attempt. (A)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#25) Move `tests/jp3-design-visual.test.mjs` into the visual-test path (`npm run test:visual`) and run it serially with other visual suites, so `npm test` stays unit-focused and avoids browser/dev-server side effects.
-- [ ] (#26) Harden preexisting-server detection in `tests/jp3-design-visual.test.mjs` to verify it is this app before reusing `:3000`; if verification fails, start the dedicated `4173` server with `NEXT_DIST_DIR=.next-visual-tests`.
+- [B] (#25) Move `tests/jp3-design-visual.test.mjs` into the visual-test path (`npm run test:visual`) and run it serially with other visual suites, so `npm test` stays unit-focused and avoids browser/dev-server side effects.
+- [B] (#26) Harden preexisting-server detection in `tests/jp3-design-visual.test.mjs` to verify it is this app before reusing `:3000`; if verification fails, start the dedicated `4173` server with `NEXT_DIST_DIR=.next-visual-tests`.
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#27) Restore cross-platform visual-server startup by resolving the Next CLI executable per platform (`next.cmd` on Windows) in `tests/jp3-design-visual.test.mjs` and `tests/workspace-visual-layout.visual.mjs` instead of hardcoding `node_modules/.bin/next`.
+- [B] (#27) Restore cross-platform visual-server startup by resolving the Next CLI executable per platform (`next.cmd` on Windows) in `tests/jp3-design-visual.test.mjs` and `tests/workspace-visual-layout.visual.mjs` instead of hardcoding `node_modules/.bin/next`.
