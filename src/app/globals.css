@@ -1191,55 +1191,76 @@ body {
   color: rgba(240, 237, 216, 0.72);
 }
 
+/* ── JP3 Research Center Thumbnail Grid ─────────────────── */
+
 .gallery-grid {
   display: grid;
-  gap: 0.7rem;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.35rem;
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .gallery-card {
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 0.45rem;
-  background: rgba(0, 0, 0, 0.1);
-  padding: 0.62rem;
+  position: relative;
+  border: 2px solid #145a22;
+  border-radius: 0.2rem;
+  background: #2d8a2d;
+  aspect-ratio: 1;
+  overflow: hidden;
 }
 
 .gallery-card-trigger {
   width: 100%;
+  height: 100%;
   border: 0;
   background: transparent;
   padding: 0;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .gallery-card-trigger:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--jp-amber) 72%, white);
-  outline-offset: 2px;
-  border-radius: 0.65rem;
+  outline-offset: -2px;
+  border-radius: 0.2rem;
 }
 
 .gallery-thumb {
   overflow: hidden;
   position: relative;
-  border-radius: 0.35rem;
-  height: 4.8rem;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  background: rgba(0, 0, 0, 0.15);
+  width: 80%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  border: none;
+  background: transparent;
 }
 
 .gallery-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
 .gallery-name {
-  margin-top: 0.55rem;
-  font-size: 0.88rem;
+  margin-top: 0.2rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  color: var(--jp-panel-text);
+  color: #f0edd8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  padding: 0 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .gallery-meta {
