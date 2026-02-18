@@ -1,15 +1,17 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import {
   buildHybridDinosaurDossier,
   formatMetersAsMetersAndFeet,
+  formatRewardDossierPromptBlock,
   isAmberRewardAssetName,
-  listPrimaryDinosaurDossiers,
   parseHybridGenerationAssetName,
   resolveRewardAssetDossier,
+  toRewardDossierArtifactSlug,
   type RewardDinosaurDossier,
 } from "./dino-dossiers";
+import { generateGeminiRewardDossier } from "./gemini-dossier-service";
 
 const DOSSIER_ARTIFACTS_ROOT = path.join(process.cwd(), "public", "artifacts", "dossiers");
 const PRIMARY_DOSSIER_DIRECTORY = path.join(DOSSIER_ARTIFACTS_ROOT, "primary");
@@ -22,6 +24,8 @@ const HYBRID_DOSSIER_MANIFEST_PATH = path.join(
   DOSSIER_ARTIFACTS_ROOT,
   "hybrid-dinosaur-dossiers.json",
 );
+
+type DossierGenerationSource = "gemini" | "deterministic-fallback";
 
 interface RewardDossierArtifact {
   readonly kind: RewardDinosaurDossier["kind"];
@@ -37,8 +41,18 @@ interface RewardDossierArtifact {
   readonly description: string;
 }
 
+interface RewardDossierArtifactFile extends RewardDossierArtifact {
+  readonly generatedAt: string;
+  readonly generator: {
+    readonly source: DossierGenerationSource;
+    readonly model: string;
+    readonly prompt: string;
+  };
+}
+
 interface RewardDossierArtifactManifestEntry extends RewardDossierArtifact {
   readonly artifactPath: string;
+  readonly generator: RewardDossierArtifactFile["generator"];
 }
 
 interface RewardDossierArtifactManifest {
@@ -47,7 +61,13 @@ interface RewardDossierArtifactManifest {
   readonly dossiers: readonly RewardDossierArtifactManifestEntry[];
 }
 
-let primaryDossierArtifactManifestWrite: Promise<void> | null = null;
+export interface RewardDossierArtifactResolution {
+  readonly dossier: RewardDinosaurDossier;
+  readonly promptBlock: string;
+  readonly artifactPath: string;
+  readonly wasRegenerated: boolean;
+  readonly source: DossierGenerationSource | "cached";
+}
 
 function getTrimmedNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -58,23 +78,8 @@ function getTrimmedNonEmptyString(value: unknown): string | null {
   return trimmedValue.length > 0 ? trimmedValue : null;
 }
 
-function toArtifactSlug(value: string): string {
-  const normalizedValue = getTrimmedNonEmptyString(value);
-
-  if (!normalizedValue) {
-    throw new Error("value must be a non-empty string.");
-  }
-
-  const slug = normalizedValue
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  if (slug.length === 0) {
-    throw new Error("value must include alphanumeric characters.");
-  }
-
-  return slug;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function toRewardDossierArtifact(dossier: RewardDinosaurDossier): RewardDossierArtifact {
@@ -93,122 +98,163 @@ function toRewardDossierArtifact(dossier: RewardDinosaurDossier): RewardDossierA
   };
 }
 
-function toPrimaryDossierArtifactPath(subjectName: string): string {
-  return `/artifacts/dossiers/primary/${toArtifactSlug(subjectName)}.json`;
+function toArtifactPublicPath(input: {
+  kind: RewardDinosaurDossier["kind"];
+  subjectName: string;
+}): string {
+  const folder = input.kind === "hybrid" ? "hybrid" : "primary";
+  return `/artifacts/dossiers/${folder}/${toRewardDossierArtifactSlug(input.subjectName)}.json`;
 }
 
-function toHybridDossierArtifactPath(subjectName: string): string {
-  return `/artifacts/dossiers/hybrid/${toArtifactSlug(subjectName)}.json`;
+function toAbsoluteArtifactPath(input: {
+  kind: RewardDinosaurDossier["kind"];
+  subjectName: string;
+}): string {
+  const folder = input.kind === "hybrid" ? HYBRID_DOSSIER_DIRECTORY : PRIMARY_DOSSIER_DIRECTORY;
+  return path.join(folder, `${toRewardDossierArtifactSlug(input.subjectName)}.json`);
 }
 
-async function writeArtifactJsonFile(
-  absolutePath: string,
-  payload: unknown,
-): Promise<void> {
+function toManifestPath(kind: RewardDinosaurDossier["kind"]): string {
+  return kind === "hybrid" ? HYBRID_DOSSIER_MANIFEST_PATH : PRIMARY_DOSSIER_MANIFEST_PATH;
+}
+
+function toDossierFromArtifactPayload(payload: unknown): RewardDinosaurDossier | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+
+  const kind = payload.kind === "primary" || payload.kind === "hybrid" ? payload.kind : null;
+  const subjectName = getTrimmedNonEmptyString(payload.subjectName);
+  const description = getTrimmedNonEmptyString(payload.description);
+
+  if (!kind || !subjectName || !description || !isRecord(payload.dimensions)) {
+    return null;
+  }
+
+  if (
+    typeof payload.dimensions.heightMeters !== "number" ||
+    typeof payload.dimensions.lengthMeters !== "number"
+  ) {
+    return null;
+  }
+
+  if (!Array.isArray(payload.attributes)) {
+    return null;
+  }
+  const attributes = payload.attributes
+    .map((entry) => getTrimmedNonEmptyString(entry))
+    .filter((entry): entry is string => Boolean(entry));
+
+  if (attributes.length === 0) {
+    return null;
+  }
+
+  let sourceDinosaurs: readonly [string, string] | null = null;
+  if (payload.sourceDinosaurs !== null && payload.sourceDinosaurs !== undefined) {
+    if (!Array.isArray(payload.sourceDinosaurs) || payload.sourceDinosaurs.length !== 2) {
+      return null;
+    }
+
+    const firstDinosaurName = getTrimmedNonEmptyString(payload.sourceDinosaurs[0]);
+    const secondDinosaurName = getTrimmedNonEmptyString(payload.sourceDinosaurs[1]);
+    if (!firstDinosaurName || !secondDinosaurName) {
+      return null;
+    }
+
+    sourceDinosaurs = [firstDinosaurName, secondDinosaurName];
+  }
+
+  return {
+    kind,
+    subjectName,
+    heightMeters: payload.dimensions.heightMeters,
+    lengthMeters: payload.dimensions.lengthMeters,
+    attributes,
+    description,
+    sourceDinosaurs,
+  };
+}
+
+function toGenerationSource(payload: unknown): DossierGenerationSource | null {
+  if (!isRecord(payload) || !isRecord(payload.generator)) {
+    return null;
+  }
+
+  const source = payload.generator.source;
+  return source === "gemini" || source === "deterministic-fallback" ? source : null;
+}
+
+function shouldReuseExistingArtifact(payload: unknown): boolean {
+  return toGenerationSource(payload) === "gemini";
+}
+
+async function readJsonFileIfExists(absolutePath: string): Promise<unknown | null> {
+  try {
+    await access(absolutePath);
+  } catch {
+    return null;
+  }
+
+  try {
+    const rawPayload = await readFile(absolutePath, "utf8");
+    return JSON.parse(rawPayload);
+  } catch {
+    return null;
+  }
+}
+
+async function writeArtifactJsonFile(absolutePath: string, payload: unknown): Promise<void> {
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
-async function ensurePrimaryDossierArtifacts(): Promise<void> {
-  if (primaryDossierArtifactManifestWrite) {
-    return primaryDossierArtifactManifestWrite;
-  }
+async function readManifest(kind: RewardDinosaurDossier["kind"]): Promise<RewardDossierArtifactManifest> {
+  const manifestPath = toManifestPath(kind);
+  const parsedManifest = await readJsonFileIfExists(manifestPath);
 
-  primaryDossierArtifactManifestWrite = (async () => {
-    const generatedAt = new Date().toISOString();
-    const primaryDossiers = listPrimaryDinosaurDossiers();
-    const manifestEntries: RewardDossierArtifactManifestEntry[] = [];
-
-    for (const dossier of primaryDossiers) {
-      const artifact = toRewardDossierArtifact(dossier);
-      const artifactPath = toPrimaryDossierArtifactPath(dossier.subjectName);
-      const absoluteArtifactPath = path.join(
-        PRIMARY_DOSSIER_DIRECTORY,
-        `${toArtifactSlug(dossier.subjectName)}.json`,
-      );
-
-      await writeArtifactJsonFile(absoluteArtifactPath, {
-        generatedAt,
-        ...artifact,
-      });
-
-      manifestEntries.push({
-        ...artifact,
-        artifactPath,
-      });
-    }
-
-    const manifest: RewardDossierArtifactManifest = {
-      generatedAt,
-      count: manifestEntries.length,
-      dossiers: manifestEntries,
-    };
-
-    await writeArtifactJsonFile(PRIMARY_DOSSIER_MANIFEST_PATH, manifest);
-  })().catch((error) => {
-    primaryDossierArtifactManifestWrite = null;
-    throw error;
-  });
-
-  return primaryDossierArtifactManifestWrite;
-}
-
-async function readHybridDossierManifest(): Promise<RewardDossierArtifactManifest> {
-  try {
-    const rawManifest = await readFile(HYBRID_DOSSIER_MANIFEST_PATH, "utf8");
-    const parsedManifest = JSON.parse(rawManifest) as Partial<RewardDossierArtifactManifest>;
-
-    if (!Array.isArray(parsedManifest.dossiers)) {
-      throw new Error("hybrid dossier manifest is not an array.");
-    }
-
-    const entries = parsedManifest.dossiers.filter(
-      (entry): entry is RewardDossierArtifactManifestEntry =>
-        Boolean(
-          entry &&
-            typeof entry === "object" &&
-            typeof entry.subjectName === "string" &&
-            typeof entry.artifactPath === "string",
-        ),
-    );
-
-    return {
-      generatedAt: new Date().toISOString(),
-      count: entries.length,
-      dossiers: entries,
-    };
-  } catch {
+  if (!isRecord(parsedManifest) || !Array.isArray(parsedManifest.dossiers)) {
     return {
       generatedAt: new Date().toISOString(),
       count: 0,
       dossiers: [],
     };
   }
+
+  const dossiers = parsedManifest.dossiers.filter(
+    (entry): entry is RewardDossierArtifactManifestEntry =>
+      Boolean(
+        isRecord(entry) &&
+          typeof entry.subjectName === "string" &&
+          typeof entry.artifactPath === "string",
+      ),
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    count: dossiers.length,
+    dossiers,
+  };
 }
 
-async function writeHybridDossierArtifact(dossier: RewardDinosaurDossier): Promise<void> {
-  const generatedAt = new Date().toISOString();
-  const artifact = toRewardDossierArtifact(dossier);
-  const artifactPath = toHybridDossierArtifactPath(dossier.subjectName);
-  const absoluteArtifactPath = path.join(
-    HYBRID_DOSSIER_DIRECTORY,
-    `${toArtifactSlug(dossier.subjectName)}.json`,
-  );
-
-  await writeArtifactJsonFile(absoluteArtifactPath, {
-    generatedAt,
-    ...artifact,
+async function upsertManifestEntry(input: {
+  dossier: RewardDinosaurDossier;
+  generator: RewardDossierArtifactFile["generator"];
+}): Promise<void> {
+  const artifact = toRewardDossierArtifact(input.dossier);
+  const artifactPath = toArtifactPublicPath({
+    kind: input.dossier.kind,
+    subjectName: input.dossier.subjectName,
   });
-
-  const existingManifest = await readHybridDossierManifest();
-  const filteredEntries = existingManifest.dossiers.filter(
-    (entry) => entry.subjectName.toLowerCase() !== dossier.subjectName.toLowerCase(),
+  const currentManifest = await readManifest(input.dossier.kind);
+  const filteredDossiers = currentManifest.dossiers.filter(
+    (entry) => entry.subjectName.toLowerCase() !== input.dossier.subjectName.toLowerCase(),
   );
-  const nextEntries = [
-    ...filteredEntries,
+  const nextDossiers = [
+    ...filteredDossiers,
     {
       ...artifact,
       artifactPath,
+      generator: input.generator,
     },
   ].sort((leftEntry, rightEntry) =>
     leftEntry.subjectName.localeCompare(rightEntry.subjectName, "en", {
@@ -216,43 +262,132 @@ async function writeHybridDossierArtifact(dossier: RewardDinosaurDossier): Promi
     }),
   );
 
-  await writeArtifactJsonFile(HYBRID_DOSSIER_MANIFEST_PATH, {
-    generatedAt,
-    count: nextEntries.length,
-    dossiers: nextEntries,
+  await writeArtifactJsonFile(toManifestPath(input.dossier.kind), {
+    generatedAt: new Date().toISOString(),
+    count: nextDossiers.length,
+    dossiers: nextDossiers,
   });
 }
 
-export async function ensureRewardDossierArtifacts(assetName: string): Promise<void> {
-  const normalizedAssetName = getTrimmedNonEmptyString(assetName);
+async function generateDossierForAsset(assetName: string): Promise<{
+  dossier: RewardDinosaurDossier;
+  generator: RewardDossierArtifactFile["generator"];
+}> {
+  try {
+    const generatedDossier = await generateGeminiRewardDossier(assetName);
 
-  if (!normalizedAssetName) {
-    throw new Error("assetName must be a non-empty string.");
+    return {
+      dossier: generatedDossier.dossier,
+      generator: {
+        source: "gemini",
+        model: generatedDossier.model,
+        prompt: generatedDossier.prompt,
+      },
+    };
+  } catch (error) {
+    const fallbackDossier =
+      resolveRewardAssetDossier(assetName) ??
+      (() => {
+        const parsedHybridPair = parseHybridGenerationAssetName(assetName);
+        if (!parsedHybridPair) {
+          throw new Error("Unable to build fallback dossier for this asset.");
+        }
+
+        return buildHybridDinosaurDossier(parsedHybridPair);
+      })();
+
+    return {
+      dossier: fallbackDossier,
+      generator: {
+        source: "deterministic-fallback",
+        model: "local-deterministic-fallback",
+        prompt: `Fallback dossier for ${assetName}: ${error instanceof Error ? error.message : "unknown generation error"}`,
+      },
+    };
   }
+}
 
-  await ensurePrimaryDossierArtifacts();
-
-  if (isAmberRewardAssetName(normalizedAssetName)) {
-    return;
+export function resolveRewardDossierArtifactPath(
+  assetName: string,
+): string | null {
+  const normalizedAssetName = getTrimmedNonEmptyString(assetName);
+  if (!normalizedAssetName || isAmberRewardAssetName(normalizedAssetName)) {
+    return null;
   }
 
   const hybridPair = parseHybridGenerationAssetName(normalizedAssetName);
   if (hybridPair) {
-    await writeHybridDossierArtifact(buildHybridDinosaurDossier(hybridPair));
-    return;
+    const hybridAssetName = `Hybrid ${hybridPair.firstDinosaurName} + ${hybridPair.secondDinosaurName}`;
+    return toArtifactPublicPath({
+      kind: "hybrid",
+      subjectName: hybridAssetName,
+    });
   }
 
-  const primaryDossier = resolveRewardAssetDossier(normalizedAssetName);
-  if (!primaryDossier) {
-    return;
-  }
-
-  const primaryArtifactPath = path.join(
-    PRIMARY_DOSSIER_DIRECTORY,
-    `${toArtifactSlug(primaryDossier.subjectName)}.json`,
-  );
-  await writeArtifactJsonFile(primaryArtifactPath, {
-    generatedAt: new Date().toISOString(),
-    ...toRewardDossierArtifact(primaryDossier),
+  return toArtifactPublicPath({
+    kind: "primary",
+    subjectName: normalizedAssetName,
   });
+}
+
+export async function ensureRewardDossierArtifacts(
+  assetName: string,
+): Promise<RewardDossierArtifactResolution | null> {
+  const normalizedAssetName = getTrimmedNonEmptyString(assetName);
+  if (!normalizedAssetName) {
+    throw new Error("assetName must be a non-empty string.");
+  }
+
+  if (isAmberRewardAssetName(normalizedAssetName)) {
+    return null;
+  }
+
+  const parsedHybridPair = parseHybridGenerationAssetName(normalizedAssetName);
+  const normalizedDossierName = parsedHybridPair
+    ? `Hybrid ${parsedHybridPair.firstDinosaurName} + ${parsedHybridPair.secondDinosaurName}`
+    : normalizedAssetName;
+  const dossierKind: RewardDinosaurDossier["kind"] = parsedHybridPair ? "hybrid" : "primary";
+  const absoluteArtifactPath = toAbsoluteArtifactPath({
+    kind: dossierKind,
+    subjectName: normalizedDossierName,
+  });
+  const artifactPath = toArtifactPublicPath({
+    kind: dossierKind,
+    subjectName: normalizedDossierName,
+  });
+
+  const existingArtifactPayload = await readJsonFileIfExists(absoluteArtifactPath);
+  if (existingArtifactPayload && shouldReuseExistingArtifact(existingArtifactPayload)) {
+    const parsedDossier = toDossierFromArtifactPayload(existingArtifactPayload);
+    if (parsedDossier) {
+      return {
+        dossier: parsedDossier,
+        promptBlock: formatRewardDossierPromptBlock(parsedDossier),
+        artifactPath,
+        wasRegenerated: false,
+        source: "cached",
+      };
+    }
+  }
+
+  const generatedResult = await generateDossierForAsset(normalizedAssetName);
+  const artifactPayload: RewardDossierArtifactFile = {
+    generatedAt: new Date().toISOString(),
+    ...toRewardDossierArtifact(generatedResult.dossier),
+    generator: generatedResult.generator,
+  };
+
+  await writeArtifactJsonFile(absoluteArtifactPath, artifactPayload);
+  await upsertManifestEntry({
+    dossier: generatedResult.dossier,
+    generator: generatedResult.generator,
+  });
+
+  return {
+    dossier: generatedResult.dossier,
+    promptBlock: formatRewardDossierPromptBlock(generatedResult.dossier),
+    artifactPath,
+    wasRegenerated: true,
+    source: generatedResult.generator.source,
+  };
 }

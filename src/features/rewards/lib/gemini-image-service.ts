@@ -32,6 +32,7 @@ export class GeminiImageGenerationError extends Error {
 export interface GeminiImageGenerationRequest {
   dinosaurName: string;
   modelOverride?: string;
+  dossierPromptBlock?: string;
 }
 
 export interface GeminiGeneratedImage {
@@ -65,7 +66,7 @@ export interface GeminiApiClient {
 
 export interface GeminiImageServiceDependencies {
   getRequestConfig: () => GeminiServiceRequestConfig;
-  buildPrompt: (dinosaurName: string) => string;
+  buildPrompt: (dinosaurName: string, dossierPromptBlock?: string) => string;
   createClient: (apiKey: string) => GeminiApiClient;
 }
 
@@ -230,14 +231,17 @@ export function parseGeminiImageGenerationRequest(payload: unknown): GeminiImage
   }
 
   const modelOverride = getTrimmedNonEmptyString(payload.modelOverride);
-  if (modelOverride) {
-    return {
-      dinosaurName,
-      modelOverride,
-    };
+  const dossierPromptBlock = getTrimmedNonEmptyString(payload.dossierPromptBlock);
+
+  if (!modelOverride && !dossierPromptBlock) {
+    return { dinosaurName };
   }
 
-  return { dinosaurName };
+  return {
+    dinosaurName,
+    ...(modelOverride ? { modelOverride } : {}),
+    ...(dossierPromptBlock ? { dossierPromptBlock } : {}),
+  };
 }
 
 export function buildGeminiGenerateContentRequest(
@@ -389,7 +393,7 @@ export async function generateGeminiDinosaurImage(
 
   let prompt: string;
   try {
-    prompt = dependencies.buildPrompt(request.dinosaurName);
+    prompt = dependencies.buildPrompt(request.dinosaurName, request.dossierPromptBlock);
   } catch (cause) {
     throw new GeminiImageGenerationError(
       "GEMINI_PROMPT_ERROR",

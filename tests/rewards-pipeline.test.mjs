@@ -185,11 +185,13 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
     "Tyrannosaurus Rex",
     { outputDirectory: cacheDirectory },
   );
-  assert.deepEqual(readyStatus, {
-    dinosaurName: "Tyrannosaurus Rex",
-    status: "ready",
-    imagePath: "/rewards/tyrannosaurus-rex.png",
-  });
+  assert.equal(readyStatus.dinosaurName, "Tyrannosaurus Rex");
+  assert.equal(readyStatus.status, "ready");
+  assert.ok(
+    typeof readyStatus.imagePath === "string" &&
+      readyStatus.imagePath.startsWith("/rewards/tyrannosaurus-rex.png?v="),
+    `Expected cache-busted ready image path, received: ${readyStatus.imagePath}`,
+  );
   assert.equal(generatorInvocationCount, 1);
 });
 
@@ -258,5 +260,9 @@ test("earned reward reveal polling waits for in-flight prefetched generation and
   assert.equal(revealResult.attempts, 2);
   assert.equal(revealResult.snapshot.status, "ready");
   assert.equal(revealResult.snapshot.dinosaurName, earnedReward.dinosaurName);
-  assert.equal(revealResult.snapshot.imagePath, earnedReward.imagePath);
+  assert.ok(
+    typeof revealResult.snapshot.imagePath === "string" &&
+      revealResult.snapshot.imagePath.startsWith(`${earnedReward.imagePath}?v=`),
+    `Expected revealed image path to include cache-buster, received: ${revealResult.snapshot.imagePath}`,
+  );
 });

@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 import {
-  buildRewardImagePrompt,
+  buildRewardImagePromptWithDossier,
   createGeminiImageRequestConfig,
 } from "./gemini";
 import { createFallbackRewardImage } from "./fallback-reward-image";
@@ -16,7 +16,8 @@ import {
 
 const defaultGeminiImageServiceDependencies: GeminiImageServiceDependencies = {
   getRequestConfig: createGeminiImageRequestConfig,
-  buildPrompt: buildRewardImagePrompt,
+  buildPrompt: (assetName: string, dossierPromptBlock?: string) =>
+    buildRewardImagePromptWithDossier(assetName, dossierPromptBlock ?? null),
   createClient: (apiKey: string) => new GoogleGenAI({ apiKey }),
 };
 

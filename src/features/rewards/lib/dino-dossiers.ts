@@ -55,6 +55,15 @@ export interface RewardHybridPair {
   readonly secondDinosaurName: string;
 }
 
+interface RewardDinosaurDossierArtifactPayload {
+  readonly kind?: unknown;
+  readonly subjectName?: unknown;
+  readonly sourceDinosaurs?: unknown;
+  readonly dimensions?: unknown;
+  readonly attributes?: unknown;
+  readonly description?: unknown;
+}
+
 function getTrimmedNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") {
     return null;
@@ -91,6 +100,24 @@ function normalizeNameOrThrow(value: string, argumentName: string): string {
   }
 
   return normalizedValue;
+}
+
+export function toRewardDossierArtifactSlug(value: string): string {
+  const normalizedValue = normalizeNameOrThrow(value, "value");
+  const slug = normalizedValue
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (slug.length === 0) {
+    throw new Error("value must include alphanumeric characters.");
+  }
+
+  return slug;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function normalizeHybridPair(input: RewardHybridPair): RewardHybridPair {
@@ -274,6 +301,14 @@ export function isAmberRewardAssetName(assetName: string): boolean {
   return AMBER_ASSET_NAME_PATTERN.test(normalizedAssetName);
 }
 
+export function toPrimaryRewardDossierArtifactPath(subjectName: string): string {
+  return `/artifacts/dossiers/primary/${toRewardDossierArtifactSlug(subjectName)}.json`;
+}
+
+export function toHybridRewardDossierArtifactPath(subjectName: string): string {
+  return `/artifacts/dossiers/hybrid/${toRewardDossierArtifactSlug(subjectName)}.json`;
+}
+
 export function resolveRewardAssetDossier(assetName: string): RewardDinosaurDossier | null {
   const normalizedAssetName = normalizeNameOrThrow(assetName, "assetName");
 
@@ -309,6 +344,73 @@ export function formatRewardDossierPromptBlock(dossier: RewardDinosaurDossier): 
     sourceLine,
     `Description: ${dossier.description}`,
   ].join(" ");
+}
+
+export function parseRewardDinosaurDossierArtifact(
+  payload: unknown,
+): RewardDinosaurDossier | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+
+  const parsedPayload = payload as RewardDinosaurDossierArtifactPayload;
+  const kind = parsedPayload.kind === "primary" || parsedPayload.kind === "hybrid"
+    ? parsedPayload.kind
+    : null;
+  const subjectName = getTrimmedNonEmptyString(parsedPayload.subjectName);
+  const description = getTrimmedNonEmptyString(parsedPayload.description);
+
+  if (!kind || !subjectName || !description || !isRecord(parsedPayload.dimensions)) {
+    return null;
+  }
+
+  const heightMeters = parsedPayload.dimensions.heightMeters;
+  const lengthMeters = parsedPayload.dimensions.lengthMeters;
+  if (
+    typeof heightMeters !== "number" ||
+    Number.isNaN(heightMeters) ||
+    typeof lengthMeters !== "number" ||
+    Number.isNaN(lengthMeters)
+  ) {
+    return null;
+  }
+
+  if (!Array.isArray(parsedPayload.attributes)) {
+    return null;
+  }
+
+  const attributes = parsedPayload.attributes
+    .map((entry) => getTrimmedNonEmptyString(entry))
+    .filter((entry): entry is string => Boolean(entry));
+
+  if (attributes.length === 0) {
+    return null;
+  }
+
+  let sourceDinosaurs: readonly [string, string] | null = null;
+  if (parsedPayload.sourceDinosaurs !== null && parsedPayload.sourceDinosaurs !== undefined) {
+    if (!Array.isArray(parsedPayload.sourceDinosaurs) || parsedPayload.sourceDinosaurs.length !== 2) {
+      return null;
+    }
+
+    const firstDinosaurName = getTrimmedNonEmptyString(parsedPayload.sourceDinosaurs[0]);
+    const secondDinosaurName = getTrimmedNonEmptyString(parsedPayload.sourceDinosaurs[1]);
+    if (!firstDinosaurName || !secondDinosaurName) {
+      return null;
+    }
+
+    sourceDinosaurs = [firstDinosaurName, secondDinosaurName];
+  }
+
+  return {
+    kind,
+    subjectName,
+    heightMeters,
+    lengthMeters,
+    attributes,
+    description,
+    sourceDinosaurs,
+  };
 }
 
 export function listPrimaryDinosaurDossiers(): RewardDinosaurDossier[] {

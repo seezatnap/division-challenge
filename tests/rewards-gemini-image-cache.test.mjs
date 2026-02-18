@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -337,9 +337,68 @@ test("getGeminiRewardImageGenerationStatus reports generating during in-flight p
     outputDirectory: cacheDirectory,
   });
 
-  assert.deepEqual(readyStatus, {
-    dinosaurName: "Stigimoloch",
-    status: "ready",
-    imagePath: "/rewards/stigimoloch.png",
+  assert.equal(readyStatus.dinosaurName, "Stigimoloch");
+  assert.equal(readyStatus.status, "ready");
+  assert.ok(
+    typeof readyStatus.imagePath === "string" &&
+      readyStatus.imagePath.startsWith("/rewards/stigimoloch.png?v="),
+    `Expected cache-busted reward path, received: ${readyStatus.imagePath}`,
+  );
+});
+
+test("getGeminiRewardImageGenerationStatus prefers the newest cached extension when multiple files exist", async () => {
+  const { getGeminiRewardImageGenerationStatus, toRewardImageCacheSlug } = await geminiImageCacheModule;
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+  const dinosaurName = "Tyrannosaurus Rex";
+  const slug = toRewardImageCacheSlug(dinosaurName);
+  const pngPath = path.join(cacheDirectory, `${slug}.png`);
+  const jpgPath = path.join(cacheDirectory, `${slug}.jpg`);
+  const now = new Date();
+  const oldTime = new Date(now.getTime() - 60_000);
+
+  await writeFile(pngPath, Buffer.from("older-png"));
+  await writeFile(jpgPath, Buffer.from("newer-jpg"));
+  await utimes(pngPath, oldTime, oldTime);
+  await utimes(jpgPath, now, now);
+
+  const status = await getGeminiRewardImageGenerationStatus(dinosaurName, {
+    outputDirectory: cacheDirectory,
   });
+
+  assert.equal(status.dinosaurName, dinosaurName);
+  assert.equal(status.status, "ready");
+  assert.ok(
+    typeof status.imagePath === "string" &&
+      status.imagePath.startsWith("/rewards/tyrannosaurus-rex.jpg?v="),
+    `Expected newest extension with cache-buster path, received: ${status.imagePath}`,
+  );
+});
+
+test("persistGeminiRewardImageToFilesystemCache removes stale sibling formats for the same dinosaur", async () => {
+  const {
+    persistGeminiRewardImageToFilesystemCache,
+    toRewardImageCacheSlug,
+  } = await geminiImageCacheModule;
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+  const dinosaurName = "Spinosaurus";
+
+  await persistGeminiRewardImageToFilesystemCache(
+    createGeminiImage(dinosaurName, {
+      mimeType: "image/png",
+      imageBase64: Buffer.from("png-bytes").toString("base64"),
+    }),
+    { outputDirectory: cacheDirectory },
+  );
+
+  await persistGeminiRewardImageToFilesystemCache(
+    createGeminiImage(dinosaurName, {
+      mimeType: "image/jpeg",
+      imageBase64: Buffer.from("jpg-bytes").toString("base64"),
+    }),
+    { outputDirectory: cacheDirectory },
+  );
+
+  const slug = toRewardImageCacheSlug(dinosaurName);
+  const entries = (await readdir(cacheDirectory)).sort();
+  assert.deepEqual(entries, [`${slug}.jpg`, `${slug}.jpg.metadata.json`]);
 });

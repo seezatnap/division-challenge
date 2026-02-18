@@ -39,6 +39,9 @@ import { NANO_BANANA_PRO_IMAGE_MODEL } from "@/features/rewards/lib/gemini";
 import {
   buildHybridDinosaurDossier,
   formatMetersAsMetersAndFeet,
+  parseRewardDinosaurDossierArtifact,
+  toHybridRewardDossierArtifactPath,
+  type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
 import {
@@ -662,6 +665,8 @@ export default function Home() {
   const [hybridLabError, setHybridLabError] = useState<string | null>(null);
   const [selectedHybridReward, setSelectedHybridReward] =
     useState<UnlockedHybridReward | null>(null);
+  const [selectedHybridDossier, setSelectedHybridDossier] =
+    useState<RewardDinosaurDossier | null>(null);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
   const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -714,16 +719,6 @@ export default function Home() {
       ),
     [gameSession.unlockedHybrids, unlockedPrimaryDinosaurNames],
   );
-  const selectedHybridDossier = useMemo(() => {
-    if (!selectedHybridReward) {
-      return null;
-    }
-
-    return buildHybridDinosaurDossier({
-      firstDinosaurName: selectedHybridReward.firstDinosaurName,
-      secondDinosaurName: selectedHybridReward.secondDinosaurName,
-    });
-  }, [selectedHybridReward]);
   const canUnlockNextDinosaurWithAmber =
     gameSession.amberBalance >= AMBER_COST_PER_DINO_UNLOCK;
   const hasEnoughAmberForHybrid = gameSession.amberBalance >= AMBER_COST_PER_HYBRID_CREATION;
@@ -737,6 +732,52 @@ export default function Home() {
       setHybridLabSecondDinosaurName("");
     }
   }, [hybridLabSecondDinosaurName, hybridLabSecondDinosaurOptions]);
+
+  useEffect(() => {
+    if (!selectedHybridReward) {
+      setSelectedHybridDossier(null);
+      return;
+    }
+
+    let didCancel = false;
+    const abortController = new AbortController();
+    const fallbackDossier = buildHybridDinosaurDossier({
+      firstDinosaurName: selectedHybridReward.firstDinosaurName,
+      secondDinosaurName: selectedHybridReward.secondDinosaurName,
+    });
+    setSelectedHybridDossier(fallbackDossier);
+
+    void (async () => {
+      try {
+        const dossierResponse = await fetch(
+          toHybridRewardDossierArtifactPath(selectedHybridReward.generationAssetName),
+          {
+            cache: "no-store",
+            signal: abortController.signal,
+          },
+        );
+
+        if (!dossierResponse.ok) {
+          return;
+        }
+
+        const dossierPayload = (await dossierResponse.json().catch(() => null)) as unknown;
+        const parsedDossier = parseRewardDinosaurDossierArtifact(dossierPayload);
+        if (!parsedDossier || didCancel) {
+          return;
+        }
+
+        setSelectedHybridDossier(parsedDossier);
+      } catch {
+        // Keep fallback dossier when artifact loading fails.
+      }
+    })();
+
+    return () => {
+      didCancel = true;
+      abortController.abort();
+    };
+  }, [selectedHybridReward]);
 
   useEffect(() => {
     if (!isHybridLabOpen && !selectedHybridReward) {
@@ -981,6 +1022,7 @@ export default function Home() {
               data?: {
                 dinosaurName?: string;
                 mimeType?: string;
+                imagePath?: string;
               };
               error?: {
                 message?: string;
@@ -998,10 +1040,12 @@ export default function Home() {
 
         const resolvedAssetName =
           responseBody?.data?.dinosaurName?.trim() || normalizedAssetName;
-        const resolvedImagePath = toRewardImagePathFromMimeType(
-          resolvedAssetName,
-          responseBody?.data?.mimeType?.trim() ?? null,
-        );
+        const resolvedImagePath =
+          responseBody?.data?.imagePath?.trim() ??
+          toRewardImagePathFromMimeType(
+            resolvedAssetName,
+            responseBody?.data?.mimeType?.trim() ?? null,
+          );
 
         return {
           resolvedAssetName,

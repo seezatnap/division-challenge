@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type {
@@ -46,6 +46,7 @@ export interface FilesystemGeminiImageCacheOptions {
 export interface CachedRewardImageFile {
   absolutePath: string;
   extension: SupportedImageExtension;
+  modifiedTimeMs: number;
 }
 
 export type GeminiRewardImageGenerationStatus = "ready" | "generating" | "missing";
@@ -111,8 +112,14 @@ function getCacheMetadataPath(absoluteImagePath: string): string {
 function toRewardImagePublicPath(
   dinosaurName: string,
   extension: SupportedImageExtension,
+  modifiedTimeMs?: number,
 ): string {
-  return `/rewards/${toRewardImageCacheSlug(dinosaurName)}.${extension}`;
+  const baseImagePath = `/rewards/${toRewardImageCacheSlug(dinosaurName)}.${extension}`;
+  if (typeof modifiedTimeMs !== "number" || Number.isNaN(modifiedTimeMs)) {
+    return baseImagePath;
+  }
+
+  return `${baseImagePath}?v=${Math.max(0, Math.floor(modifiedTimeMs))}`;
 }
 
 function getMimeTypeForExtension(extension: SupportedImageExtension): string {
@@ -190,16 +197,19 @@ export async function findCachedRewardImageFile(
 ): Promise<CachedRewardImageFile | null> {
   const slug = toRewardImageCacheSlug(dinosaurName);
   const outputDirectory = resolveOutputDirectory(options);
+  const cachedFiles: CachedRewardImageFile[] = [];
 
   for (const extension of SUPPORTED_IMAGE_EXTENSIONS) {
     const absolutePath = path.join(outputDirectory, `${slug}.${extension}`);
 
     try {
       await access(absolutePath);
-      return {
+      const fileStats = await stat(absolutePath);
+      cachedFiles.push({
         absolutePath,
         extension,
-      };
+        modifiedTimeMs: fileStats.mtimeMs,
+      });
     } catch (error) {
       if (!isNotFoundError(error)) {
         throw error;
@@ -207,7 +217,12 @@ export async function findCachedRewardImageFile(
     }
   }
 
-  return null;
+  if (cachedFiles.length === 0) {
+    return null;
+  }
+
+  cachedFiles.sort((leftFile, rightFile) => rightFile.modifiedTimeMs - leftFile.modifiedTimeMs);
+  return cachedFiles[0];
 }
 
 export async function doesRewardImageExistOnDisk(
@@ -257,7 +272,11 @@ export async function getGeminiRewardImageGenerationStatus(
     return {
       dinosaurName: normalizedDinosaurName,
       status: "ready",
-      imagePath: toRewardImagePublicPath(normalizedDinosaurName, cachedFile.extension),
+      imagePath: toRewardImagePublicPath(
+        normalizedDinosaurName,
+        cachedFile.extension,
+        cachedFile.modifiedTimeMs,
+      ),
     };
   }
 
@@ -292,6 +311,19 @@ export async function persistGeminiRewardImageToFilesystemCache(
   const imageBuffer = Buffer.from(image.imageBase64, "base64");
 
   await mkdir(outputDirectory, { recursive: true });
+
+  const slug = toRewardImageCacheSlug(normalizedDinosaurName);
+  for (const candidateExtension of SUPPORTED_IMAGE_EXTENSIONS) {
+    if (candidateExtension === extension) {
+      continue;
+    }
+
+    const siblingAbsolutePath = path.join(outputDirectory, `${slug}.${candidateExtension}`);
+    const siblingMetadataPath = getCacheMetadataPath(siblingAbsolutePath);
+    await rm(siblingAbsolutePath, { force: true }).catch(() => undefined);
+    await rm(siblingMetadataPath, { force: true }).catch(() => undefined);
+  }
+
   await writeFile(absoluteImagePath, imageBuffer);
 
   const metadata: RewardImageCacheMetadata = {

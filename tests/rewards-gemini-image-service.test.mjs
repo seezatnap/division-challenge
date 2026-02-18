@@ -44,6 +44,15 @@ test("parseGeminiImageGenerationRequest enforces a non-empty dinosaurName", asyn
 
   const parsedRequest = parseGeminiImageGenerationRequest({ dinosaurName: " Velociraptor " });
   assert.deepEqual(parsedRequest, { dinosaurName: "Velociraptor" });
+
+  const parsedRequestWithDossier = parseGeminiImageGenerationRequest({
+    dinosaurName: " Velociraptor ",
+    dossierPromptBlock: " Field dossier for Velociraptor... ",
+  });
+  assert.deepEqual(parsedRequestWithDossier, {
+    dinosaurName: "Velociraptor",
+    dossierPromptBlock: "Field dossier for Velociraptor...",
+  });
 });
 
 test("extractInlineImageDataFromGeminiResponse finds inline data and normalizes whitespace", async () => {

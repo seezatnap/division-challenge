@@ -36,11 +36,21 @@ async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
 async function loadGenerateImageRoute(
   generateGeminiRewardImageImpl,
   ensureRewardDossierArtifactsImpl = async () => undefined,
+  getGeminiRewardImageGenerationStatusImpl = async (dinosaurName) => ({
+    dinosaurName,
+    status: "ready",
+    imagePath: `/rewards/${String(dinosaurName)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")}.png`,
+  }),
 ) {
   const callbackName = `__routeGenerateImage_${Math.random().toString(16).slice(2)}`;
   const dossierCallbackName = `__routeEnsureDossiers_${Math.random().toString(16).slice(2)}`;
+  const statusCallbackName = `__routeGetImageStatus_${Math.random().toString(16).slice(2)}`;
   globalThis[callbackName] = generateGeminiRewardImageImpl;
   globalThis[dossierCallbackName] = ensureRewardDossierArtifactsImpl;
+  globalThis[statusCallbackName] = getGeminiRewardImageGenerationStatusImpl;
 
   const nextServerModuleUrl = toDataUrl(`
     export const NextResponse = {
@@ -68,12 +78,18 @@ async function loadGenerateImageRoute(
       return await globalThis.${dossierCallbackName}(assetName);
     }
   `);
+  const imageCacheModuleUrl = toDataUrl(`
+    export async function getGeminiRewardImageGenerationStatus(dinosaurName) {
+      return await globalThis.${statusCallbackName}(dinosaurName);
+    }
+  `);
 
   const routeModuleUrl = await transpileTypeScriptToDataUrl(
     "src/app/api/rewards/generate-image/route.ts",
     {
       "next/server": nextServerModuleUrl,
       "@/features/rewards/lib/dossier-artifacts": dossierArtifactModuleUrl,
+      "@/features/rewards/lib/gemini-image-cache": imageCacheModuleUrl,
       "@/features/rewards/lib/gemini-image-runtime": runtimeModuleUrl,
       "@/features/rewards/lib/gemini-image-service": serviceModuleUrl,
     },
@@ -86,6 +102,7 @@ async function loadGenerateImageRoute(
     cleanup: () => {
       delete globalThis[callbackName];
       delete globalThis[dossierCallbackName];
+      delete globalThis[statusCallbackName];
     },
   };
 }
@@ -186,7 +203,12 @@ test("POST /api/rewards/generate-image wraps successful image output in a data e
 
     assert.equal(response.status, 200);
     assert.deepEqual(seenPayload, { dinosaurName: "Brachiosaurus" });
-    assert.deepEqual(body, { data: generatedImage });
+    assert.deepEqual(body, {
+      data: {
+        ...generatedImage,
+        imagePath: "/rewards/brachiosaurus.png",
+      },
+    });
   } finally {
     cleanup();
   }
@@ -226,6 +248,45 @@ test("POST /api/rewards/generate-image creates dossier artifacts before image ge
       "dossier:Hybrid Tyrannosaurus Rex + Velociraptor",
       "generate:Hybrid Tyrannosaurus Rex + Velociraptor",
     ]);
+  } finally {
+    cleanup();
+  }
+});
+
+test("POST /api/rewards/generate-image forwards generated dossier prompt block to image generation", async () => {
+  let seenPayload;
+
+  const { routeModule, cleanup } = await loadGenerateImageRoute(
+    async (payload) => {
+      seenPayload = payload;
+      return {
+        dinosaurName: payload.dinosaurName,
+        prompt: "prompt",
+        model: "test-model",
+        mimeType: "image/png",
+        imageBase64: "YWJjZA==",
+      };
+    },
+    async () => ({
+      promptBlock: "Field dossier for Brachiosaurus: Height: 9.0 m. Length: 21.0 m.",
+    }),
+  );
+
+  try {
+    const request = new Request("https://example.test/api/rewards/generate-image", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ dinosaurName: "Brachiosaurus" }),
+    });
+
+    const response = await routeModule.POST(request);
+    assert.equal(response.status, 200);
+    assert.deepEqual(seenPayload, {
+      dinosaurName: "Brachiosaurus",
+      dossierPromptBlock: "Field dossier for Brachiosaurus: Height: 9.0 m. Length: 21.0 m.",
+    });
   } finally {
     cleanup();
   }

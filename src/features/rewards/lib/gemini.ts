@@ -88,6 +88,13 @@ function buildPrimaryDinosaurPrompt(
 }
 
 export function buildRewardImagePrompt(assetName: string): string {
+  return buildRewardImagePromptWithDossier(assetName, null);
+}
+
+export function buildRewardImagePromptWithDossier(
+  assetName: string,
+  dossierPromptBlock: string | null,
+): string {
   const sanitizedAssetName = assetName.trim();
 
   if (sanitizedAssetName.length === 0) {
@@ -98,14 +105,18 @@ export function buildRewardImagePrompt(assetName: string): string {
     return buildAmberRewardPrompt(sanitizedAssetName);
   }
 
+  const trimmedDossierPromptBlock = dossierPromptBlock?.trim() ?? "";
   const resolvedDossier = resolveRewardAssetDossier(sanitizedAssetName);
-  const dossierPromptBlock = resolvedDossier
-    ? formatRewardDossierPromptBlock(resolvedDossier)
-    : "";
+  const resolvedPromptBlock =
+    trimmedDossierPromptBlock.length > 0
+      ? trimmedDossierPromptBlock
+      : resolvedDossier
+        ? formatRewardDossierPromptBlock(resolvedDossier)
+        : "";
 
   if (/^hybrid\b/i.test(sanitizedAssetName)) {
-    return buildHybridDinosaurPrompt(sanitizedAssetName, dossierPromptBlock);
+    return buildHybridDinosaurPrompt(sanitizedAssetName, resolvedPromptBlock);
   }
 
-  return buildPrimaryDinosaurPrompt(sanitizedAssetName, dossierPromptBlock);
+  return buildPrimaryDinosaurPrompt(sanitizedAssetName, resolvedPromptBlock);
 }

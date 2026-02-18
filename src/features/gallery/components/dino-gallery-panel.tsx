@@ -15,6 +15,9 @@ import {
 import {
   buildPrimaryDinosaurDossier,
   formatMetersAsMetersAndFeet,
+  parseRewardDinosaurDossierArtifact,
+  toPrimaryRewardDossierArtifactPath,
+  type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
 
 const EMPTY_STATE_TITLE = "No dinos unlocked yet.";
@@ -36,13 +39,8 @@ export function DinoGalleryPanel({
     useState<UnlockedReward[]>(sortedUnlockedRewards);
   const [refreshStatus, setRefreshStatus] = useState<string>("");
   const [selectedReward, setSelectedReward] = useState<UnlockedReward | null>(null);
-  const selectedRewardDossier = useMemo(
-    () =>
-      selectedReward
-        ? buildPrimaryDinosaurDossier(selectedReward.dinosaurName)
-        : null,
-    [selectedReward],
-  );
+  const [selectedRewardDossier, setSelectedRewardDossier] =
+    useState<RewardDinosaurDossier | null>(null);
 
   useEffect(() => {
     setGalleryRewards(sortedUnlockedRewards);
@@ -90,8 +88,39 @@ export function DinoGalleryPanel({
 
   useEffect(() => {
     if (!selectedReward) {
+      setSelectedRewardDossier(null);
       return;
     }
+
+    let didCancel = false;
+    const abortController = new AbortController();
+    setSelectedRewardDossier(buildPrimaryDinosaurDossier(selectedReward.dinosaurName));
+
+    void (async () => {
+      try {
+        const dossierResponse = await fetch(
+          toPrimaryRewardDossierArtifactPath(selectedReward.dinosaurName),
+          {
+            cache: "no-store",
+            signal: abortController.signal,
+          },
+        );
+
+        if (!dossierResponse.ok) {
+          return;
+        }
+
+        const dossierPayload = (await dossierResponse.json().catch(() => null)) as unknown;
+        const parsedDossier = parseRewardDinosaurDossierArtifact(dossierPayload);
+        if (!parsedDossier || didCancel) {
+          return;
+        }
+
+        setSelectedRewardDossier(parsedDossier);
+      } catch {
+        // Keep the deterministic fallback dossier when the artifact fetch fails.
+      }
+    })();
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -105,6 +134,8 @@ export function DinoGalleryPanel({
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      didCancel = true;
+      abortController.abort();
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
