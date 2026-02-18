@@ -71,6 +71,8 @@ test("root layout wires themed typography variables", async () => {
     "--font-jurassic-display",
     "--font-jurassic-body",
     "--font-jurassic-mono",
+    'className="jurassic-app-frame"',
+    'data-ui-decoration="viewport-frame"',
   ]) {
     assert.ok(source.includes(fragment), `Expected themed typography fragment: ${fragment}`);
   }
@@ -92,7 +94,14 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-bark: var(--jp-panel-text);",
     "inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 86%, black)",
     "--jp-frame:",
+    "--jp-frame-width:",
+    "--jp-frame-rivet-size:",
     "--jp-frame-grain:",
+    ".jurassic-app-frame {",
+    ".jurassic-app-frame::before",
+    ".jurassic-app-frame::after",
+    "-webkit-mask-composite: xor;",
+    "mask-composite: exclude;",
     "--jp-toolbar:",
     "--jp-toolbar-text:",
     "--jp-accent-red:",
