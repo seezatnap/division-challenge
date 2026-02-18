@@ -351,9 +351,18 @@ body {
 .motif-canopy::after {
   inset: auto -16% -34% -16%;
   height: 74%;
+  opacity: 0.7;
   background:
-    radial-gradient(circle at 25% 30%, rgba(70, 96, 56, 0.18) 0%, transparent 44%),
-    radial-gradient(circle at 70% 40%, rgba(113, 137, 81, 0.16) 0%, transparent 42%);
+    radial-gradient(
+      circle at 25% 30%,
+      color-mix(in srgb, var(--jp-panel-text) 20%, transparent) 0%,
+      transparent 46%
+    ),
+    radial-gradient(
+      circle at 70% 40%,
+      color-mix(in srgb, var(--jp-panel-border) 24%, transparent) 0%,
+      transparent 44%
+    );
 }
 
 .motif-claw::after {
@@ -364,9 +373,10 @@ body {
   background: repeating-linear-gradient(
     128deg,
     transparent 0 14px,
-    rgba(169, 127, 69, 0.2) 14px 17px,
+    color-mix(in srgb, var(--jp-panel-text) 18%, transparent) 14px 17px,
     transparent 17px 34px
   );
+  opacity: 0.52;
   transform: rotate(4deg);
 }
 
@@ -375,10 +385,11 @@ body {
   width: 16rem;
   height: 10rem;
   border-radius: 999px;
+  opacity: 0.5;
   background:
     repeating-radial-gradient(
       circle,
-      rgba(169, 127, 69, 0.22) 0 2px,
+      color-mix(in srgb, var(--jp-panel-text) 16%, transparent) 0 2px,
       transparent 2px 12px
     );
 }
@@ -388,10 +399,23 @@ body {
   left: -0.5rem;
   width: 115%;
   height: 4.75rem;
+  opacity: 0.46;
   background-image:
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%),
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%),
-    radial-gradient(ellipse at center, rgba(45, 36, 25, 0.16) 0 34%, transparent 35%);
+    radial-gradient(
+      ellipse at center,
+      color-mix(in srgb, var(--jp-panel-border) 26%, transparent) 0 34%,
+      transparent 35%
+    ),
+    radial-gradient(
+      ellipse at center,
+      color-mix(in srgb, var(--jp-panel-border) 26%, transparent) 0 34%,
+      transparent 35%
+    ),
+    radial-gradient(
+      ellipse at center,
+      color-mix(in srgb, var(--jp-panel-border) 26%, transparent) 0 34%,
+      transparent 35%
+    );
   background-size: 2.5rem 1.7rem;
   background-position:
     0 0,
