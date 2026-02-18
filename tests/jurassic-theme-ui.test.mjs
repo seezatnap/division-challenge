@@ -59,6 +59,10 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     source.includes('data-ui-surface="hybrid-lab-modal"'),
     "Expected hybrid lab modal surface to be rendered from the home page",
   );
+  assert.ok(
+    source.includes("<SurveillanceToolbar />"),
+    "Expected persistent surveillance toolbar component to be mounted on the home page",
+  );
 });
 
 test("root layout wires themed typography variables", async () => {
@@ -76,6 +80,24 @@ test("root layout wires themed typography variables", async () => {
   }
 
   assert.equal(source.includes("Geist"), false, "Geist font wiring should be removed for Jurassic typography");
+});
+
+test("surveillance toolbar component includes JP3 footer label, icon controls, and MORE affordance", async () => {
+  const source = await readRepoFile("src/features/workspace-ui/components/surveillance-toolbar.tsx");
+
+  for (const fragment of [
+    'data-ui-surface="surveillance-toolbar"',
+    "ISLA SORNA SURVEILLANCE DEVICE",
+    "Footprint tracker",
+    "Fossil scanner",
+    "DNA analyzer",
+    "Egg monitor",
+    'data-ui-action="toolbar-more"',
+    "MORE",
+    "jp-surveillance-icon-button",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected surveillance toolbar fragment: ${fragment}`);
+  }
 });
 
 test("global stylesheet defines Jurassic palette, motif overlays, glow animation, and responsive breakpoints", async () => {
@@ -96,6 +118,15 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--jp-toolbar:",
     "--jp-toolbar-text:",
     "--jp-accent-red:",
+    ".jp-surveillance-toolbar",
+    "position: fixed;",
+    ".jp-surveillance-toolbar-label",
+    "font-variant: small-caps;",
+    ".jp-surveillance-toolbar-icons",
+    ".jp-surveillance-icon-button",
+    ".jp-surveillance-toolbar-more",
+    ".jp-surveillance-toolbar-more::after",
+    "border-left: 0.45rem solid var(--jp-accent-red);",
     "--background-image: url(\"/jp3-jungle-canopy.jpg\");",
     "--jp-amber:",
     "--jp-glow:",
