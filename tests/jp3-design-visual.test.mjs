@@ -243,7 +243,7 @@ test.after(async () => {
 });
 
 /**
- * Parse a CSS color string (rgb, rgba, or hex) into {r, g, b} components.
+ * Parse a CSS color string (rgb, rgba, hex, or color(srgb ...)) into {r, g, b} components.
  */
 function parseColor(colorString) {
   const rgbMatch = colorString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
@@ -258,6 +258,16 @@ function parseColor(colorString) {
       r: Number.parseInt(hex.slice(0, 2), 16),
       g: Number.parseInt(hex.slice(2, 4), 16),
       b: Number.parseInt(hex.slice(4, 6), 16),
+    };
+  }
+
+  // Handle color(srgb r g b) and color(srgb r g b / a) formats
+  const srgbMatch = colorString.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+  if (srgbMatch) {
+    return {
+      r: Math.round(Number(srgbMatch[1]) * 255),
+      g: Math.round(Number(srgbMatch[2]) * 255),
+      b: Math.round(Number(srgbMatch[3]) * 255),
     };
   }
 
@@ -791,6 +801,403 @@ test("gallery visual: dinosaur name labels are cream-colored and uppercase", { c
         `Expected cream/light name color (R>180, G>180, B>150), got R=${rgb.r}, G=${rgb.g}, B=${rgb.b}`,
       );
     }
+  } finally {
+    await context.close();
+  }
+});
+
+/* ── Workspace Contrast & Typography Visual Tests (#18) ─── */
+
+/**
+ * Calculate relative luminance per WCAG 2.0 formula.
+ * @param {{r: number, g: number, b: number}} rgb
+ * @returns {number} luminance value between 0 and 1
+ */
+function relativeLuminance({ r, g, b }) {
+  const [rs, gs, bs] = [r / 255, g / 255, b / 255].map((c) =>
+    c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
+  );
+  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+}
+
+/**
+ * Calculate WCAG contrast ratio between two colors.
+ */
+function contrastRatio(color1, color2) {
+  const l1 = relativeLuminance(color1);
+  const l2 = relativeLuminance(color2);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+test("workspace contrast: divisor text is light-colored on green panel background", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const colors = await page.evaluate(() => {
+      const panel = document.querySelector('[data-visual-snapshot="workspace-live"].jurassic-panel') ||
+        document.querySelector('.jurassic-panel');
+      const divisor = document.querySelector('[data-visual-snapshot="workspace-live"] .divisor-cell') ||
+        document.querySelector('.divisor-cell');
+      if (!panel || !divisor) return null;
+      const panelStyle = window.getComputedStyle(panel);
+      const divisorStyle = window.getComputedStyle(divisor);
+      return {
+        panelBg: panelStyle.backgroundColor,
+        textColor: divisorStyle.color,
+      };
+    });
+
+    assert.ok(colors, "Expected to find .jurassic-panel and .divisor-cell elements.");
+    const bgRgb = parseColor(colors.panelBg);
+    const textRgb = parseColor(colors.textColor);
+    assert.ok(bgRgb, `Expected parseable panel background color, got: ${colors.panelBg}`);
+    assert.ok(textRgb, `Expected parseable divisor text color, got: ${colors.textColor}`);
+
+    // Panel background should be green
+    assert.ok(
+      bgRgb.r < 80 && bgRgb.g > 100 && bgRgb.b < 80,
+      `Expected green panel bg (R<80, G>100, B<80), got rgb(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b})`,
+    );
+
+    // Text should be light (cream/white or amber-bright): R>180, G>160, B>100
+    // Both cream (#f0edd8 = 240,237,216) and amber-bright (#f4d48d = 244,212,141) are valid
+    assert.ok(
+      textRgb.r > 180 && textRgb.g > 160 && textRgb.b > 100,
+      `Expected light divisor text (R>180, G>160, B>100), got rgb(${textRgb.r}, ${textRgb.g}, ${textRgb.b})`,
+    );
+
+    // WCAG contrast ratio check: divisor text is large (1.2rem ≈ 19.2px),
+    // and may glow amber when step is active. WCAG AA for large text requires 3:1.
+    const ratio = contrastRatio(textRgb, bgRgb);
+    assert.ok(
+      ratio >= 3.0,
+      `Expected WCAG contrast ratio >= 3.0:1 (AA large text) between text rgb(${textRgb.r},${textRgb.g},${textRgb.b}) and bg rgb(${bgRgb.r},${bgRgb.g},${bgRgb.b}), got ${ratio.toFixed(2)}:1`,
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test("workspace contrast: dividend digits are light-colored on green background", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const colorSamples = await page.evaluate(() => {
+      const panel = document.querySelector('[data-visual-snapshot="workspace-live"].jurassic-panel') ||
+        document.querySelector('.jurassic-panel');
+      const digits = Array.from(
+        document.querySelectorAll('[data-visual-snapshot="workspace-live"] .dividend-digit'),
+      );
+      if (!panel || digits.length === 0) return null;
+      const panelBg = window.getComputedStyle(panel).backgroundColor;
+      const digitColors = digits.map((d) => window.getComputedStyle(d).color);
+      return { panelBg, digitColors };
+    });
+
+    assert.ok(colorSamples, "Expected to find panel and dividend digit elements.");
+    const bgRgb = parseColor(colorSamples.panelBg);
+    assert.ok(bgRgb, `Expected parseable panel bg color, got: ${colorSamples.panelBg}`);
+
+    for (let i = 0; i < colorSamples.digitColors.length; i++) {
+      const rgb = parseColor(colorSamples.digitColors[i]);
+      assert.ok(rgb, `Expected parseable dividend digit ${i} color, got: ${colorSamples.digitColors[i]}`);
+
+      // Both cream (#f0edd8) and amber-bright (#f4d48d) are valid light colors on green
+      assert.ok(
+        rgb.r > 180 && rgb.g > 160 && rgb.b > 100,
+        `Expected light dividend digit ${i} color (R>180, G>160, B>100), got rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
+      );
+
+      // Dividend digits are large text (1.2rem) and may glow amber when active.
+      // WCAG AA for large text requires 3:1 minimum contrast.
+      const ratio = contrastRatio(rgb, bgRgb);
+      assert.ok(
+        ratio >= 3.0,
+        `Expected WCAG AA large text contrast (>= 3.0:1) for dividend digit ${i}, got ${ratio.toFixed(2)}:1`,
+      );
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("workspace contrast: workspace label text is light-colored on green background", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const colors = await page.evaluate(() => {
+      const panel = document.querySelector('[data-visual-snapshot="workspace-live"].jurassic-panel') ||
+        document.querySelector('.jurassic-panel');
+      const label = document.querySelector('[data-visual-snapshot="workspace-live"] .workspace-label') ||
+        document.querySelector('.workspace-label');
+      if (!panel || !label) return null;
+      return {
+        panelBg: window.getComputedStyle(panel).backgroundColor,
+        labelColor: window.getComputedStyle(label).color,
+      };
+    });
+
+    assert.ok(colors, "Expected to find .jurassic-panel and .workspace-label elements.");
+    const bgRgb = parseColor(colors.panelBg);
+    const labelRgb = parseColor(colors.labelColor);
+    assert.ok(bgRgb, `Expected parseable bg color, got: ${colors.panelBg}`);
+    assert.ok(labelRgb, `Expected parseable label color, got: ${colors.labelColor}`);
+
+    assert.ok(
+      labelRgb.r > 150 && labelRgb.g > 150 && labelRgb.b > 100,
+      `Expected light workspace label color (R>150, G>150, B>100), got rgb(${labelRgb.r}, ${labelRgb.g}, ${labelRgb.b})`,
+    );
+
+    const ratio = contrastRatio(labelRgb, bgRgb);
+    assert.ok(
+      ratio >= 3.0,
+      `Expected contrast ratio >= 3.0:1 for workspace label, got ${ratio.toFixed(2)}:1`,
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test("workspace contrast: work-row operation symbols (minus, times) are light on green", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    // The solved workspace has visible work-row operations
+    const colors = await page.evaluate(() => {
+      const panel = document.querySelector('[data-visual-snapshot="workspace-solved"].jurassic-panel') ||
+        document.querySelector('.jurassic-panel');
+      const ops = Array.from(
+        document.querySelectorAll('[data-visual-snapshot="workspace-solved"] .work-row-op'),
+      );
+      if (!panel || ops.length === 0) return null;
+      return {
+        panelBg: window.getComputedStyle(panel).backgroundColor,
+        opColors: ops.map((op) => window.getComputedStyle(op).color),
+      };
+    });
+
+    assert.ok(colors, "Expected to find panel and work-row-op elements in the solved workspace.");
+    const bgRgb = parseColor(colors.panelBg);
+    assert.ok(bgRgb, `Expected parseable panel bg, got: ${colors.panelBg}`);
+
+    for (let i = 0; i < colors.opColors.length; i++) {
+      const rgb = parseColor(colors.opColors[i]);
+      assert.ok(rgb, `Expected parseable work-row-op ${i} color, got: ${colors.opColors[i]}`);
+
+      assert.ok(
+        rgb.r > 150 && rgb.g > 150 && rgb.b > 100,
+        `Expected light work-row-op ${i} color (R>150, G>150, B>100), got rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
+      );
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("workspace contrast: coach message text is light-colored on panel background", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const colors = await page.evaluate(() => {
+      const coachItem = document.querySelector('[data-visual-snapshot="workspace-live"] .coach-item');
+      const hintStack = document.querySelector('[data-visual-snapshot="workspace-live"] .hint-stack');
+      if (!coachItem || !hintStack) return null;
+      return {
+        containerBg: window.getComputedStyle(hintStack).backgroundColor,
+        textColor: window.getComputedStyle(coachItem).color,
+      };
+    });
+
+    assert.ok(colors, "Expected to find .hint-stack and .coach-item elements.");
+    const textRgb = parseColor(colors.textColor);
+    assert.ok(textRgb, `Expected parseable coach text color, got: ${colors.textColor}`);
+
+    // Coach text should be light/cream colored for readability
+    assert.ok(
+      textRgb.r > 150 && textRgb.g > 150 && textRgb.b > 100,
+      `Expected light coach text color (R>150, G>150, B>100), got rgb(${textRgb.r}, ${textRgb.g}, ${textRgb.b})`,
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test("workspace contrast: bracket border is visible against green panel", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const borderInfo = await page.evaluate(() => {
+      const bracket = document.querySelector('[data-visual-snapshot="workspace-live"] .bracket-stack') ||
+        document.querySelector('.bracket-stack');
+      if (!bracket) return null;
+      const style = window.getComputedStyle(bracket);
+      return {
+        borderLeftColor: style.borderLeftColor,
+        borderTopColor: style.borderTopColor,
+        borderLeftWidth: style.borderLeftWidth,
+        borderTopWidth: style.borderTopWidth,
+      };
+    });
+
+    assert.ok(borderInfo, "Expected to find .bracket-stack element.");
+
+    // Verify bracket has visible border width
+    const leftWidth = parseFloat(borderInfo.borderLeftWidth);
+    const topWidth = parseFloat(borderInfo.borderTopWidth);
+    assert.ok(
+      leftWidth >= 1 || topWidth >= 1,
+      `Expected bracket to have visible border (left: ${borderInfo.borderLeftWidth}, top: ${borderInfo.borderTopWidth})`,
+    );
+
+    // Verify border color is light enough to be visible on green
+    // The border uses color-mix with panel-text (cream) at 72%, producing a light color
+    const borderRgb = parseColor(borderInfo.borderLeftColor) || parseColor(borderInfo.borderTopColor);
+    assert.ok(borderRgb, `Expected parseable bracket border color, got left: ${borderInfo.borderLeftColor}, top: ${borderInfo.borderTopColor}`);
+    // Border should be a light/cream color, distinguishable from the green panel background
+    assert.ok(
+      borderRgb.r > 150 && borderRgb.g > 150,
+      `Expected bracket border to be light-colored and distinguishable from green bg, got rgb(${borderRgb.r}, ${borderRgb.g}, ${borderRgb.b})`,
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test("typography: heading elements use serif font family (Cinzel/Orbitron)", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const headingFonts = await page.evaluate(() => {
+      // Check the hint-title (Console Coach heading) which uses serif display font
+      const hintTitle = document.querySelector('[data-visual-snapshot="workspace-live"] .hint-title');
+      // Check the workspace-label which has specific typography
+      const workspaceLabel = document.querySelector('[data-visual-snapshot="workspace-live"] .workspace-label');
+
+      const results = {};
+      if (hintTitle) {
+        results.hintTitle = window.getComputedStyle(hintTitle).fontFamily;
+      }
+      if (workspaceLabel) {
+        results.workspaceLabel = window.getComputedStyle(workspaceLabel).fontFamily;
+      }
+      return results;
+    });
+
+    // The hint-title ("Console Coach") should use a serif display font
+    assert.ok(headingFonts.hintTitle, "Expected to find .hint-title element with computed font-family.");
+    const hintTitleFont = headingFonts.hintTitle.toLowerCase();
+    assert.ok(
+      hintTitleFont.includes("orbitron") || hintTitleFont.includes("cinzel") || hintTitleFont.includes("serif"),
+      `Expected hint-title to use serif/display font (Orbitron or Cinzel), got: ${headingFonts.hintTitle}`,
+    );
+    // Must NOT be purely sans-serif — should include serif in fallback chain
+    assert.ok(
+      hintTitleFont.includes("serif"),
+      `Expected hint-title font stack to include "serif" in its fallback chain, got: ${headingFonts.hintTitle}`,
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test("typography: body/workspace text uses sans-serif or monospace font family", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const bodyFonts = await page.evaluate(() => {
+      const body = document.querySelector("body");
+      const coachItem = document.querySelector('[data-visual-snapshot="workspace-live"] .coach-item');
+      const digitCell = document.querySelector('[data-visual-snapshot="workspace-live"] .digit-cell') ||
+        document.querySelector('[data-visual-snapshot="workspace-solved"] .digit-cell');
+      const divisorCell = document.querySelector('[data-visual-snapshot="workspace-live"] .divisor-cell') ||
+        document.querySelector('[data-visual-snapshot="workspace-solved"] .divisor-cell');
+
+      const results = {};
+      if (body) results.body = window.getComputedStyle(body).fontFamily;
+      if (coachItem) results.coachItem = window.getComputedStyle(coachItem).fontFamily;
+      if (digitCell) results.digitCell = window.getComputedStyle(digitCell).fontFamily;
+      if (divisorCell) results.divisorCell = window.getComputedStyle(divisorCell).fontFamily;
+      return results;
+    });
+
+    // Body should use sans-serif (Alegreya Sans)
+    assert.ok(bodyFonts.body, "Expected to find body element with computed font-family.");
+    const bodyFont = bodyFonts.body.toLowerCase();
+    assert.ok(
+      bodyFont.includes("sans-serif") || bodyFont.includes("alegreya"),
+      `Expected body to use sans-serif font, got: ${bodyFonts.body}`,
+    );
+
+    // Coach items should use monospace (IBM Plex Mono) per the field-station readout styling
+    if (bodyFonts.coachItem) {
+      const coachFont = bodyFonts.coachItem.toLowerCase();
+      assert.ok(
+        coachFont.includes("monospace") || coachFont.includes("plex") || coachFont.includes("courier"),
+        `Expected coach-item to use monospace font, got: ${bodyFonts.coachItem}`,
+      );
+    }
+
+    // Digit cells should use monospace (IBM Plex Mono) for numerals
+    if (bodyFonts.digitCell) {
+      const digitFont = bodyFonts.digitCell.toLowerCase();
+      assert.ok(
+        digitFont.includes("monospace") || digitFont.includes("plex") || digitFont.includes("courier"),
+        `Expected digit-cell to use monospace font, got: ${bodyFonts.digitCell}`,
+      );
+    }
+
+    // Divisor cell should use monospace
+    if (bodyFonts.divisorCell) {
+      const divisorFont = bodyFonts.divisorCell.toLowerCase();
+      assert.ok(
+        divisorFont.includes("monospace") || divisorFont.includes("plex") || divisorFont.includes("courier"),
+        `Expected divisor-cell to use monospace font, got: ${bodyFonts.divisorCell}`,
+      );
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test("typography: heading and body fonts are distinct — headings use serif, body uses sans-serif", { concurrency: false }, async () => {
+  const { context, page } = await createWorkspacePage();
+
+  try {
+    const fonts = await page.evaluate(() => {
+      const body = document.querySelector("body");
+      const hintTitle = document.querySelector('[data-visual-snapshot="workspace-live"] .hint-title');
+      if (!body || !hintTitle) return null;
+      return {
+        bodyFont: window.getComputedStyle(body).fontFamily,
+        headingFont: window.getComputedStyle(hintTitle).fontFamily,
+      };
+    });
+
+    assert.ok(fonts, "Expected to find body and .hint-title elements.");
+
+    const bodyFont = fonts.bodyFont.toLowerCase();
+    const headingFont = fonts.headingFont.toLowerCase();
+
+    // Body should end with sans-serif generic family
+    assert.ok(
+      bodyFont.includes("sans-serif"),
+      `Expected body font to include sans-serif, got: ${fonts.bodyFont}`,
+    );
+
+    // Heading should include serif generic family (and it's specifically serif, not sans-serif only)
+    assert.ok(
+      headingFont.includes("serif"),
+      `Expected heading font to include serif, got: ${fonts.headingFont}`,
+    );
+
+    // The heading font stack should be different from body
+    assert.notEqual(
+      fonts.bodyFont,
+      fonts.headingFont,
+      "Expected heading and body to use different font stacks.",
+    );
   } finally {
     await context.close();
   }
