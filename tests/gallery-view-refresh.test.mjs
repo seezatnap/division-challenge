@@ -47,8 +47,35 @@ test("gallery panel includes reward image, earned date output, empty-state copy,
     "mergeUnlockedRewardsForGallery",
     'data-ui-surface="dino-dossier"',
     "dino-dossier-attributes",
+    "gallery-shell gallery-shell-jp3",
+    "gallery-grid gallery-grid-jp3",
+    "gallery-card gallery-card-jp3",
+    "gallery-card-trigger gallery-card-trigger-jp3",
+    "gallery-thumb gallery-thumb-jp3",
+    "gallery-image gallery-image-jp3",
+    "gallery-name gallery-name-jp3",
+    "gallery-meta gallery-meta-jp3",
   ]) {
     assert.ok(source.includes(fragment), `Expected gallery panel fragment: ${fragment}`);
+  }
+});
+
+test("JP3 gallery styles define a bright 3x3 thumbnail grid with centered dino images and labels below", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    ".gallery-grid-jp3 {",
+    "grid-template-columns: repeat(3, minmax(0, 1fr));",
+    ".gallery-thumb-jp3 {",
+    "aspect-ratio: 1 / 0.78;",
+    "background: linear-gradient(180deg, #27b533 0%, #1f9f2f 56%, #178826 100%);",
+    ".gallery-image-jp3 {",
+    "object-fit: contain;",
+    "object-position: center;",
+    ".gallery-name-jp3 {",
+    "text-transform: uppercase;",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected JP3 gallery style fragment: ${fragment}`);
   }
 });
 

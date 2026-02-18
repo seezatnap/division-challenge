@@ -48,6 +48,14 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     "Expected player-start copy to describe lowercase localStorage profile behavior",
   );
   assert.ok(
+    source.includes("The Research Center"),
+    "Expected player-start heading to use the Research Center title treatment",
+  );
+  assert.ok(
+    source.includes("field-station terminal"),
+    "Expected player-start subtitle copy to reference the field-station terminal",
+  );
+  assert.ok(
     source.includes('data-ui-action="trade-amber-for-dino"'),
     "Expected amber trade action wiring in the gallery surface",
   );
@@ -60,9 +68,16 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     "Expected hybrid lab modal surface to be rendered from the home page",
   );
   assert.ok(
-    source.includes("<SurveillanceToolbar />"),
+    source.includes("<SurveillanceToolbar"),
     "Expected persistent surveillance toolbar component to be mounted on the home page",
   );
+  for (const fragment of [
+    "problemsSolved={gameSession.sessionSolvedProblems}",
+    "currentStreak={currentSessionStreak}",
+    "difficultyLevel={currentDifficultyLevel}",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected toolbar stat wiring fragment: ${fragment}`);
+  }
 });
 
 test("root layout wires themed typography variables", async () => {
@@ -84,11 +99,23 @@ test("root layout wires themed typography variables", async () => {
   assert.equal(source.includes("Geist"), false, "Geist font wiring should be removed for Jurassic typography");
 });
 
-test("surveillance toolbar component includes JP3 footer label, icon controls, and MORE affordance", async () => {
+test("surveillance toolbar component includes JP3 footer label, icon controls, stat readouts, and MORE affordance", async () => {
   const source = await readRepoFile("src/features/workspace-ui/components/surveillance-toolbar.tsx");
 
   for (const fragment of [
+    "problemsSolved",
+    "currentStreak",
+    "difficultyLevel",
+    "formatToolbarReadout",
     'data-ui-surface="surveillance-toolbar"',
+    'data-ui-surface="surveillance-toolbar-stats"',
+    "data-ui-stat={id}",
+    '"problems-solved"',
+    '"current-streak"',
+    '"difficulty-level"',
+    "Solved",
+    "Streak",
+    "Level",
     "ISLA SORNA SURVEILLANCE DEVICE",
     "Footprint tracker",
     "Fossil scanner",
@@ -97,6 +124,8 @@ test("surveillance toolbar component includes JP3 footer label, icon controls, a
     'data-ui-action="toolbar-more"',
     "MORE",
     "jp-surveillance-icon-button",
+    "jp-surveillance-toolbar-readouts",
+    "jp-surveillance-readout-value",
   ]) {
     assert.ok(source.includes(fragment), `Expected surveillance toolbar fragment: ${fragment}`);
   }
@@ -132,6 +161,10 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".jp-surveillance-toolbar-label",
     "font-variant: small-caps;",
     ".jp-surveillance-toolbar-icons",
+    ".jp-surveillance-toolbar-readouts",
+    ".jp-surveillance-readout",
+    ".jp-surveillance-readout-label",
+    ".jp-surveillance-readout-value",
     ".jp-surveillance-icon-button",
     ".jp-surveillance-toolbar-more",
     ".jp-surveillance-toolbar-more::after",
@@ -139,9 +172,19 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "--background-image: url(\"/jp3-jungle-canopy.jpg\");",
     "--jp-amber:",
     "--jp-glow:",
+    ".motif-canopy::after",
     ".motif-claw::after",
     ".motif-fossil::after",
     ".motif-track::after",
+    "color-mix(in srgb, var(--jp-panel-text) 20%, transparent)",
+    "color-mix(in srgb, var(--jp-panel-border) 24%, transparent)",
+    "color-mix(in srgb, var(--jp-panel-text) 18%, transparent)",
+    "color-mix(in srgb, var(--jp-panel-text) 16%, transparent)",
+    "color-mix(in srgb, var(--jp-panel-border) 26%, transparent)",
+    "opacity: 0.7;",
+    "opacity: 0.52;",
+    "opacity: 0.5;",
+    "opacity: 0.46;",
     ".inline-entry",
     '.inline-entry[data-entry-inline="true"][contenteditable="true"]:focus-visible',
     ".inline-entry-quotient.inline-entry-pending:focus-visible",
@@ -157,12 +200,21 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     ".hint-stack[data-feedback-tone=\"retry\"]",
     ".hint-stack[data-feedback-tone=\"celebration\"]",
     ".hint-status",
+    ".coach-readout",
+    ".hint-stack[data-feedback-tone=\"retry\"] .coach-readout",
+    ".hint-stack[data-feedback-tone=\"celebration\"] .coach-readout",
     ".amber-bank",
     ".amber-actions",
+    ".player-start-research-intro",
+    ".player-start-title",
+    ".player-start-subtitle",
+    ".game-start-input-terminal",
+    "font-family: var(--font-jurassic-mono), \"IBM Plex Mono\", monospace;",
     ".hybrid-lab-modal",
     ".hybrid-lab-select",
     ".hybrid-lab-actions",
     ".coach-item[data-feedback-tone=\"retry\"]",
+    "font-family: var(--font-jurassic-mono), \"IBM Plex Mono\", monospace;",
     "@keyframes amber-pulse",
     "@keyframes amber-pulse-bring-down",
     "@keyframes inline-entry-lock-in",

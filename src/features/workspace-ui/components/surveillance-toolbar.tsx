@@ -95,7 +95,43 @@ const toolbarEquipment = [
   },
 ] as const;
 
-export function SurveillanceToolbar() {
+interface SurveillanceToolbarProps {
+  problemsSolved: number;
+  currentStreak: number;
+  difficultyLevel: number;
+}
+
+function formatToolbarReadout(value: number, minimumDigits = 2): string {
+  if (!Number.isFinite(value)) {
+    return "00";
+  }
+
+  return Math.max(0, Math.trunc(value)).toString().padStart(minimumDigits, "0");
+}
+
+export function SurveillanceToolbar({
+  problemsSolved,
+  currentStreak,
+  difficultyLevel,
+}: SurveillanceToolbarProps) {
+  const sessionReadouts = [
+    {
+      id: "problems-solved",
+      label: "Solved",
+      value: formatToolbarReadout(problemsSolved),
+    },
+    {
+      id: "current-streak",
+      label: "Streak",
+      value: formatToolbarReadout(currentStreak),
+    },
+    {
+      id: "difficulty-level",
+      label: "Level",
+      value: `L${formatToolbarReadout(difficultyLevel)}`,
+    },
+  ] as const;
+
   return (
     <footer
       aria-label="Isla Sorna surveillance toolbar"
@@ -114,6 +150,21 @@ export function SurveillanceToolbar() {
           </button>
         ))}
       </div>
+
+      <ul
+        aria-label="Session surveillance readouts"
+        className="jp-surveillance-toolbar-readouts"
+        data-ui-surface="surveillance-toolbar-stats"
+      >
+        {sessionReadouts.map(({ id, label, value }) => (
+          <li className="jp-surveillance-readout" key={id}>
+            <span className="jp-surveillance-readout-label">{label}</span>
+            <span className="jp-surveillance-readout-value" data-ui-stat={id}>
+              {value}
+            </span>
+          </li>
+        ))}
+      </ul>
 
       <p className="jp-surveillance-toolbar-label">ISLA SORNA SURVEILLANCE DEVICE</p>
 

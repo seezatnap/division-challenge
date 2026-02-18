@@ -260,6 +260,46 @@ test("bus-stop renderer component uses inline workspace entries and avoids stand
   }
 });
 
+test("bus-stop renderer styles use cream notation on green panels and updated animation colors", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    ".bus-stop-renderer {",
+    "--division-text:",
+    "--division-text-soft:",
+    "--division-bracket-color:",
+    "--division-rule-color:",
+    "color: var(--division-text);",
+    "border-left: var(--division-bracket-stroke-width) solid var(--division-bracket-color);",
+    "border-top: var(--division-bracket-stroke-width) solid var(--division-bracket-color);",
+    ".work-row-op {",
+    ".work-row[data-step-kind=\"bring-down\"] .work-row-value {",
+    ".inline-entry-work-row[data-entry-step-kind=\"bring-down\"] {",
+    ".final-line {",
+    ".inline-entry.inline-entry-error-pulse {",
+    ".inline-entry.inline-entry-retry-lock {",
+    "var(--jp-accent-red)",
+    ".inline-entry-lock-in[data-entry-lock-pulse=\"subtraction-result\"]::after",
+    "color-mix(in srgb, var(--jp-panel-text) 72%, white);",
+    ".glow-amber",
+    "@keyframes inline-entry-error-shake",
+    "@keyframes inline-entry-lock-in",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected bus-stop renderer style fragment: ${fragment}`);
+  }
+
+  assert.equal(
+    /\.work-row\[data-step-kind="bring-down"\] \.work-row-value\s*{\s*color:\s*var\(--jp-fern\);/m.test(source),
+    false,
+    "Bring-down row text should no longer use legacy fern-green notation coloring.",
+  );
+  assert.equal(
+    source.includes("rgba(113, 137, 81, 0.56)"),
+    false,
+    "Legacy lock-in ring accent should be replaced by the updated panel-text palette.",
+  );
+});
+
 test("home page renders the workspace through the reusable bus-stop renderer", async () => {
   const homePageSource = await readRepoFile("src/app/page.tsx");
   const workspacePanelSource = await readRepoFile(
@@ -289,6 +329,7 @@ test("home page wires dino coach guidance to the active step context", async () 
     "onActiveStepFocusChange={handleActiveStepFocusChange}",
     'data-feedback-tone={activeCoachMessage.tone}',
     'data-feedback-outcome={activeCoachMessage.outcome}',
+    'className="coach-readout"',
     "data-feedback-key={entry.message.messageKey}",
     "{entry.message.text}",
     "{activeCoachMessage.note}",

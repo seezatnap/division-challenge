@@ -72,19 +72,21 @@ export function LiveDivisionWorkspacePanel({
       >
         <h3 className="hint-title">Dino Coach</h3>
         <p className="hint-status">{activeCoachMessage.statusLabel}</p>
-        <ul className="coach-list">
-          {coachMessages.map((entry) => (
-            <li
-              className="coach-item"
-              data-feedback-key={entry.message.messageKey}
-              data-feedback-tone={entry.message.tone}
-              key={entry.message.id}
-            >
-              {entry.message.text}
-            </li>
-          ))}
-        </ul>
-        <p className="hint-note">{activeCoachMessage.note}</p>
+        <div className="coach-readout">
+          <ul className="coach-list">
+            {coachMessages.map((entry) => (
+              <li
+                className="coach-item"
+                data-feedback-key={entry.message.messageKey}
+                data-feedback-tone={entry.message.tone}
+                key={entry.message.id}
+              >
+                {entry.message.text}
+              </li>
+            ))}
+          </ul>
+          <p className="hint-note">{activeCoachMessage.note}</p>
+        </div>
       </aside>
     </div>
   );
