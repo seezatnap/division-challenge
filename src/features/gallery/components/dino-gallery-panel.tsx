@@ -253,7 +253,7 @@ export function DinoGalleryPanel({
         {selectedReward && selectedRewardProfile ? (
           <article
             aria-label={`${selectedReward.dinosaurName} detail card`}
-            className="gallery-detail-panel-jp3"
+            className="gallery-detail-panel-jp3 jp-scroll-indicators"
             id={GALLERY_DETAIL_PANEL_ID}
           >
             <p className="gallery-detail-meta-jp3">

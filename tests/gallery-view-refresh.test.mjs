@@ -48,6 +48,7 @@ test("gallery panel includes reward image, earned date output, empty-state copy,
     "gallery-research-center-grid",
     "gallery-selected-name-jp3",
     "gallery-detail-panel-jp3",
+    "gallery-detail-panel-jp3 jp-scroll-indicators",
     "gallery-data-sheet-list-jp3",
     "gallery-data-sheet-row-jp3",
     "gallery-detail-description-jp3",
@@ -87,6 +88,25 @@ test("JP3 gallery styles define a bright 3x3 thumbnail grid and two-panel detail
     "grid-template-columns: minmax(0, 21rem) minmax(0, 1fr);",
   ]) {
     assert.ok(source.includes(fragment), `Expected JP3 gallery style fragment: ${fragment}`);
+  }
+});
+
+test("JP3 gallery detail and overflow panels include red triangular scroll indicators", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    ".gallery-detail-panel-jp3 {",
+    "max-height: min(69vh, 34rem);",
+    "overflow-y: auto;",
+    ".gallery-detail-panel-jp3.jp-scroll-indicators {",
+    ".jp-scroll-indicators::before",
+    ".jp-scroll-indicators::after",
+    ".jp-modal::before",
+    ".jp-modal::after",
+    "border-bottom: 0.82rem solid color-mix(in srgb, var(--jp-accent-red) 88%, #f55252);",
+    "border-top: 0.82rem solid color-mix(in srgb, var(--jp-accent-red) 88%, #f55252);",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected JP3 scroll indicator style fragment: ${fragment}`);
   }
 });
 
