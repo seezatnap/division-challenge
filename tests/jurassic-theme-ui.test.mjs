@@ -165,6 +165,39 @@ test("global stylesheet uses a full-viewport jungle canopy body background image
   assert.ok(canopyImage.size > 0, "Expected jungle canopy JPG asset to be non-empty");
 });
 
+test("bus-stop workspace color styling renders cream text on green surfaces while preserving amber and error states", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+
+  for (const fragment of [
+    ".workspace-paper {",
+    "color: color-mix(in srgb, var(--jp-panel-text) 92%, white);",
+    ".workspace-label {",
+    "color: color-mix(in srgb, var(--jp-panel-text) 84%, white);",
+    ".bracket-stack {",
+    "border-left: var(--division-bracket-stroke-width) solid color-mix(in srgb, var(--jp-panel-text) 72%, transparent);",
+    ".work-row[data-step-kind=\"multiply-result\"] .work-row-value-shell::after",
+    "border-bottom: 0.12rem solid color-mix(in srgb, var(--jp-panel-text) 66%, transparent);",
+    ".dividend-line,",
+    ".work-row-op {",
+    "color: var(--jp-panel-text);",
+    ".inline-entry.inline-entry-error-pulse {",
+    "background: rgba(131, 26, 26, 0.56);",
+    ".inline-entry.inline-entry-retry-lock {",
+    "background: rgba(104, 19, 19, 0.46);",
+    ".glow-amber {",
+    "@keyframes inline-entry-lock-in",
+    "background: color-mix(in srgb, var(--jp-amber-bright) 36%, rgba(4, 16, 8, 0.18));",
+  ]) {
+    assert.ok(source.includes(fragment), `Expected bus-stop workspace styling fragment: ${fragment}`);
+  }
+
+  assert.equal(
+    source.includes("border-left: var(--division-bracket-stroke-width) solid rgba(45, 36, 25, 0.68);"),
+    false,
+    "Expected brown bracket stroke color to be removed for green-panel workspace rendering",
+  );
+});
+
 test("surveillance toolbar renders JP3 footer affordances with icon controls and MORE link", async () => {
   const pageSource = await readRepoFile("src/app/page.tsx");
   const toolbarSource = await readRepoFile(
