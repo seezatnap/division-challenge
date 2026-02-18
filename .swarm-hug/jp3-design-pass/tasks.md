@@ -30,7 +30,7 @@ Every task below should be implemented to visually match these comps. When in do
 
 - [x] (#10) Rework `DinoGalleryPanel` thumbnail grid to match the JP3 Research Center thumbnail grid layout shown in the left panel of `test-comp-targets/Jp3websitebrachi.webp`: bright green tile backgrounds, dinosaur images centered within tiles, name labels below each tile, 3×3 grid matching the comp's proportions [5 pts] (blocked by #4) (A) (A)
 - [x] (#11) Implement the Research Center two-panel detail view for gallery matching `test-comp-targets/Jp3websitebrachi.webp`: when a dinosaur is selected, show dinosaur image top-left with a data-sheet info card on the right (name, scientific name, pronunciation, diet, name meaning, length, height, weight, time period, location, taxon) matching the exact layout of the Brachiosaurus info card in the comp, description paragraph below [5 pts] (blocked by #10) (A) (A)
-- [B] (#12) Add red triangular scroll indicators (up/down arrows) for scrollable content areas in the gallery detail view and any overflow panels, matching the red triangle scroll arrows visible in the right panel of `test-comp-targets/Jp3websitebrachi.webp` [5 pts] (blocked by #11) (B)
+- [x] (#12) Add red triangular scroll indicators (up/down arrows) for scrollable content areas in the gallery detail view and any overflow panels, matching the red triangle scroll arrows visible in the right panel of `test-comp-targets/Jp3websitebrachi.webp` [5 pts] (blocked by #11) (B) (B)
 
 ## Player Start & Reward Screens
 
@@ -44,9 +44,9 @@ Every task below should be implemented to visually match these comps. When in do
 ## Visual Tests
 
 - [x] (#16) Create `tests/jp3-design-visual.test.mjs` with Playwright visual tests that validate the implementation matches `test-comp-targets/Jp3websitebrachi.webp`: (a) full-page screenshot verifying wood frame border is visible on all four sides, (b) pixel-sample panel centers to assert green background matching the comp's green (R<80, G>100, B<80), (c) verify bottom toolbar is dark-colored and contains expected label text matching the comp's "SURVEILLANCE DEVICE" bar [5 pts] (blocked by #3, #4, #6) (A) (C)
-- [B] (#17) Add gallery visual tests validating against the comp: verify gallery renders as a grid of green tiles with dinosaur thumbnails matching the 3×3 grid in `test-comp-targets/Jp3websitebrachi.webp`, check grid has expected column count, verify tiles have green backgrounds via pixel sampling [5 pts] (blocked by #10, #16) (B)
-- [C] (#18) Add workspace contrast and typography visual tests: verify workspace text elements are light-colored on green background with sufficient contrast as shown in the comp, verify heading elements use serif font and body uses sans-serif via computed style checks [5 pts] (blocked by #8, #16) (B)
-- [C] (#19) Add active-glow visual test: verify the active input cell glows amber/gold against the green panel background (adapt existing glow tests if needed with updated selectors) [5 pts] (blocked by #8, #16) (B)
+- [x] (#17) Add gallery visual tests validating against the comp: verify gallery renders as a grid of green tiles with dinosaur thumbnails matching the 3×3 grid in `test-comp-targets/Jp3websitebrachi.webp`, check grid has expected column count, verify tiles have green backgrounds via pixel sampling [5 pts] (blocked by #10, #16) (B) (B)
+- [x] (#18) Add workspace contrast and typography visual tests: verify workspace text elements are light-colored on green background with sufficient contrast as shown in the comp, verify heading elements use serif font and body uses sans-serif via computed style checks [5 pts] (blocked by #8, #16) (B) (C)
+- [x] (#19) Add active-glow visual test: verify the active input cell glows amber/gold against the green panel background (adapt existing glow tests if needed with updated selectors) [5 pts] (blocked by #8, #16) (B) (C)
 
 ## Existing Test Updates
 
@@ -54,8 +54,8 @@ Every task below should be implemented to visually match these comps. When in do
 
 ## Polish & Integration
 
-- [A] (#21) Run the full existing test suite (`npm test` and `npm run test:visual`) and fix any regressions caused by the design pass, ensuring all workspace interaction, game logic, persistence, and reward pipeline tests still pass [5 pts] (blocked by #8, #9, #10, #13, #14, #15, #20) (A)
+- [x] (#21) Run the full existing test suite (`npm test` and `npm run test:visual`) and fix any regressions caused by the design pass, ensuring all workspace interaction, game logic, persistence, and reward pipeline tests still pass [5 pts] (blocked by #8, #9, #10, #13, #14, #15, #20) (A) (A)
 - [ ] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A)
 
 ## Follow-up tasks (from sprint review)
-- [A] (#23) Rename `tests/jp3-design-visual.test.mjs` to a visual-only target (for example `tests/jp3-design-visual.visual.mjs`) and update `npm run test:visual` to run it, so `npm test` does not unexpectedly require Playwright/browser artifacts.
+- [x] (#23) Rename `tests/jp3-design-visual.test.mjs` to a visual-only target (for example `tests/jp3-design-visual.visual.mjs`) and update `npm run test:visual` to run it, so `npm test` does not unexpectedly require Playwright/browser artifacts. (A)
