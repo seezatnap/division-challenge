@@ -22,11 +22,14 @@ test("earned reward panel uses egg-hatching loading UX and polling helpers", asy
     "setIsRevealModalOpen(true)",
     'data-ui-surface="reward-reveal-modal"',
     "Back To Board",
+    "earned-reward-panel-screen",
     "reward-egg-loader",
     'data-hatch-state={phase}',
     "The reward egg is hatching...",
     "setPhase(\"cracking\")",
     "setPhase(\"revealed\")",
+    "reward-reveal-portrait-frame",
+    "reward-modal-portrait-frame",
     'data-reveal-state={phase === "revealing" ? "revealing" : "revealed"}',
   ]) {
     assert.ok(source.includes(fragment), `Expected earned reward panel fragment: ${fragment}`);
@@ -68,6 +71,7 @@ test("global stylesheet defines egg-hatching and reveal animation styles", async
 
   for (const fragment of [
     ".earned-reward-panel",
+    ".earned-reward-panel-screen",
     '.earned-reward-panel[data-reward-motion="cracking"]',
     ".reward-egg-loader",
     '.reward-egg-loader[data-hatch-state="cracking"] .reward-egg-shell',
@@ -77,7 +81,10 @@ test("global stylesheet defines egg-hatching and reveal animation styles", async
     "@keyframes reward-egg-wobble-cracking",
     "@keyframes reward-hatch-crack",
     "@keyframes reward-hatch-crack-widen",
+    ".reward-reveal-portrait-frame",
+    ".reward-modal-portrait-frame",
     ".reward-reveal-image",
+    ".reward-modal-image",
     '.reward-reveal-figure[data-reveal-state="revealing"] .reward-reveal-image',
     "@keyframes reward-reveal-in",
     "@keyframes reward-reveal-glow",

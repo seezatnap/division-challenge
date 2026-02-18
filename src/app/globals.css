@@ -1538,8 +1538,7 @@ body::after {
   padding: 0.13rem 0.46rem;
 }
 
-.gallery-detail-image,
-.reward-modal-image {
+.gallery-detail-image {
   width: 100%;
   max-height: min(54vh, 22rem);
   object-fit: cover;
@@ -1638,31 +1637,112 @@ body::after {
 }
 
 .earned-reward-panel {
+  position: relative;
   margin-top: 0.85rem;
-  border: 1px solid rgba(70, 96, 56, 0.26);
+  border: 1px solid color-mix(in srgb, var(--jp-frame) 86%, #180d05);
   border-radius: 0.95rem;
-  background: linear-gradient(170deg, rgba(255, 255, 255, 0.72), rgba(113, 137, 81, 0.14));
-  padding: 0.75rem;
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--jp-frame) 58%, #9b7344) 0%,
+      color-mix(in srgb, var(--jp-frame) 86%, #231408) 68%,
+      color-mix(in srgb, var(--jp-frame) 82%, #190f08) 100%
+    ),
+    var(--jp-frame-grain);
+  padding: 0.34rem;
+  box-shadow:
+    0 0.75rem 1.65rem rgba(8, 5, 2, 0.44),
+    inset 0 1px 0 rgba(238, 205, 147, 0.22),
+    inset 0 -1px 0 rgba(18, 10, 4, 0.55);
   transition:
     border-color 220ms ease,
     box-shadow 220ms ease,
     transform 220ms ease;
 }
 
-.earned-reward-panel[data-reward-motion="cracking"] {
-  border-color: rgba(211, 160, 58, 0.54);
+.earned-reward-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(117, 85, 49, 0.16) 0 6px,
+    rgba(77, 54, 31, 0.16) 6px 12px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.72;
+}
+
+.earned-reward-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.earned-reward-panel-screen {
+  position: relative;
+  border-radius: 0.72rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 84%, black);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 20%, rgba(0, 0, 0, 0.16) 100%),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--jp-panel-bg) 84%, #35a03a) 0 3px,
+      color-mix(in srgb, var(--jp-panel-bg) 96%, #0f4f1f) 3px 6px
+    ),
+    var(--jp-panel-bg);
   box-shadow:
-    inset 0 0 0 1px rgba(244, 212, 141, 0.28),
-    0 0 1rem rgba(211, 160, 58, 0.18);
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 84%, black),
+    inset 0 0.12rem 0 rgba(240, 237, 216, 0.14),
+    inset 0 -0.14rem 0 color-mix(in srgb, var(--jp-panel-border) 72%, black);
+  padding: 0.75rem;
+  overflow: hidden;
+}
+
+.earned-reward-panel-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 22% 12%, rgba(240, 237, 216, 0.14), transparent 48%);
+}
+
+.earned-reward-panel-screen > * {
+  position: relative;
+  z-index: 1;
+}
+
+.earned-reward-panel[data-reward-motion="cracking"] {
+  border-color: color-mix(in srgb, var(--jp-amber) 62%, var(--jp-frame));
+  box-shadow:
+    0 0.85rem 1.8rem rgba(8, 5, 2, 0.48),
+    inset 0 0 0 1px rgba(244, 212, 141, 0.26),
+    0 0 1rem rgba(211, 160, 58, 0.16);
   transform: translateY(-1px);
 }
 
 .earned-reward-panel[data-reward-motion="revealing"],
 .earned-reward-panel[data-reward-motion="revealed"] {
-  border-color: rgba(70, 96, 56, 0.42);
+  border-color: color-mix(in srgb, var(--jp-frame) 72%, #120904);
   box-shadow:
+    0 0.78rem 1.7rem rgba(8, 5, 2, 0.45),
     inset 0 0 0 1px rgba(113, 137, 81, 0.18),
-    0 0 1.1rem rgba(70, 96, 56, 0.13);
+    0 0 1.1rem rgba(70, 96, 56, 0.15);
+}
+
+.earned-reward-panel[data-reward-motion="cracking"] .earned-reward-panel-screen {
+  border-color: color-mix(in srgb, var(--jp-amber) 58%, var(--jp-panel-border));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-amber) 36%, var(--jp-panel-border)),
+    inset 0 0.12rem 0 rgba(240, 237, 216, 0.16),
+    inset 0 -0.14rem 0 color-mix(in srgb, var(--jp-panel-border) 72%, black),
+    0 0 0.95rem rgba(211, 160, 58, 0.18);
+}
+
+.earned-reward-panel[data-reward-motion="revealing"] .earned-reward-panel-screen,
+.earned-reward-panel[data-reward-motion="revealed"] .earned-reward-panel-screen {
+  border-color: color-mix(in srgb, var(--jp-panel-border) 88%, black);
 }
 
 .earned-reward-header {
@@ -1800,25 +1880,82 @@ body::after {
 .reward-loader-title {
   font-family: var(--font-jurassic-display), "Times New Roman", serif;
   font-size: 1.02rem;
-  color: var(--jp-bark);
+  color: color-mix(in srgb, var(--jp-panel-text) 94%, white);
+  text-shadow: 0 1px 0 rgba(8, 32, 12, 0.6);
 }
 
 .reward-loader-copy {
   font-size: 0.78rem;
   line-height: 1.35;
-  color: color-mix(in srgb, var(--jp-jungle) 70%, var(--jp-bark));
+  color: color-mix(in srgb, var(--jp-panel-text) 84%, #d4e4be);
 }
 
 .reward-reveal-figure {
   margin-top: 0.75rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.reward-reveal-portrait-frame,
+.reward-modal-portrait-frame {
+  position: relative;
+  border-radius: 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--jp-frame) 84%, #160c05);
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--jp-frame) 56%, #a27a4d) 0%,
+      color-mix(in srgb, var(--jp-frame) 84%, #1c1209) 100%
+    ),
+    var(--jp-frame-grain);
+  padding: 0.24rem;
+  box-shadow:
+    inset 0 1px 0 rgba(242, 218, 164, 0.2),
+    inset 0 -1px 0 rgba(22, 12, 5, 0.56),
+    0 0.48rem 1rem rgba(5, 3, 1, 0.36);
+}
+
+.reward-reveal-portrait-frame::before,
+.reward-modal-portrait-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0.22rem;
+  border-radius: 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 84%, black);
+  background:
+    linear-gradient(180deg, rgba(240, 237, 216, 0.12), rgba(9, 38, 15, 0.22)),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--jp-panel-bg) 74%, #3ca842) 0 3px,
+      color-mix(in srgb, var(--jp-panel-bg) 92%, #104a1f) 3px 6px
+    ),
+    var(--jp-panel-bg);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 90%, black),
+    inset 0 0.1rem 0 rgba(240, 237, 216, 0.13);
+  pointer-events: none;
 }
 
 .reward-reveal-image {
+  position: relative;
+  z-index: 1;
+  display: block;
   width: 100%;
   max-height: 11rem;
   object-fit: cover;
-  border-radius: 0.76rem;
-  border: 1px solid rgba(45, 36, 25, 0.2);
+  border-radius: 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 76%, black);
+}
+
+.reward-modal-image {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  max-height: min(54vh, 22rem);
+  object-fit: cover;
+  border-radius: 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 76%, black);
 }
 
 .reward-reveal-figure[data-reveal-state="revealing"] .reward-reveal-image {
@@ -1834,7 +1971,7 @@ body::after {
 .reward-reveal-caption {
   margin-top: 0.45rem;
   font-size: 0.76rem;
-  color: color-mix(in srgb, var(--jp-jungle) 74%, var(--jp-bark));
+  color: color-mix(in srgb, var(--jp-panel-text) 82%, #d4e4be);
 }
 
 @keyframes reward-reveal-in {
@@ -1851,15 +1988,15 @@ body::after {
 
 @keyframes reward-reveal-glow {
   0% {
-    box-shadow: 0 0 0 rgba(113, 137, 81, 0);
+    box-shadow: 0 0 0 rgba(211, 160, 58, 0);
   }
 
   60% {
-    box-shadow: 0 0 1.2rem rgba(113, 137, 81, 0.35);
+    box-shadow: 0 0 1.1rem rgba(211, 160, 58, 0.32);
   }
 
   100% {
-    box-shadow: 0 0 0 rgba(113, 137, 81, 0);
+    box-shadow: 0 0 0 rgba(211, 160, 58, 0);
   }
 }
 
