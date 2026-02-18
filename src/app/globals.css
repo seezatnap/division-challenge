@@ -1211,6 +1211,45 @@ body {
   color: color-mix(in srgb, var(--jp-jungle) 72%, var(--jp-bark));
 }
 
+.dino-dossier {
+  border: 1px solid rgba(70, 96, 56, 0.3);
+  border-radius: 0.78rem;
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.75), rgba(113, 137, 81, 0.14));
+  padding: 0.56rem 0.62rem;
+  display: grid;
+  gap: 0.42rem;
+}
+
+.dino-dossier-dimensions {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--jp-bark) 82%, black);
+}
+
+.dino-dossier-description {
+  font-size: 0.78rem;
+  line-height: 1.34;
+  color: color-mix(in srgb, var(--jp-jungle) 76%, var(--jp-bark));
+}
+
+.dino-dossier-attributes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dino-dossier-attribute {
+  border-radius: 999px;
+  border: 1px solid rgba(70, 96, 56, 0.34);
+  background: rgba(255, 255, 255, 0.62);
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--jp-jungle) 78%, var(--jp-bark));
+  padding: 0.13rem 0.46rem;
+}
+
 .gallery-detail-image,
 .reward-modal-image {
   width: 100%;

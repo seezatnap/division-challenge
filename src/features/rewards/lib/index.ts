@@ -7,3 +7,4 @@ export * from "./gemini-image-runtime";
 export * from "./gemini-image-service";
 export * from "./prefetch";
 export * from "./earned-reward-reveal";
+export * from "./dino-dossiers";

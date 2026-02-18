@@ -45,6 +45,8 @@ test("gallery panel includes reward image, earned date output, empty-state copy,
     "window.addEventListener(",
     "readUnlockedRewardsFromGalleryEvent",
     "mergeUnlockedRewardsForGallery",
+    'data-ui-surface="dino-dossier"',
+    "dino-dossier-attributes",
   ]) {
     assert.ok(source.includes(fragment), `Expected gallery panel fragment: ${fragment}`);
   }
@@ -130,6 +132,10 @@ test("home page uses the reusable DinoGalleryPanel with unlocked reward data", a
   assert.ok(
     source.includes("gameSession.unlockedHybrids"),
     "Expected home page to wire hybrid gallery data from session state",
+  );
+  assert.ok(
+    source.includes('data-ui-surface="hybrid-dossier"'),
+    "Expected home page to render hybrid dossier content in hybrid detail modal",
   );
 });
 

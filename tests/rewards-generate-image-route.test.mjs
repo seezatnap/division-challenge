@@ -33,9 +33,14 @@ async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
   return toDataUrl(compiled);
 }
 
-async function loadGenerateImageRoute(generateGeminiRewardImageImpl) {
+async function loadGenerateImageRoute(
+  generateGeminiRewardImageImpl,
+  ensureRewardDossierArtifactsImpl = async () => undefined,
+) {
   const callbackName = `__routeGenerateImage_${Math.random().toString(16).slice(2)}`;
+  const dossierCallbackName = `__routeEnsureDossiers_${Math.random().toString(16).slice(2)}`;
   globalThis[callbackName] = generateGeminiRewardImageImpl;
+  globalThis[dossierCallbackName] = ensureRewardDossierArtifactsImpl;
 
   const nextServerModuleUrl = toDataUrl(`
     export const NextResponse = {
@@ -58,11 +63,17 @@ async function loadGenerateImageRoute(generateGeminiRewardImageImpl) {
       return await globalThis.${callbackName}(payload);
     }
   `);
+  const dossierArtifactModuleUrl = toDataUrl(`
+    export async function ensureRewardDossierArtifacts(assetName) {
+      return await globalThis.${dossierCallbackName}(assetName);
+    }
+  `);
 
   const routeModuleUrl = await transpileTypeScriptToDataUrl(
     "src/app/api/rewards/generate-image/route.ts",
     {
       "next/server": nextServerModuleUrl,
+      "@/features/rewards/lib/dossier-artifacts": dossierArtifactModuleUrl,
       "@/features/rewards/lib/gemini-image-runtime": runtimeModuleUrl,
       "@/features/rewards/lib/gemini-image-service": serviceModuleUrl,
     },
@@ -74,6 +85,7 @@ async function loadGenerateImageRoute(generateGeminiRewardImageImpl) {
     serviceModule,
     cleanup: () => {
       delete globalThis[callbackName];
+      delete globalThis[dossierCallbackName];
     },
   };
 }
@@ -175,6 +187,45 @@ test("POST /api/rewards/generate-image wraps successful image output in a data e
     assert.equal(response.status, 200);
     assert.deepEqual(seenPayload, { dinosaurName: "Brachiosaurus" });
     assert.deepEqual(body, { data: generatedImage });
+  } finally {
+    cleanup();
+  }
+});
+
+test("POST /api/rewards/generate-image creates dossier artifacts before image generation", async () => {
+  const callOrder = [];
+
+  const { routeModule, cleanup } = await loadGenerateImageRoute(
+    async (payload) => {
+      callOrder.push(`generate:${payload.dinosaurName}`);
+      return {
+        dinosaurName: payload.dinosaurName,
+        prompt: "prompt",
+        model: "test-model",
+        mimeType: "image/png",
+        imageBase64: "YWJjZA==",
+      };
+    },
+    async (assetName) => {
+      callOrder.push(`dossier:${assetName}`);
+    },
+  );
+
+  try {
+    const request = new Request("https://example.test/api/rewards/generate-image", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ dinosaurName: "Hybrid Tyrannosaurus Rex + Velociraptor" }),
+    });
+
+    const response = await routeModule.POST(request);
+    assert.equal(response.status, 200);
+    assert.deepEqual(callOrder, [
+      "dossier:Hybrid Tyrannosaurus Rex + Velociraptor",
+      "generate:Hybrid Tyrannosaurus Rex + Velociraptor",
+    ]);
   } finally {
     cleanup();
   }

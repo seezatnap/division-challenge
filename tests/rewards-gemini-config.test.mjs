@@ -9,11 +9,15 @@ import ts from "typescript";
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "..");
 
-async function loadTypeScriptModule(relativePath) {
+function toDataUrl(source) {
+  return `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
+}
+
+async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
   const absolutePath = path.join(repoRoot, relativePath);
   const source = await readFile(absolutePath, "utf8");
 
-  const compiled = ts.transpileModule(source, {
+  let compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.ESNext,
       target: ts.ScriptTarget.ES2022,
@@ -21,10 +25,35 @@ async function loadTypeScriptModule(relativePath) {
     fileName: absolutePath,
   }).outputText;
 
-  return import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  for (const [specifier, replacement] of Object.entries(replacements)) {
+    compiled = compiled.replaceAll(`from "${specifier}"`, `from "${replacement}"`);
+    compiled = compiled.replaceAll(`from '${specifier}'`, `from "${replacement}"`);
+  }
+
+  return toDataUrl(compiled);
 }
 
-const rewardsGeminiModule = loadTypeScriptModule("src/features/rewards/lib/gemini.ts");
+async function loadGeminiModule() {
+  const dinosaursModuleUrl = await transpileTypeScriptToDataUrl(
+    "src/features/rewards/lib/dinosaurs.ts",
+  );
+  const dossiersModuleUrl = await transpileTypeScriptToDataUrl(
+    "src/features/rewards/lib/dino-dossiers.ts",
+    {
+      "./dinosaurs": dinosaursModuleUrl,
+    },
+  );
+  const geminiModuleUrl = await transpileTypeScriptToDataUrl(
+    "src/features/rewards/lib/gemini.ts",
+    {
+      "./dino-dossiers": dossiersModuleUrl,
+    },
+  );
+
+  return import(geminiModuleUrl);
+}
+
+const rewardsGeminiModule = loadGeminiModule();
 
 test("createGeminiImageRequestConfig returns model + trimmed API key", async () => {
   const { createGeminiImageRequestConfig, GEMINI_IMAGE_MODEL_DEFAULT } =
@@ -97,4 +126,20 @@ test("buildRewardImagePrompt switches to hybrid-specific guidance for hybrid ass
   assert.match(prompt, /Hybrid Tyrannosaurus Rex \+ Velociraptor/);
   assert.match(prompt, /dinosaur hybrid/i);
   assert.match(prompt, /family-friendly/i);
+  assert.match(prompt, /Height: [\d.]+ m/);
+  assert.match(prompt, /Length: [\d.]+ m/);
+  assert.match(prompt, /Attributes:/);
+  assert.match(prompt, /Description:/);
+});
+
+test("buildRewardImagePrompt includes dossier details for primary dinosaur assets", async () => {
+  const { buildRewardImagePrompt } = await rewardsGeminiModule;
+
+  const prompt = buildRewardImagePrompt("Brachiosaurus");
+
+  assert.match(prompt, /Field dossier for Brachiosaurus/);
+  assert.match(prompt, /Height: [\d.]+ m/);
+  assert.match(prompt, /Length: [\d.]+ m/);
+  assert.match(prompt, /Attributes:/);
+  assert.match(prompt, /Description:/);
 });

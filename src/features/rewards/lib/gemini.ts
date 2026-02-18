@@ -1,3 +1,8 @@
+import {
+  formatRewardDossierPromptBlock,
+  resolveRewardAssetDossier,
+} from "./dino-dossiers";
+
 export const GEMINI_API_KEY_ENV_VAR = "GEMINI_API_KEY";
 export const GEMINI_IMAGE_MODEL_ENV_VAR = "GEMINI_IMAGE_MODEL";
 export const GEMINI_IMAGE_MODEL_DEFAULT = "gemini-2.5-flash-image-preview";
@@ -62,12 +67,23 @@ function buildAmberRewardPrompt(assetName: string): string {
   ].join(" ");
 }
 
-function buildHybridDinosaurPrompt(assetName: string): string {
+function buildHybridDinosaurPrompt(assetName: string, dossierPromptBlock: string): string {
   return [
     `Create a photorealistic cinematic still of ${assetName}.`,
     "The subject is a believable dinosaur hybrid combining anatomy cues from both source species.",
+    dossierPromptBlock,
     "Use Jurassic adventure framing, dense foliage, humid haze, and golden-hour rim lighting.",
     "Keep the tone family-friendly and awe-filled, with no gore or graphic violence.",
+  ].join(" ");
+}
+
+function buildPrimaryDinosaurPrompt(
+  assetName: string,
+  dossierPromptBlock: string,
+): string {
+  return [
+    buildJurassicParkCinematicPrompt(assetName),
+    dossierPromptBlock,
   ].join(" ");
 }
 
@@ -82,9 +98,14 @@ export function buildRewardImagePrompt(assetName: string): string {
     return buildAmberRewardPrompt(sanitizedAssetName);
   }
 
+  const resolvedDossier = resolveRewardAssetDossier(sanitizedAssetName);
+  const dossierPromptBlock = resolvedDossier
+    ? formatRewardDossierPromptBlock(resolvedDossier)
+    : "";
+
   if (/^hybrid\b/i.test(sanitizedAssetName)) {
-    return buildHybridDinosaurPrompt(sanitizedAssetName);
+    return buildHybridDinosaurPrompt(sanitizedAssetName, dossierPromptBlock);
   }
 
-  return buildJurassicParkCinematicPrompt(sanitizedAssetName);
+  return buildPrimaryDinosaurPrompt(sanitizedAssetName, dossierPromptBlock);
 }

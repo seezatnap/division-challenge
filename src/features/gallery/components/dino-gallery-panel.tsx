@@ -12,6 +12,10 @@ import {
   readUnlockedRewardsFromGalleryEvent,
   sortUnlockedRewardsForGallery,
 } from "@/features/gallery/lib";
+import {
+  buildPrimaryDinosaurDossier,
+  formatMetersAsMetersAndFeet,
+} from "@/features/rewards/lib/dino-dossiers";
 
 const EMPTY_STATE_TITLE = "No dinos unlocked yet.";
 const EMPTY_STATE_COPY =
@@ -32,6 +36,13 @@ export function DinoGalleryPanel({
     useState<UnlockedReward[]>(sortedUnlockedRewards);
   const [refreshStatus, setRefreshStatus] = useState<string>("");
   const [selectedReward, setSelectedReward] = useState<UnlockedReward | null>(null);
+  const selectedRewardDossier = useMemo(
+    () =>
+      selectedReward
+        ? buildPrimaryDinosaurDossier(selectedReward.dinosaurName)
+        : null,
+    [selectedReward],
+  );
 
   useEffect(() => {
     setGalleryRewards(sortedUnlockedRewards);
@@ -181,6 +192,24 @@ export function DinoGalleryPanel({
                   {formatGalleryEarnedDate(selectedReward.earnedAt)}
                 </time>
               </p>
+              {selectedRewardDossier ? (
+                <section className="dino-dossier" data-ui-surface="dino-dossier">
+                  <p className="dino-dossier-dimensions">
+                    Height: {formatMetersAsMetersAndFeet(selectedRewardDossier.heightMeters)} •
+                    Length: {formatMetersAsMetersAndFeet(selectedRewardDossier.lengthMeters)}
+                  </p>
+                  <p className="dino-dossier-description">
+                    {selectedRewardDossier.description}
+                  </p>
+                  <ul className="dino-dossier-attributes" aria-label="Dinosaur attributes">
+                    {selectedRewardDossier.attributes.map((attribute) => (
+                      <li className="dino-dossier-attribute" key={attribute}>
+                        {attribute}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
               <Image
                 alt={`${selectedReward.dinosaurName} unlocked reward image`}
                 className="gallery-detail-image"

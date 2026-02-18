@@ -36,6 +36,10 @@ import {
   getMilestoneSolvedCountForRewardNumber,
 } from "@/features/rewards/lib/dinosaurs";
 import { NANO_BANANA_PRO_IMAGE_MODEL } from "@/features/rewards/lib/gemini";
+import {
+  buildHybridDinosaurDossier,
+  formatMetersAsMetersAndFeet,
+} from "@/features/rewards/lib/dino-dossiers";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
 import {
   normalizePlayerProfileName,
@@ -710,6 +714,16 @@ export default function Home() {
       ),
     [gameSession.unlockedHybrids, unlockedPrimaryDinosaurNames],
   );
+  const selectedHybridDossier = useMemo(() => {
+    if (!selectedHybridReward) {
+      return null;
+    }
+
+    return buildHybridDinosaurDossier({
+      firstDinosaurName: selectedHybridReward.firstDinosaurName,
+      secondDinosaurName: selectedHybridReward.secondDinosaurName,
+    });
+  }, [selectedHybridReward]);
   const canUnlockNextDinosaurWithAmber =
     gameSession.amberBalance >= AMBER_COST_PER_DINO_UNLOCK;
   const hasEnoughAmberForHybrid = gameSession.amberBalance >= AMBER_COST_PER_HYBRID_CREATION;
@@ -1710,6 +1724,24 @@ export default function Home() {
                     Built from {selectedHybridReward.firstDinosaurName} +{" "}
                     {selectedHybridReward.secondDinosaurName}
                   </p>
+                  {selectedHybridDossier ? (
+                    <section className="dino-dossier" data-ui-surface="hybrid-dossier">
+                      <p className="dino-dossier-dimensions">
+                        Height: {formatMetersAsMetersAndFeet(selectedHybridDossier.heightMeters)} •
+                        Length: {formatMetersAsMetersAndFeet(selectedHybridDossier.lengthMeters)}
+                      </p>
+                      <p className="dino-dossier-description">
+                        {selectedHybridDossier.description}
+                      </p>
+                      <ul className="dino-dossier-attributes" aria-label="Hybrid attributes">
+                        {selectedHybridDossier.attributes.map((attribute) => (
+                          <li className="dino-dossier-attribute" key={attribute}>
+                            {attribute}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ) : null}
                   <Image
                     alt={`${selectedHybridReward.hybridName} hybrid image`}
                     className="gallery-detail-image"
