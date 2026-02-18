@@ -44,6 +44,7 @@ import {
   type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
+import { SurveillanceToolbar } from "@/features/workspace-ui/components/surveillance-toolbar";
 import {
   normalizePlayerProfileName,
   readPlayerProfileSnapshot,
@@ -1417,6 +1418,7 @@ export default function Home() {
             </form>
           </section>
         </div>
+        <SurveillanceToolbar />
       </main>
     );
   }
@@ -1628,6 +1630,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+      <SurveillanceToolbar />
 
       {isHybridLabOpen && modalHost
         ? createPortal(

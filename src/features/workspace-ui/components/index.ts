@@ -9,3 +9,4 @@ export const workspaceUiModule: FeatureModuleDescriptor = {
 
 export * from "./bus-stop-long-division-renderer";
 export * from "./live-division-workspace-panel";
+export * from "./surveillance-toolbar";
