@@ -1835,8 +1835,7 @@ body {
   padding: 0.13rem 0.46rem;
 }
 
-.gallery-detail-image,
-.reward-modal-image {
+.gallery-detail-image {
   width: 100%;
   max-height: min(54vh, 22rem);
   object-fit: cover;
@@ -1935,34 +1934,136 @@ body {
 }
 
 .earned-reward-panel {
+  --reward-frame-padding: clamp(0.26rem, 0.72vw, 0.38rem);
+  --reward-frame-radius: 0.96rem;
+  --reward-rivet-size: clamp(0.3rem, 0.95vw, 0.42rem);
   margin-top: 0.85rem;
-  border: 1px solid rgba(9, 64, 23, 0.8);
-  border-radius: 0.95rem;
-  background: linear-gradient(170deg, rgba(15, 78, 29, 0.74), rgba(8, 58, 21, 0.72));
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--jp-frame) 68%, #2c1707);
+  border-radius: var(--reward-frame-radius);
+  background:
+    linear-gradient(
+      142deg,
+      color-mix(in srgb, var(--jp-frame) 84%, #bc8c54),
+      color-mix(in srgb, var(--jp-frame) 64%, #2e1a0a) 44%,
+      color-mix(in srgb, var(--jp-frame) 76%, #805a31)
+    ),
+    var(--jp-frame-grain),
+    repeating-linear-gradient(
+      18deg,
+      rgba(29, 15, 7, 0.22) 0 7px,
+      rgba(231, 204, 149, 0.11) 7px 13px
+    );
+  background-blend-mode: multiply, normal, soft-light;
   box-shadow:
-    inset 0 0 0 1px rgba(7, 47, 18, 0.78),
-    inset 0 1px 0 rgba(247, 243, 226, 0.14);
-  padding: 0.75rem;
+    0 0.72rem 1.4rem rgba(7, 22, 11, 0.42),
+    inset 0 0 0 1px rgba(28, 14, 6, 0.82),
+    inset 0 1px 0 rgba(247, 226, 182, 0.22);
+  padding: var(--reward-frame-padding);
+  overflow: hidden;
   transition:
     border-color 220ms ease,
     box-shadow 220ms ease,
     transform 220ms ease;
 }
 
-.earned-reward-panel[data-reward-motion="cracking"] {
-  border-color: rgba(211, 160, 58, 0.54);
+.earned-reward-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle,
+      rgba(227, 210, 178, 0.95) 0 36%,
+      rgba(93, 73, 50, 0.94) 37% 66%,
+      rgba(18, 10, 6, 0.95) 67% 100%
+    ),
+    radial-gradient(
+      circle,
+      rgba(227, 210, 178, 0.95) 0 36%,
+      rgba(93, 73, 50, 0.94) 37% 66%,
+      rgba(18, 10, 6, 0.95) 67% 100%
+    ),
+    radial-gradient(
+      circle,
+      rgba(227, 210, 178, 0.95) 0 36%,
+      rgba(93, 73, 50, 0.94) 37% 66%,
+      rgba(18, 10, 6, 0.95) 67% 100%
+    ),
+    radial-gradient(
+      circle,
+      rgba(227, 210, 178, 0.95) 0 36%,
+      rgba(93, 73, 50, 0.94) 37% 66%,
+      rgba(18, 10, 6, 0.95) 67% 100%
+    );
+  background-repeat: no-repeat;
+  background-size: var(--reward-rivet-size) var(--reward-rivet-size);
+  background-position:
+    0.42rem 0.42rem,
+    calc(100% - 0.42rem) 0.42rem,
+    0.42rem calc(100% - 0.42rem),
+    calc(100% - 0.42rem) calc(100% - 0.42rem);
+  opacity: 0.85;
+  z-index: 2;
+}
+
+.earned-reward-panel-shell {
+  position: relative;
+  z-index: 1;
+  border-radius: calc(var(--reward-frame-radius) - 0.18rem);
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 86%, black);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-panel-bg) 92%, #2aa239),
+      color-mix(in srgb, var(--jp-panel-border) 82%, #0c4318)
+    ),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 0.22rem,
+      color-mix(in srgb, var(--jp-panel-text) 7%, transparent) 0.22rem 0.5rem
+    );
   box-shadow:
-    inset 0 0 0 1px rgba(244, 212, 141, 0.28),
-    0 0 1rem rgba(211, 160, 58, 0.18);
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 88%, black),
+    inset 0 1px 0 color-mix(in srgb, var(--jp-panel-text) 20%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--jp-panel-border) 92%, black);
+  padding: 0.75rem;
+}
+
+.earned-reward-panel[data-reward-motion="cracking"] {
+  border-color: color-mix(in srgb, var(--jp-amber) 58%, var(--jp-frame));
+  box-shadow:
+    0 0.78rem 1.6rem rgba(7, 22, 11, 0.44),
+    0 0 1rem rgba(211, 160, 58, 0.2),
+    inset 0 0 0 1px rgba(28, 14, 6, 0.82),
+    inset 0 1px 0 rgba(247, 226, 182, 0.26);
   transform: translateY(-1px);
+}
+
+.earned-reward-panel[data-reward-motion="cracking"] .earned-reward-panel-shell {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 78%, black),
+    inset 0 1px 0 color-mix(in srgb, var(--jp-panel-text) 24%, transparent),
+    0 0 0 1px rgba(244, 212, 141, 0.22);
 }
 
 .earned-reward-panel[data-reward-motion="revealing"],
 .earned-reward-panel[data-reward-motion="revealed"] {
-  border-color: rgba(70, 96, 56, 0.42);
+  border-color: color-mix(in srgb, var(--jp-panel-border) 60%, var(--jp-frame));
   box-shadow:
-    inset 0 0 0 1px rgba(113, 137, 81, 0.18),
-    0 0 1.1rem rgba(70, 96, 56, 0.13);
+    0 0.75rem 1.5rem rgba(7, 22, 11, 0.42),
+    0 0 1.1rem rgba(70, 96, 56, 0.16),
+    inset 0 0 0 1px rgba(28, 14, 6, 0.82),
+    inset 0 1px 0 rgba(247, 226, 182, 0.24);
+}
+
+.earned-reward-panel[data-reward-motion="revealing"] .earned-reward-panel-shell,
+.earned-reward-panel[data-reward-motion="revealed"] .earned-reward-panel-shell {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 80%, black),
+    inset 0 1px 0 color-mix(in srgb, var(--jp-panel-text) 24%, transparent),
+    0 0 0 1px rgba(113, 137, 81, 0.2);
 }
 
 .earned-reward-header {
@@ -1978,6 +2079,24 @@ body {
   justify-items: center;
   text-align: center;
   gap: 0.5rem;
+  border-radius: 0.68rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 78%, black);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-panel-bg) 87%, #2ba23b),
+      color-mix(in srgb, var(--jp-panel-border) 78%, #0d4519)
+    ),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 0.5rem,
+      color-mix(in srgb, var(--jp-panel-text) 9%, transparent) 0.5rem 0.58rem
+    );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 86%, black),
+    inset 0 1px 0 color-mix(in srgb, var(--jp-panel-text) 16%, transparent),
+    0 0.35rem 0.8rem rgba(6, 35, 14, 0.32);
+  padding: 0.72rem 0.62rem;
 }
 
 .reward-egg-shell {
@@ -2100,25 +2219,81 @@ body {
 .reward-loader-title {
   font-family: var(--font-jurassic-display), "Times New Roman", serif;
   font-size: 1.02rem;
-  color: var(--jp-bark);
+  color: color-mix(in srgb, var(--jp-panel-text) 96%, white);
+  text-shadow: 0 1px 0 rgba(6, 30, 13, 0.72);
 }
 
 .reward-loader-copy {
   font-size: 0.78rem;
   line-height: 1.35;
-  color: color-mix(in srgb, var(--jp-jungle) 70%, var(--jp-bark));
+  color: color-mix(in srgb, var(--jp-panel-text) 82%, #f5f0db);
 }
 
 .reward-reveal-figure {
   margin-top: 0.75rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.reward-portrait-frame {
+  position: relative;
+  border-radius: 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--jp-frame) 72%, #291507);
+  background:
+    linear-gradient(
+      146deg,
+      color-mix(in srgb, var(--jp-frame) 82%, #c39055),
+      color-mix(in srgb, var(--jp-frame) 62%, #2d1909) 45%,
+      color-mix(in srgb, var(--jp-frame) 76%, #835d31)
+    ),
+    var(--jp-frame-grain);
+  background-blend-mode: multiply, normal;
+  box-shadow:
+    inset 0 0 0 1px rgba(25, 12, 6, 0.82),
+    0 0.45rem 0.92rem rgba(5, 28, 11, 0.34);
+  padding: 0.24rem;
+}
+
+.reward-portrait-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0.24rem;
+  border-radius: 0.44rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 36%, var(--jp-frame));
+  opacity: 0.66;
+  pointer-events: none;
+}
+
+.reward-portrait-screen {
+  position: relative;
+  border-radius: 0.38rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-border) 84%, black);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jp-panel-bg) 90%, #2da43b),
+      color-mix(in srgb, var(--jp-panel-border) 80%, #0f4b1b)
+    ),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 0.52rem,
+      color-mix(in srgb, var(--jp-panel-text) 8%, transparent) 0.52rem 0.6rem
+    );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--jp-panel-border) 88%, black),
+    inset 0 1px 0 color-mix(in srgb, var(--jp-panel-text) 14%, transparent);
+  padding: 0.14rem;
+  overflow: hidden;
 }
 
 .reward-reveal-image {
+  display: block;
   width: 100%;
   max-height: 11rem;
   object-fit: cover;
-  border-radius: 0.76rem;
-  border: 1px solid rgba(45, 36, 25, 0.2);
+  border-radius: 0.2rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-text) 24%, transparent);
+  background: color-mix(in srgb, var(--jp-panel-border) 42%, black);
 }
 
 .reward-reveal-figure[data-reveal-state="revealing"] .reward-reveal-image {
@@ -2132,9 +2307,22 @@ body {
 }
 
 .reward-reveal-caption {
-  margin-top: 0.45rem;
   font-size: 0.76rem;
-  color: color-mix(in srgb, var(--jp-jungle) 74%, var(--jp-bark));
+  color: color-mix(in srgb, var(--jp-panel-text) 82%, #f5f0db);
+}
+
+.reward-modal-image-frame {
+  width: 100%;
+}
+
+.reward-modal-image {
+  display: block;
+  width: 100%;
+  max-height: min(54vh, 22rem);
+  object-fit: cover;
+  border-radius: 0.2rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-text) 24%, transparent);
+  background: color-mix(in srgb, var(--jp-panel-border) 42%, black);
 }
 
 @keyframes reward-reveal-in {
