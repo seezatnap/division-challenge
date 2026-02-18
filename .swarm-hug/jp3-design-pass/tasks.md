@@ -29,28 +29,28 @@ Every task below should be implemented to visually match these comps. When in do
 ## Gallery Rework
 
 - [x] (#10) Rework `DinoGalleryPanel` thumbnail grid to match the JP3 Research Center thumbnail grid layout shown in the left panel of `test-comp-targets/Jp3websitebrachi.webp`: bright green tile backgrounds, dinosaur images centered within tiles, name labels below each tile, 3×3 grid matching the comp's proportions [5 pts] (blocked by #4) (A) (A)
-- [ ] (#11) Implement the Research Center two-panel detail view for gallery matching `test-comp-targets/Jp3websitebrachi.webp`: when a dinosaur is selected, show dinosaur image top-left with a data-sheet info card on the right (name, scientific name, pronunciation, diet, name meaning, length, height, weight, time period, location, taxon) matching the exact layout of the Brachiosaurus info card in the comp, description paragraph below [5 pts] (blocked by #10) (A)
+- [A] (#11) Implement the Research Center two-panel detail view for gallery matching `test-comp-targets/Jp3websitebrachi.webp`: when a dinosaur is selected, show dinosaur image top-left with a data-sheet info card on the right (name, scientific name, pronunciation, diet, name meaning, length, height, weight, time period, location, taxon) matching the exact layout of the Brachiosaurus info card in the comp, description paragraph below [5 pts] (blocked by #10) (A)
 - [ ] (#12) Add red triangular scroll indicators (up/down arrows) for scrollable content areas in the gallery detail view and any overflow panels, matching the red triangle scroll arrows visible in the right panel of `test-comp-targets/Jp3websitebrachi.webp` [5 pts] (blocked by #11) (B)
 
 ## Player Start & Reward Screens
 
 - [x] (#13) Restyle the player-start screen with the Research Center title treatment matching the "The Research Center" heading style in `test-comp-targets/Jp3websitebrachi.webp`: serif heading, subtitle text, all on a green panel within the wood frame, with the player-name input styled as a field-station terminal input (cream text on dark-green input field) [5 pts] (blocked by #3, #4) (B) (C)
-- [ ] (#14) Adapt `EarnedRewardRevealPanel` to use green panel + wood frame aesthetic consistent with the comp's panel styling for the egg-hatching container, and style the revealed dinosaur image in a bordered frame matching the comp's dinosaur portrait area in the info card [5 pts] (blocked by #4) (B)
+- [B] (#14) Adapt `EarnedRewardRevealPanel` to use green panel + wood frame aesthetic consistent with the comp's panel styling for the egg-hatching container, and style the revealed dinosaur image in a bordered frame matching the comp's dinosaur portrait area in the info card [5 pts] (blocked by #4) (B)
 
 ## Layout & Responsive
 
-- [ ] (#15) Update the `.jurassic-content` grid layout for desktop to use the comp's two-column proportions as seen in `test-comp-targets/Jp3websitebrachi.webp` (left navigation/gallery column, right workspace/detail column) and ensure the wood frame, toolbar, and jungle background remain correct at all breakpoints [5 pts] (blocked by #3, #6) (A)
+- [A] (#15) Update the `.jurassic-content` grid layout for desktop to use the comp's two-column proportions as seen in `test-comp-targets/Jp3websitebrachi.webp` (left navigation/gallery column, right workspace/detail column) and ensure the wood frame, toolbar, and jungle background remain correct at all breakpoints [5 pts] (blocked by #3, #6) (A)
 
 ## Visual Tests
 
-- [ ] (#16) Create `tests/jp3-design-visual.test.mjs` with Playwright visual tests that validate the implementation matches `test-comp-targets/Jp3websitebrachi.webp`: (a) full-page screenshot verifying wood frame border is visible on all four sides, (b) pixel-sample panel centers to assert green background matching the comp's green (R<80, G>100, B<80), (c) verify bottom toolbar is dark-colored and contains expected label text matching the comp's "SURVEILLANCE DEVICE" bar [5 pts] (blocked by #3, #4, #6) (A)
+- [C] (#16) Create `tests/jp3-design-visual.test.mjs` with Playwright visual tests that validate the implementation matches `test-comp-targets/Jp3websitebrachi.webp`: (a) full-page screenshot verifying wood frame border is visible on all four sides, (b) pixel-sample panel centers to assert green background matching the comp's green (R<80, G>100, B<80), (c) verify bottom toolbar is dark-colored and contains expected label text matching the comp's "SURVEILLANCE DEVICE" bar [5 pts] (blocked by #3, #4, #6) (A)
 - [ ] (#17) Add gallery visual tests validating against the comp: verify gallery renders as a grid of green tiles with dinosaur thumbnails matching the 3×3 grid in `test-comp-targets/Jp3websitebrachi.webp`, check grid has expected column count, verify tiles have green backgrounds via pixel sampling [5 pts] (blocked by #10, #16) (B)
 - [ ] (#18) Add workspace contrast and typography visual tests: verify workspace text elements are light-colored on green background with sufficient contrast as shown in the comp, verify heading elements use serif font and body uses sans-serif via computed style checks [5 pts] (blocked by #8, #16) (B)
 - [ ] (#19) Add active-glow visual test: verify the active input cell glows amber/gold against the green panel background (adapt existing glow tests if needed with updated selectors) [5 pts] (blocked by #8, #16) (B)
 
 ## Existing Test Updates
 
-- [ ] (#20) Update `tests/jurassic-theme-ui.test.mjs` assertions to match the new CSS class names, color values, and design tokens introduced by the JP3 restyling [5 pts] (blocked by #4, #6) (A)
+- [C] (#20) Update `tests/jurassic-theme-ui.test.mjs` assertions to match the new CSS class names, color values, and design tokens introduced by the JP3 restyling [5 pts] (blocked by #4, #6) (A)
 
 ## Polish & Integration
 
@@ -58,7 +58,7 @@ Every task below should be implemented to visually match these comps. When in do
 - [ ] (#22) Run `npm run build` and `npm run typecheck` to verify zero TypeScript errors and successful production build after all design changes [5 pts] (blocked by #21) (A)
 
 ## Follow-up tasks (from sprint review)
-- [ ] (#23) Remove remaining dark text overrides inside `.jurassic-panel` (notably classes like `.hero-title`, `.surface-title`, `.hero-copy`, `.status-chip`, `.hint-title`, `.gallery-name`, and `.game-start-label`) so panel content consistently renders in cream/white for contrast against the JP3 green background.
+- [B] (#23) Remove remaining dark text overrides inside `.jurassic-panel` (notably classes like `.hero-title`, `.surface-title`, `.hero-copy`, `.status-chip`, `.hint-title`, `.gallery-name`, and `.game-start-label`) so panel content consistently renders in cream/white for contrast against the JP3 green background.
 
 ## Follow-up tasks (from sprint review)
 - [ ] (#24) Replace the toolbar’s placeholder streak wiring (`currentStreak` currently mirrors `sessionSolvedProblems`) with a true streak metric in session state, and add test coverage showing streak can diverge from total solved after an incorrect attempt.
