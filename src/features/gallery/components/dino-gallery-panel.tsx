@@ -149,7 +149,7 @@ export function DinoGalleryPanel({
 
   if (galleryRewards.length === 0) {
     return (
-      <div className="gallery-shell" data-gallery-state="empty">
+      <div className="gallery-shell gallery-shell-jp3" data-gallery-state="empty">
         <p className="gallery-empty-title">{EMPTY_STATE_TITLE}</p>
         <p className="gallery-empty-copy">{EMPTY_STATE_COPY}</p>
       </div>
@@ -157,36 +157,36 @@ export function DinoGalleryPanel({
   }
 
   return (
-    <div className="gallery-shell" data-gallery-state="unlocked">
+    <div className="gallery-shell gallery-shell-jp3" data-gallery-state="unlocked">
       {refreshStatus ? (
         <p className="gallery-refresh-status" role="status">
           {refreshStatus}
         </p>
       ) : null}
 
-      <div className="gallery-grid">
+      <div className="gallery-grid gallery-grid-jp3">
         {galleryRewards.map((reward) => (
-          <article className="gallery-card" key={reward.rewardId}>
+          <article className="gallery-card gallery-card-jp3" key={reward.rewardId}>
             <button
               aria-haspopup="dialog"
-              className="gallery-card-trigger"
+              className="gallery-card-trigger gallery-card-trigger-jp3"
               onClick={() => {
                 setSelectedReward(reward);
               }}
               type="button"
             >
-              <div className="gallery-thumb">
+              <div className="gallery-thumb gallery-thumb-jp3">
                 <Image
                   alt={`${reward.dinosaurName} unlocked reward image`}
-                  className="gallery-image"
+                  className="gallery-image gallery-image-jp3"
                   height={352}
                   loading="lazy"
                   src={reward.imagePath}
                   width={640}
                 />
               </div>
-              <p className="gallery-name">{reward.dinosaurName}</p>
-              <p className="gallery-meta">
+              <p className="gallery-name gallery-name-jp3">{reward.dinosaurName}</p>
+              <p className="gallery-meta gallery-meta-jp3">
                 Earned{" "}
                 <time dateTime={reward.earnedAt}>
                   {formatGalleryEarnedDate(reward.earnedAt)}
