@@ -70,7 +70,7 @@ export function LiveDivisionWorkspacePanel({
         data-feedback-outcome={activeCoachMessage.outcome}
         data-feedback-tone={activeCoachMessage.tone}
       >
-        <h3 className="hint-title">Dino Coach</h3>
+        <h3 className="hint-title">Console Coach</h3>
         <p className="hint-status">{activeCoachMessage.statusLabel}</p>
         <ul className="coach-list">
           {coachMessages.map((entry) => (

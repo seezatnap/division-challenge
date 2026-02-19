@@ -118,8 +118,8 @@ test("resolver maps completion outcomes to celebration messaging", async () => {
 
   assert.equal(message.outcome, "complete");
   assert.equal(message.tone, "celebration");
-  assert.equal(message.statusLabel, "Dino-Mite Finish");
-  assert.match(message.text, /Fossil-five/i);
+  assert.equal(message.statusLabel, "Console Sequence Complete");
+  assert.match(message.text, /VERIFIED/i);
 });
 
 test("resolver falls back to tone defaults when message key is unknown", async () => {
@@ -188,5 +188,5 @@ test("current-step coach resolver returns celebration guidance once the active s
 
   assert.equal(message.outcome, "complete");
   assert.equal(message.tone, "celebration");
-  assert.equal(message.statusLabel, "Dino-Mite Finish");
+  assert.equal(message.statusLabel, "Console Sequence Complete");
 });

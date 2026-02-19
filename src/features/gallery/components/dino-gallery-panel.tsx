@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+import { ScrollIndicators } from "./scroll-indicators";
 
 import type { UnlockedReward } from "@/features/contracts";
 import {
@@ -15,6 +17,7 @@ import {
 import {
   buildPrimaryDinosaurDossier,
   formatMetersAsMetersAndFeet,
+  formatWeightForDisplay,
   parseRewardDinosaurDossierArtifact,
   toPrimaryRewardDossierArtifactPath,
   type RewardDinosaurDossier,
@@ -41,6 +44,7 @@ export function DinoGalleryPanel({
   const [selectedReward, setSelectedReward] = useState<UnlockedReward | null>(null);
   const [selectedRewardDossier, setSelectedRewardDossier] =
     useState<RewardDinosaurDossier | null>(null);
+  const modalScrollRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setGalleryRewards(sortedUnlockedRewards);
@@ -203,46 +207,85 @@ export function DinoGalleryPanel({
             <section
               aria-label={`${selectedReward.dinosaurName} details`}
               aria-modal="true"
-              className="jp-modal gallery-detail-modal"
+              className="jp-modal gallery-detail-modal scroll-indicator-container"
               onClick={(event) => {
                 event.stopPropagation();
               }}
+              ref={modalScrollRef}
               role="dialog"
             >
-              <p className="surface-kicker">Gallery Detail</p>
-              <h3 className="surface-title gallery-detail-title">{selectedReward.dinosaurName}</h3>
-              <p className="gallery-detail-meta">
-                Milestone {selectedReward.milestoneSolvedCount} • Earned{" "}
-                <time dateTime={selectedReward.earnedAt}>
-                  {formatGalleryEarnedDate(selectedReward.earnedAt)}
-                </time>
-              </p>
-              {selectedRewardDossier ? (
-                <section className="dino-dossier" data-ui-surface="dino-dossier">
-                  <p className="dino-dossier-dimensions">
-                    Height: {formatMetersAsMetersAndFeet(selectedRewardDossier.heightMeters)} •
-                    Length: {formatMetersAsMetersAndFeet(selectedRewardDossier.lengthMeters)}
+              <ScrollIndicators scrollRef={modalScrollRef} />
+              <div className="detail-two-panel" data-ui-surface="detail-two-panel">
+                <div className="detail-panel-image">
+                  <Image
+                    alt={`${selectedReward.dinosaurName} unlocked reward image`}
+                    className="gallery-detail-image"
+                    height={540}
+                    loading="lazy"
+                    src={selectedReward.imagePath}
+                    width={960}
+                  />
+                  <p className="gallery-detail-meta">
+                    Milestone {selectedReward.milestoneSolvedCount} • Earned{" "}
+                    <time dateTime={selectedReward.earnedAt}>
+                      {formatGalleryEarnedDate(selectedReward.earnedAt)}
+                    </time>
                   </p>
+                </div>
+                {selectedRewardDossier ? (
+                  <div className="detail-panel-info">
+                    <div className="detail-info-card" data-ui-surface="dino-info-card">
+                      <h3 className="info-card-name">{selectedReward.dinosaurName}</h3>
+                      {selectedRewardDossier.infoCard ? (
+                        <>
+                          <p className="info-card-scientific">{selectedRewardDossier.infoCard.scientificName}</p>
+                          <dl className="info-card-fields" data-ui-surface="dino-dossier">
+                            <dt className="info-card-label">Pronounced:</dt>
+                            <dd className="info-card-value">{selectedRewardDossier.infoCard.pronunciation}</dd>
+                            <dt className="info-card-label">Diet:</dt>
+                            <dd className="info-card-value">{selectedRewardDossier.infoCard.diet}</dd>
+                            <dt className="info-card-label">Name Means:</dt>
+                            <dd className="info-card-value">{selectedRewardDossier.infoCard.nameMeaning}</dd>
+                            <dt className="info-card-label">Length:</dt>
+                            <dd className="info-card-value">{formatMetersAsMetersAndFeet(selectedRewardDossier.lengthMeters)}</dd>
+                            <dt className="info-card-label">Height:</dt>
+                            <dd className="info-card-value">{formatMetersAsMetersAndFeet(selectedRewardDossier.heightMeters)}</dd>
+                            <dt className="info-card-label">Weight:</dt>
+                            <dd className="info-card-value">{formatWeightForDisplay(selectedRewardDossier.infoCard.weightKg)}</dd>
+                            <dt className="info-card-label">Time:</dt>
+                            <dd className="info-card-value">{selectedRewardDossier.infoCard.timePeriod}</dd>
+                            <dt className="info-card-label">Location:</dt>
+                            <dd className="info-card-value">{selectedRewardDossier.infoCard.location}</dd>
+                            <dt className="info-card-label">Taxon:</dt>
+                            <dd className="info-card-value">{selectedRewardDossier.infoCard.taxon}</dd>
+                          </dl>
+                        </>
+                      ) : (
+                        <div className="dino-dossier" data-ui-surface="dino-dossier">
+                          <p className="dino-dossier-dimensions">
+                            Height: {formatMetersAsMetersAndFeet(selectedRewardDossier.heightMeters)} •
+                            Length: {formatMetersAsMetersAndFeet(selectedRewardDossier.lengthMeters)}
+                          </p>
+                          <ul className="dino-dossier-attributes" aria-label="Dinosaur attributes">
+                            {selectedRewardDossier.attributes.map((attribute) => (
+                              <li className="dino-dossier-attribute" key={attribute}>
+                                {attribute}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <div className="detail-description-section">
+                {selectedRewardDossier ? (
                   <p className="dino-dossier-description">
                     {selectedRewardDossier.description}
                   </p>
-                  <ul className="dino-dossier-attributes" aria-label="Dinosaur attributes">
-                    {selectedRewardDossier.attributes.map((attribute) => (
-                      <li className="dino-dossier-attribute" key={attribute}>
-                        {attribute}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-              <Image
-                alt={`${selectedReward.dinosaurName} unlocked reward image`}
-                className="gallery-detail-image"
-                height={540}
-                loading="lazy"
-                src={selectedReward.imagePath}
-                width={960}
-              />
+                ) : null}
+              </div>
               <button className="jp-button" onClick={closeSelectedReward} type="button">
                 Close
               </button>

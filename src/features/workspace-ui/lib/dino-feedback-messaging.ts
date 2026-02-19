@@ -76,9 +76,9 @@ const FEEDBACK_TEMPLATE_BY_MESSAGE_KEY: Record<string, DinoFeedbackTemplate> = {
     note: "Drop the next digit beside the remainder to build the next working value.",
   },
   "dino.feedback.complete.problem": {
-    statusLabel: "Dino-Mite Finish",
-    text: "You solved the full trail. Fossil-five!",
-    note: "Great work. Queue up the next problem and keep your streak alive.",
+    statusLabel: "Console Sequence Complete",
+    text: "Trail computation complete. Run log marked VERIFIED.",
+    note: "Queue the next division task to keep your session streak online.",
   },
 };
 
@@ -132,7 +132,7 @@ function resolveCurrentStepStatusLabel(stepKind: LongDivisionStepKind | "none"):
     case "bring-down":
       return "Bring Down The Digit";
     default:
-      return "Dino-Mite Finish";
+      return "Console Sequence Complete";
   }
 }
 

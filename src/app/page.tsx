@@ -18,6 +18,7 @@ import {
   type LongDivisionStepValidationResult,
 } from "@/features/division-engine";
 import { DinoGalleryPanel } from "@/features/gallery/components/dino-gallery-panel";
+import { ScrollIndicators } from "@/features/gallery/components/scroll-indicators";
 import { IslaSornaToolbar } from "./isla-sorna-toolbar";
 import {
   type ActiveInputLane,
@@ -68,6 +69,7 @@ interface LiveGameSessionState {
   steps: readonly LongDivisionStep[];
   sessionSolvedProblems: number;
   sessionAttemptedProblems: number;
+  currentStreak: number;
   totalProblemsSolved: number;
   totalProblemsAttempted: number;
   amberBalance: number;
@@ -532,6 +534,7 @@ const initialLiveGameSessionState: LiveGameSessionState = {
   steps: workspacePreviewSolution.steps,
   sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
   sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
+  currentStreak: 0,
   totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
   totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
   amberBalance: 0,
@@ -552,6 +555,7 @@ function createFreshLiveGameSessionState(): LiveGameSessionState {
     steps: workspacePreviewSolution.steps,
     sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
     sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
+    currentStreak: 0,
     totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
     totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
     amberBalance: 0,
@@ -632,6 +636,10 @@ function hydrateLiveGameSessionState(
 ): LiveGameSessionState {
   return {
     ...persistedState,
+    currentStreak:
+      typeof persistedState.currentStreak === "number"
+        ? toNonNegativeInteger(persistedState.currentStreak)
+        : 0,
     amberBalance:
       typeof persistedState.amberBalance === "number"
         ? toNonNegativeInteger(persistedState.amberBalance)
@@ -664,13 +672,18 @@ export default function Home() {
   const [hybridLabFirstDinosaurName, setHybridLabFirstDinosaurName] = useState("");
   const [hybridLabSecondDinosaurName, setHybridLabSecondDinosaurName] = useState("");
   const [hybridLabError, setHybridLabError] = useState<string | null>(null);
+  const [isHybridFusionInProgress, setIsHybridFusionInProgress] = useState(false);
+  const [pendingHybridFusionReward, setPendingHybridFusionReward] =
+    useState<UnlockedHybridReward | null>(null);
   const [selectedHybridReward, setSelectedHybridReward] =
     useState<UnlockedHybridReward | null>(null);
   const [selectedHybridDossier, setSelectedHybridDossier] =
     useState<RewardDinosaurDossier | null>(null);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
+  const hadErrorInCurrentProblemRef = useRef(false);
   const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
+  const hybridDetailScrollRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     gameSessionRef.current = gameSession;
@@ -678,6 +691,7 @@ export default function Home() {
 
   useEffect(() => {
     completedProblemIdRef.current = null;
+    hadErrorInCurrentProblemRef.current = false;
     setIsNextProblemReady(false);
   }, [gameSession.activeProblem.id]);
 
@@ -699,6 +713,14 @@ export default function Home() {
     () => resolveUnlockedPrimaryDinosaurNames(gameSession.unlockedRewards),
     [gameSession.unlockedRewards],
   );
+  const unlockedPrimaryDinosaurImagePathByName = useMemo(() => {
+    const imagePathByName = new Map<string, string>();
+    for (const unlockedReward of gameSession.unlockedRewards) {
+      imagePathByName.set(unlockedReward.dinosaurName, unlockedReward.imagePath);
+    }
+
+    return imagePathByName;
+  }, [gameSession.unlockedRewards]);
   const hybridLabSecondDinosaurOptions = useMemo(
     () =>
       resolveAvailableHybridSecondDinosaurNames({
@@ -723,6 +745,24 @@ export default function Home() {
   const canUnlockNextDinosaurWithAmber =
     gameSession.amberBalance >= AMBER_COST_PER_DINO_UNLOCK;
   const hasEnoughAmberForHybrid = gameSession.amberBalance >= AMBER_COST_PER_HYBRID_CREATION;
+  const firstHybridPreviewImagePath =
+    hybridLabFirstDinosaurName.length > 0
+      ? unlockedPrimaryDinosaurImagePathByName.get(hybridLabFirstDinosaurName) ??
+        PROVISIONAL_REWARD_IMAGE_PATH
+      : null;
+  const secondHybridPreviewImagePath =
+    hybridLabSecondDinosaurName.length > 0
+      ? unlockedPrimaryDinosaurImagePathByName.get(hybridLabSecondDinosaurName) ??
+        PROVISIONAL_REWARD_IMAGE_PATH
+      : null;
+  const pendingHybridFirstPreviewImagePath = pendingHybridFusionReward
+    ? unlockedPrimaryDinosaurImagePathByName.get(pendingHybridFusionReward.firstDinosaurName) ??
+      PROVISIONAL_REWARD_IMAGE_PATH
+    : null;
+  const pendingHybridSecondPreviewImagePath = pendingHybridFusionReward
+    ? unlockedPrimaryDinosaurImagePathByName.get(pendingHybridFusionReward.secondDinosaurName) ??
+      PROVISIONAL_REWARD_IMAGE_PATH
+    : null;
   const modalHost = typeof document !== "undefined" ? document.body : null;
 
   useEffect(() => {
@@ -793,6 +833,10 @@ export default function Home() {
         return;
       }
 
+      if (isHybridFusionInProgress) {
+        return;
+      }
+
       if (selectedHybridReward) {
         setSelectedHybridReward(null);
         return;
@@ -808,7 +852,7 @@ export default function Home() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isHybridLabOpen, selectedHybridReward]);
+  }, [isHybridFusionInProgress, isHybridLabOpen, selectedHybridReward]);
 
   const handleStartSession = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -845,6 +889,7 @@ export default function Home() {
         }
 
         completedProblemIdRef.current = null;
+        hadErrorInCurrentProblemRef.current = false;
         setIsNextProblemReady(false);
         setActivePlayerName(normalizedPlayerName);
         setPlayerNameDraft(normalizedPlayerName);
@@ -1141,12 +1186,12 @@ export default function Home() {
   }, [requestGeneratedImage, syncAmberImageStatus]);
 
   const requestHybridImageGeneration = useCallback(
-    async (hybridReward: UnlockedHybridReward) => {
+    async (hybridReward: UnlockedHybridReward): Promise<string | null> => {
       const generationResult = await requestGeneratedImage({
         assetName: hybridReward.generationAssetName,
       });
       if (!generationResult) {
-        return;
+        return null;
       }
 
       setGameSession((currentState) => {
@@ -1176,8 +1221,14 @@ export default function Home() {
         };
       });
 
-      await syncHybridImageStatus(hybridReward);
+      try {
+        await syncHybridImageStatus(hybridReward);
+      } catch {
+        // Keep the generated image path when status sync fails.
+      }
       setRewardGenerationNotice(null);
+
+      return generationResult.resolvedImagePath;
     },
     [requestGeneratedImage, syncHybridImageStatus],
   );
@@ -1213,12 +1264,16 @@ export default function Home() {
     const nextTotalProblemsSolved = currentState.totalProblemsSolved + 1;
     const { problem: nextProblem, steps: nextSteps } =
       resolveNextLiveProblem(nextTotalProblemsSolved);
+    const solvedWithoutErrors = !hadErrorInCurrentProblemRef.current;
 
     setGameSession({
       activeProblem: nextProblem,
       steps: nextSteps,
       sessionSolvedProblems: currentState.sessionSolvedProblems + 1,
       sessionAttemptedProblems: currentState.sessionAttemptedProblems + 1,
+      currentStreak: solvedWithoutErrors
+        ? currentState.currentStreak + 1
+        : 0,
       totalProblemsSolved: nextTotalProblemsSolved,
       totalProblemsAttempted: currentState.totalProblemsAttempted + 1,
       amberBalance:
@@ -1265,18 +1320,29 @@ export default function Home() {
     setHybridLabError(null);
     setHybridLabFirstDinosaurName("");
     setHybridLabSecondDinosaurName("");
+    setIsHybridFusionInProgress(false);
+    setPendingHybridFusionReward(null);
     setSelectedHybridReward(null);
     setIsHybridLabOpen(true);
   }, []);
 
   const closeHybridLab = useCallback(() => {
+    if (isHybridFusionInProgress) {
+      return;
+    }
+
     setHybridLabError(null);
     setHybridLabFirstDinosaurName("");
     setHybridLabSecondDinosaurName("");
+    setPendingHybridFusionReward(null);
     setIsHybridLabOpen(false);
-  }, []);
+  }, [isHybridFusionInProgress]);
 
-  const handleCreateHybrid = useCallback(() => {
+  const handleCreateHybrid = useCallback(async () => {
+    if (isHybridFusionInProgress) {
+      return;
+    }
+
     const currentState = gameSessionRef.current;
     const firstDinosaurName = hybridLabFirstDinosaurName.trim();
     const secondDinosaurName = hybridLabSecondDinosaurName.trim();
@@ -1318,17 +1384,38 @@ export default function Home() {
       unlockedHybrids: [...currentState.unlockedHybrids, unlockedHybridReward],
     });
     setHybridLabError(null);
-    setIsHybridLabOpen(false);
     setRewardGenerationNotice(null);
-    void requestHybridImageGeneration(unlockedHybridReward);
+    setPendingHybridFusionReward(unlockedHybridReward);
+    setIsHybridFusionInProgress(true);
+
+    const generatedHybridImagePath = await requestHybridImageGeneration(
+      unlockedHybridReward,
+    );
+
+    setIsHybridFusionInProgress(false);
+    setPendingHybridFusionReward(null);
+    setIsHybridLabOpen(false);
+    setSelectedHybridReward(
+      generatedHybridImagePath
+        ? {
+            ...unlockedHybridReward,
+            imagePath: generatedHybridImagePath,
+          }
+        : unlockedHybridReward,
+    );
   }, [
     hybridLabFirstDinosaurName,
     hybridLabSecondDinosaurName,
+    isHybridFusionInProgress,
     requestHybridImageGeneration,
   ]);
 
   const handleWorkspaceStepValidation = useCallback(
     (validation: LongDivisionStepValidationResult) => {
+      if (validation.outcome === "incorrect") {
+        hadErrorInCurrentProblemRef.current = true;
+      }
+
       if (!validation.didAdvance || validation.outcome !== "complete") {
         return;
       }
@@ -1355,30 +1442,31 @@ export default function Home() {
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
-        <div className="jurassic-content">
+        <div className="jurassic-content player-start-content">
           <section
             aria-labelledby="player-start-heading"
             className="jurassic-panel player-start-panel"
             data-ui-surface="player-start"
           >
             <div className="research-center-header">
+              <p className="research-center-kicker">InGen Access Node</p>
               <h1
                 className="research-center-title"
                 id="player-start-heading"
               >
-                The Research Center
+                InGen System Login
               </h1>
               <p className="research-center-subtitle">
-                Use the computer to begin your Isla Sorna field research.
+                Authenticate operator credentials to access the InGen Division Dashboard.
               </p>
             </div>
 
             <form className="game-start-flow" onSubmit={handleStartSession}>
               <label className="game-start-label" htmlFor="game-start-player-name">
-                Player Name
+                Operator ID
               </label>
               <input
-                autoComplete="name"
+                autoComplete="username"
                 className="game-start-input terminal-input"
                 id="game-start-player-name"
                 name="playerName"
@@ -1386,14 +1474,14 @@ export default function Home() {
                   setPlayerNameDraft(event.target.value);
                   setSessionStartError(null);
                 }}
-                placeholder="Enter your dino wrangler name"
+                placeholder="Enter your InGen operator ID"
                 required
                 type="text"
                 value={playerNameDraft}
               />
 
               <p className="game-start-helper">
-                Profiles are auto-saved in this browser by lowercase player name.
+                Use this Operator ID to log in later and resume your progress on this device.
               </p>
 
               {sessionStartError ? (
@@ -1410,7 +1498,7 @@ export default function Home() {
 
               <div className="save-actions">
                 <button className="jp-button" data-ui-action="start-session" type="submit">
-                  Start Sequencing
+                  Authenticate Session
                 </button>
               </div>
             </form>
@@ -1426,8 +1514,8 @@ export default function Home() {
     <main className="jurassic-shell">
       <div className="jurassic-content">
         <header className="jurassic-panel jurassic-hero motif-canopy">
-          <p className="eyebrow">Dino Division v2</p>
-          <h1 className="hero-title">Jurassic Command Deck</h1>
+          <p className="eyebrow">Dinosaur Genomic Sequencing Console</p>
+          <h1 className="hero-title">InGen Division Dashboard</h1>
         </header>
 
         <div className="jurassic-layout">
@@ -1650,92 +1738,226 @@ export default function Home() {
                 >
                   <p className="surface-kicker">Hybrid Lab</p>
                   <h3 className="surface-title">DNA Fusion</h3>
-                  <p className="hybrid-lab-copy">
-                    Spend {AMBER_COST_PER_HYBRID_CREATION} amber to generate one hybrid per dinosaur pair.
-                  </p>
-                  <p className="hybrid-lab-copy">
-                    Amber available: <strong>{gameSession.amberBalance}</strong>
-                  </p>
-                  {!hasAvailableHybridPairs ? (
-                    <p className="hybrid-lab-copy">
-                      None available. You&apos;ve already created all hybrids from unlocked dinosaurs.
-                    </p>
-                  ) : null}
-
-                  <label className="hybrid-lab-label" htmlFor="hybrid-lab-first-dino">
-                    First dinosaur
-                  </label>
-                  <select
-                    className="hybrid-lab-select"
-                    id="hybrid-lab-first-dino"
-                    onChange={(event) => {
-                      setHybridLabFirstDinosaurName(event.target.value);
-                      setHybridLabSecondDinosaurName("");
-                      setHybridLabError(null);
-                    }}
-                    value={hybridLabFirstDinosaurName}
-                  >
-                    <option value="">Choose a dinosaur</option>
-                    {unlockedPrimaryDinosaurNames.map((dinosaurName) => (
-                      <option key={dinosaurName} value={dinosaurName}>
-                        {dinosaurName}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label className="hybrid-lab-label" htmlFor="hybrid-lab-second-dino">
-                    Second dinosaur
-                  </label>
-                  {hybridLabFirstDinosaurName.length === 0 ? (
-                    <p className="hybrid-lab-copy">Choose the first dinosaur to continue.</p>
-                  ) : hybridLabSecondDinosaurOptions.length === 0 ? (
-                    <p className="hybrid-lab-copy">
-                      None available. You&apos;ve already created all hybrids for {hybridLabFirstDinosaurName}.
-                    </p>
+                  {isHybridFusionInProgress && pendingHybridFusionReward ? (
+                    <>
+                      <p className="hybrid-lab-copy">
+                        Fusion sequence engaged. Hold while the lab compiles your hybrid genome.
+                      </p>
+                      <div className="hybrid-preview-row" data-hybrid-preview-state="generating">
+                        <article className="hybrid-preview-card" data-hybrid-preview-slot="first">
+                          <div className="hybrid-preview-thumb">
+                            <Image
+                              alt={`${pendingHybridFusionReward.firstDinosaurName} preview`}
+                              className="hybrid-preview-image"
+                              height={180}
+                              loading="lazy"
+                              src={pendingHybridFirstPreviewImagePath ?? PROVISIONAL_REWARD_IMAGE_PATH}
+                              width={180}
+                            />
+                          </div>
+                          <p className="hybrid-preview-name">
+                            {pendingHybridFusionReward.firstDinosaurName}
+                          </p>
+                        </article>
+                        <p className="hybrid-preview-operator" aria-hidden="true">
+                          ×
+                        </p>
+                        <article className="hybrid-preview-card" data-hybrid-preview-slot="second">
+                          <div className="hybrid-preview-thumb">
+                            <Image
+                              alt={`${pendingHybridFusionReward.secondDinosaurName} preview`}
+                              className="hybrid-preview-image"
+                              height={180}
+                              loading="lazy"
+                              src={pendingHybridSecondPreviewImagePath ?? PROVISIONAL_REWARD_IMAGE_PATH}
+                              width={180}
+                            />
+                          </div>
+                          <p className="hybrid-preview-name">
+                            {pendingHybridFusionReward.secondDinosaurName}
+                          </p>
+                        </article>
+                      </div>
+                      <section className="hybrid-fusion-loader" role="status" aria-live="polite">
+                        <p className="reward-loader-title">Executing DNA splice...</p>
+                        <p className="hybrid-lab-copy">
+                          Synthesizing {pendingHybridFusionReward.hybridName}. Opening the hybrid dossier when
+                          sequencing completes.
+                        </p>
+                        <div className="hybrid-fusion-bars" aria-hidden="true">
+                          <span className="hybrid-fusion-bar" />
+                          <span className="hybrid-fusion-bar" />
+                          <span className="hybrid-fusion-bar" />
+                          <span className="hybrid-fusion-bar" />
+                        </div>
+                      </section>
+                      <div className="hybrid-lab-actions">
+                        <button className="jp-button jp-button-secondary" disabled type="button">
+                          Fusion In Progress
+                        </button>
+                        <button className="jp-button" disabled type="button">
+                          Generating Hybrid...
+                        </button>
+                      </div>
+                    </>
                   ) : (
-                    <select
-                      className="hybrid-lab-select"
-                      id="hybrid-lab-second-dino"
-                      onChange={(event) => {
-                        setHybridLabSecondDinosaurName(event.target.value);
-                        setHybridLabError(null);
-                      }}
-                      value={hybridLabSecondDinosaurName}
-                    >
-                      <option value="">Choose a dinosaur</option>
-                      {hybridLabSecondDinosaurOptions.map((dinosaurName) => (
-                        <option key={dinosaurName} value={dinosaurName}>
-                          {dinosaurName}
-                        </option>
-                      ))}
-                    </select>
+                    <>
+                      <p className="hybrid-lab-copy">
+                        Spend {AMBER_COST_PER_HYBRID_CREATION} amber to generate one hybrid per dinosaur pair.
+                      </p>
+                      <p className="hybrid-lab-copy">
+                        Amber available: <strong>{gameSession.amberBalance}</strong>
+                      </p>
+                      {!hasAvailableHybridPairs ? (
+                        <p className="hybrid-lab-copy">
+                          None available. You&apos;ve already created all hybrids from unlocked dinosaurs.
+                        </p>
+                      ) : null}
+
+                      <label className="hybrid-lab-label" htmlFor="hybrid-lab-first-dino">
+                        First dinosaur
+                      </label>
+                      <select
+                        className="hybrid-lab-select"
+                        id="hybrid-lab-first-dino"
+                        onChange={(event) => {
+                          setHybridLabFirstDinosaurName(event.target.value);
+                          setHybridLabSecondDinosaurName("");
+                          setHybridLabError(null);
+                        }}
+                        value={hybridLabFirstDinosaurName}
+                      >
+                        <option value="">Choose a dinosaur</option>
+                        {unlockedPrimaryDinosaurNames.map((dinosaurName) => (
+                          <option key={dinosaurName} value={dinosaurName}>
+                            {dinosaurName}
+                          </option>
+                        ))}
+                      </select>
+
+                      <label className="hybrid-lab-label" htmlFor="hybrid-lab-second-dino">
+                        Second dinosaur
+                      </label>
+                      {hybridLabFirstDinosaurName.length === 0 ? (
+                        <p className="hybrid-lab-copy">Choose the first dinosaur to continue.</p>
+                      ) : hybridLabSecondDinosaurOptions.length === 0 ? (
+                        <p className="hybrid-lab-copy">
+                          None available. You&apos;ve already created all hybrids for {hybridLabFirstDinosaurName}.
+                        </p>
+                      ) : (
+                        <select
+                          className="hybrid-lab-select"
+                          id="hybrid-lab-second-dino"
+                          onChange={(event) => {
+                            setHybridLabSecondDinosaurName(event.target.value);
+                            setHybridLabError(null);
+                          }}
+                          value={hybridLabSecondDinosaurName}
+                        >
+                          <option value="">Choose a dinosaur</option>
+                          {hybridLabSecondDinosaurOptions.map((dinosaurName) => (
+                            <option key={dinosaurName} value={dinosaurName}>
+                              {dinosaurName}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      <p className="hybrid-lab-preview-title">Fusion Preview</p>
+                      <div
+                        className="hybrid-preview-row"
+                        data-hybrid-preview-state={
+                          hybridLabFirstDinosaurName.length > 0 && hybridLabSecondDinosaurName.length > 0
+                            ? "ready"
+                            : "partial"
+                        }
+                      >
+                        <article className="hybrid-preview-card" data-hybrid-preview-slot="first">
+                          <div className="hybrid-preview-thumb">
+                            {firstHybridPreviewImagePath ? (
+                              <Image
+                                alt={
+                                  hybridLabFirstDinosaurName.length > 0
+                                    ? `${hybridLabFirstDinosaurName} preview`
+                                    : "First dinosaur preview placeholder"
+                                }
+                                className="hybrid-preview-image"
+                                height={180}
+                                loading="lazy"
+                                src={firstHybridPreviewImagePath}
+                                width={180}
+                              />
+                            ) : (
+                              <span className="hybrid-preview-placeholder">Awaiting selection</span>
+                            )}
+                          </div>
+                          <p className="hybrid-preview-name">
+                            {hybridLabFirstDinosaurName || "First profile"}
+                          </p>
+                        </article>
+                        <p className="hybrid-preview-operator" aria-hidden="true">
+                          ×
+                        </p>
+                        <article className="hybrid-preview-card" data-hybrid-preview-slot="second">
+                          <div className="hybrid-preview-thumb">
+                            {secondHybridPreviewImagePath ? (
+                              <Image
+                                alt={
+                                  hybridLabSecondDinosaurName.length > 0
+                                    ? `${hybridLabSecondDinosaurName} preview`
+                                    : "Second dinosaur preview placeholder"
+                                }
+                                className="hybrid-preview-image"
+                                height={180}
+                                loading="lazy"
+                                src={secondHybridPreviewImagePath}
+                                width={180}
+                              />
+                            ) : (
+                              <span className="hybrid-preview-placeholder">Awaiting selection</span>
+                            )}
+                          </div>
+                          <p className="hybrid-preview-name">
+                            {hybridLabSecondDinosaurName || "Second profile"}
+                          </p>
+                        </article>
+                      </div>
+
+                      {hybridLabError ? (
+                        <p className="game-start-error" role="alert">
+                          {hybridLabError}
+                        </p>
+                      ) : null}
+
+                      <div className="hybrid-lab-actions">
+                        <button
+                          className="jp-button jp-button-secondary"
+                          disabled={isHybridFusionInProgress}
+                          onClick={closeHybridLab}
+                          type="button"
+                        >
+                          Close
+                        </button>
+                        <button
+                          className="jp-button"
+                          data-ui-action="create-hybrid"
+                          disabled={
+                            isHybridFusionInProgress ||
+                            !hasAvailableHybridPairs ||
+                            hybridLabFirstDinosaurName.length === 0 ||
+                            hybridLabSecondDinosaurName.length === 0 ||
+                            !hasEnoughAmberForHybrid
+                          }
+                          onClick={() => {
+                            void handleCreateHybrid();
+                          }}
+                          type="button"
+                        >
+                          Create Hybrid
+                        </button>
+                      </div>
+                    </>
                   )}
-
-                  {hybridLabError ? (
-                    <p className="game-start-error" role="alert">
-                      {hybridLabError}
-                    </p>
-                  ) : null}
-
-                  <div className="hybrid-lab-actions">
-                    <button className="jp-button jp-button-secondary" onClick={closeHybridLab} type="button">
-                      Close
-                    </button>
-                    <button
-                      className="jp-button"
-                      data-ui-action="create-hybrid"
-                      disabled={
-                        !hasAvailableHybridPairs ||
-                        hybridLabFirstDinosaurName.length === 0 ||
-                        hybridLabSecondDinosaurName.length === 0 ||
-                        !hasEnoughAmberForHybrid
-                      }
-                      onClick={handleCreateHybrid}
-                      type="button"
-                    >
-                      Create Hybrid
-                    </button>
-                  </div>
                 </section>
               </div>
             </div>,
@@ -1757,12 +1979,14 @@ export default function Home() {
                 <section
                   aria-label={`${selectedHybridReward.hybridName} details`}
                   aria-modal="true"
-                  className="jp-modal gallery-detail-modal"
+                  className="jp-modal gallery-detail-modal scroll-indicator-container"
                   onClick={(event) => {
                     event.stopPropagation();
                   }}
+                  ref={hybridDetailScrollRef}
                   role="dialog"
                 >
+                  <ScrollIndicators scrollRef={hybridDetailScrollRef} />
                   <p className="surface-kicker">Hybrid Detail</p>
                   <h3 className="surface-title gallery-detail-title">{selectedHybridReward.hybridName}</h3>
                   <p className="gallery-detail-meta">
@@ -1814,7 +2038,7 @@ export default function Home() {
       <IslaSornaToolbar
         stats={{
           problemsSolved: gameSession.sessionSolvedProblems,
-          currentStreak: gameSession.sessionSolvedProblems,
+          currentStreak: gameSession.currentStreak,
           difficultyLevel: gameSession.activeProblem.difficultyLevel,
         }}
       />

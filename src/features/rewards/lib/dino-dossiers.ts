@@ -42,12 +42,24 @@ export interface RewardDossierDimensions {
   readonly lengthMeters: number;
 }
 
+export interface RewardDinosaurInfoCard {
+  readonly scientificName: string;
+  readonly pronunciation: string;
+  readonly diet: string;
+  readonly nameMeaning: string;
+  readonly weightKg: number;
+  readonly timePeriod: string;
+  readonly location: string;
+  readonly taxon: string;
+}
+
 export interface RewardDinosaurDossier extends RewardDossierDimensions {
   readonly kind: RewardDossierKind;
   readonly subjectName: string;
   readonly attributes: readonly string[];
   readonly description: string;
   readonly sourceDinosaurs: readonly [string, string] | null;
+  readonly infoCard: RewardDinosaurInfoCard | null;
 }
 
 export interface RewardHybridPair {
@@ -169,6 +181,136 @@ function toPrimaryDinosaurDescription(input: {
   return `${input.dinosaurName} is profiled as a high-alert apex-era species with ${leadTrait} and ${supportTrait}, built to dominate dense tropical terrain and react quickly to movement.`;
 }
 
+const DIET_POOL = [
+  "Carnivore (Meat-Eater)",
+  "Herbivore (Plant-Eater)",
+  "Omnivore (All-Eater)",
+  "Piscivore (Fish-Eater)",
+] as const;
+
+const TIME_PERIOD_POOL = [
+  "Late Cretaceous - 68 to 66 million years ago",
+  "Late Jurassic - 155 to 150 million years ago",
+  "Early Cretaceous - 130 to 110 million years ago",
+  "Late Jurassic to Early Cretaceous - 150 million years ago",
+  "Middle Jurassic - 170 to 160 million years ago",
+  "Late Triassic - 230 to 210 million years ago",
+  "Late Cretaceous - 80 to 72 million years ago",
+  "Early Jurassic - 193 to 183 million years ago",
+] as const;
+
+const LOCATION_POOL = [
+  "Western U.S., Canada",
+  "Western U.S., Southern Europe, Northern Africa",
+  "Mongolia, China",
+  "North America, Europe",
+  "South America, Africa",
+  "East Asia, Southeast Asia",
+  "Northern Africa, Europe",
+  "Australia, Antarctica",
+] as const;
+
+const TAXON_POOL = [
+  "Theropoda, Tyrannosauridae",
+  "Sauropodomorpha, Sauropoda, Macronaria",
+  "Theropoda, Dromaeosauridae",
+  "Ornithischia, Ceratopsidae",
+  "Ornithischia, Thyreophora, Stegosauria",
+  "Ornithischia, Ornithopoda, Hadrosauridae",
+  "Theropoda, Spinosauridae",
+  "Theropoda, Abelisauridae",
+  "Sauropodomorpha, Diplodocidae",
+  "Pterosauria, Pteranodontidae",
+] as const;
+
+const NAME_MEANING_POOL = [
+  '"tyrant lizard king"',
+  '"swift thief"',
+  '"three-horned face"',
+  '"arm lizard"',
+  '"double-crested lizard"',
+  '"spine lizard"',
+  '"roofed lizard"',
+  '"near crested lizard"',
+  '"chicken mimic"',
+  '"elegant jaw"',
+  '"winged and toothless"',
+  '"fused lizard"',
+  '"thick-headed lizard"',
+  '"heavy claw"',
+  '"deceptive lizard"',
+  '"high chested arm reptile"',
+] as const;
+
+function buildInfoCardPronunciation(dinosaurName: string): string {
+  const syllables = dinosaurName.replace(/\s+/g, " ").trim().split(/(?=[A-Z])/);
+  if (syllables.length <= 1) {
+    const name = dinosaurName.toLowerCase();
+    const parts: string[] = [];
+    let remaining = name;
+    while (remaining.length > 0) {
+      const chunkLen = Math.min(remaining.length, remaining.length > 4 ? 3 : remaining.length);
+      parts.push(remaining.slice(0, chunkLen).replace(/^./, (c) => c.toUpperCase()));
+      remaining = remaining.slice(chunkLen);
+    }
+    return parts.join(" - ");
+  }
+  return syllables
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join(" - ");
+}
+
+function buildInfoCardScientificName(dinosaurName: string, seed: number): string {
+  const SPECIES_SUFFIXES = [
+    "horridus", "rex", "africanus", "mongoliensis", "walkeri",
+    "altithorax", "wetherilli", "aegyptiacus", "stenops", "longiceps",
+    "saharicus", "fragilis", "robustus", "gracilis", "antiquus",
+  ];
+  const speciesSuffix = SPECIES_SUFFIXES[seed % SPECIES_SUFFIXES.length];
+  const genus = dinosaurName.split(/\s+/)[0];
+  return `${genus} ${speciesSuffix}`;
+}
+
+function buildPrimaryInfoCard(
+  dinosaurName: string,
+  seed: number,
+  heightMeters: number,
+  lengthMeters: number,
+): RewardDinosaurInfoCard {
+  const diet = DIET_POOL[seed % DIET_POOL.length];
+  const timePeriod = TIME_PERIOD_POOL[(seed >>> 3) % TIME_PERIOD_POOL.length];
+  const location = LOCATION_POOL[(seed >>> 5) % LOCATION_POOL.length];
+  const taxon = TAXON_POOL[(seed >>> 7) % TAXON_POOL.length];
+  const nameMeaning = NAME_MEANING_POOL[(seed >>> 4) % NAME_MEANING_POOL.length];
+  const weightKg = Math.round(clampNumber(
+    lengthMeters * heightMeters * 42 + ((seed >>> 14) % 500),
+    80,
+    60000,
+  ));
+
+  return {
+    scientificName: buildInfoCardScientificName(dinosaurName, seed),
+    pronunciation: buildInfoCardPronunciation(dinosaurName),
+    diet,
+    nameMeaning,
+    weightKg,
+    timePeriod,
+    location,
+    taxon,
+  };
+}
+
+export function formatWeightForDisplay(weightKg: number): string {
+  if (weightKg >= 1000) {
+    const tons = roundToTenths(weightKg / 1000);
+    return `${tons} tons (${weightKg.toLocaleString("en-US")} kg)`;
+  }
+  const lbs = Math.round(weightKg * 2.20462);
+  return `${weightKg} kg (${lbs} lbs)`;
+}
+
 export function buildPrimaryDinosaurDossier(dinosaurName: string): RewardDinosaurDossier {
   const canonicalDinosaurName = findCanonicalDinosaurName(dinosaurName);
   const seed = toStableHashSeed(canonicalDinosaurName.toLowerCase());
@@ -190,6 +332,7 @@ export function buildPrimaryDinosaurDossier(dinosaurName: string): RewardDinosau
       attributes,
     }),
     sourceDinosaurs: null,
+    infoCard: buildPrimaryInfoCard(canonicalDinosaurName, seed, heightMeters, lengthMeters),
   };
 }
 
@@ -288,6 +431,7 @@ export function buildHybridDinosaurDossier(input: RewardHybridPair): RewardDinos
       normalizedPair.firstDinosaurName,
       normalizedPair.secondDinosaurName,
     ],
+    infoCard: null,
   };
 }
 
@@ -402,6 +546,25 @@ export function parseRewardDinosaurDossierArtifact(
     sourceDinosaurs = [firstDinosaurName, secondDinosaurName];
   }
 
+  let infoCard: RewardDinosaurInfoCard | null = null;
+  const rawInfoCard = (payload as Record<string, unknown>).infoCard;
+  if (isRecord(rawInfoCard)) {
+    const scientificName = getTrimmedNonEmptyString(rawInfoCard.scientificName);
+    const pronunciation = getTrimmedNonEmptyString(rawInfoCard.pronunciation);
+    const diet = getTrimmedNonEmptyString(rawInfoCard.diet);
+    const nameMeaning = getTrimmedNonEmptyString(rawInfoCard.nameMeaning);
+    const timePeriod = getTrimmedNonEmptyString(rawInfoCard.timePeriod);
+    const location = getTrimmedNonEmptyString(rawInfoCard.location);
+    const taxon = getTrimmedNonEmptyString(rawInfoCard.taxon);
+    const weightKg = typeof rawInfoCard.weightKg === "number" && !Number.isNaN(rawInfoCard.weightKg)
+      ? rawInfoCard.weightKg
+      : null;
+
+    if (scientificName && pronunciation && diet && nameMeaning && timePeriod && location && taxon && weightKg !== null) {
+      infoCard = { scientificName, pronunciation, diet, nameMeaning, weightKg, timePeriod, location, taxon };
+    }
+  }
+
   return {
     kind,
     subjectName,
@@ -410,6 +573,7 @@ export function parseRewardDinosaurDossierArtifact(
     attributes,
     description,
     sourceDinosaurs,
+    infoCard,
   };
 }
 
