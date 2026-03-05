@@ -47,8 +47,10 @@ import {
 } from "@/features/rewards/lib/dino-dossiers";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
 import {
+  fetchPlayerProfileSnapshot,
   normalizePlayerProfileName,
   readPlayerProfileSnapshot,
+  savePlayerProfileSnapshot,
   writePlayerProfileSnapshot,
 } from "@/features/persistence/lib";
 
@@ -85,8 +87,18 @@ interface ActiveRewardRevealState {
   initialImagePath: string | null;
 }
 
+interface PersistedPlayerGameSessionSnapshot {
+  totalProblemsSolved: number;
+  totalProblemsAttempted: number;
+  currentStreak: number;
+  amberBalance: number;
+  amberImagePath: string | null;
+  unlockedRewards: readonly UnlockedReward[];
+  unlockedHybrids: readonly UnlockedHybridReward[];
+}
+
 interface PersistedPlayerProfileSnapshot {
-  gameSession: LiveGameSessionState;
+  gameSession: PersistedPlayerGameSessionSnapshot;
   activeRewardReveal: ActiveRewardRevealState;
 }
 
@@ -297,95 +309,199 @@ function hasAnyAvailableHybridPairs(
   return false;
 }
 
-function isPersistedPlayerProfileSnapshot(
-  value: unknown,
-): value is PersistedPlayerProfileSnapshot {
+function isUnlockedReward(value: unknown): value is UnlockedReward {
   if (!value || typeof value !== "object") {
     return false;
   }
 
-  const snapshot = value as Partial<PersistedPlayerProfileSnapshot>;
-  if (!snapshot.gameSession || typeof snapshot.gameSession !== "object") {
-    return false;
-  }
-  if (!snapshot.gameSession.activeProblem || typeof snapshot.gameSession.activeProblem !== "object") {
-    return false;
-  }
-  if (
-    typeof snapshot.gameSession.activeProblem.id !== "string" ||
-    typeof snapshot.gameSession.activeProblem.dividend !== "number" ||
-    typeof snapshot.gameSession.activeProblem.divisor !== "number"
-  ) {
-    return false;
-  }
-  if (
-    typeof snapshot.gameSession.sessionSolvedProblems !== "number" ||
-    typeof snapshot.gameSession.sessionAttemptedProblems !== "number"
-  ) {
-    return false;
-  }
-  if (
-    typeof snapshot.gameSession.totalProblemsSolved !== "number" ||
-    typeof snapshot.gameSession.totalProblemsAttempted !== "number"
-  ) {
-    return false;
-  }
-  if (!Array.isArray(snapshot.gameSession.steps)) {
-    return false;
-  }
-  if (!Array.isArray(snapshot.gameSession.unlockedRewards)) {
-    return false;
-  }
-  if (
-    "amberBalance" in snapshot.gameSession &&
-    typeof snapshot.gameSession.amberBalance !== "number"
-  ) {
-    return false;
-  }
-  if (
-    "amberImagePath" in snapshot.gameSession &&
-    snapshot.gameSession.amberImagePath !== null &&
-    typeof snapshot.gameSession.amberImagePath !== "string"
-  ) {
-    return false;
-  }
-  if (
-    "unlockedHybrids" in snapshot.gameSession &&
-    !Array.isArray(snapshot.gameSession.unlockedHybrids)
-  ) {
-    return false;
-  }
-  if (Array.isArray(snapshot.gameSession.unlockedHybrids)) {
-    for (const unlockedHybrid of snapshot.gameSession.unlockedHybrids) {
-      if (!isUnlockedHybridReward(unlockedHybrid)) {
-        return false;
-      }
-    }
-  }
-  if (!snapshot.activeRewardReveal || typeof snapshot.activeRewardReveal !== "object") {
-    return false;
-  }
-  if (typeof snapshot.activeRewardReveal.dinosaurName !== "string") {
-    return false;
-  }
-  if (typeof snapshot.activeRewardReveal.milestoneSolvedCount !== "number") {
-    return false;
-  }
-  if (
-    snapshot.activeRewardReveal.initialStatus !== "missing" &&
-    snapshot.activeRewardReveal.initialStatus !== "generating" &&
-    snapshot.activeRewardReveal.initialStatus !== "ready"
-  ) {
-    return false;
-  }
-  if (
-    snapshot.activeRewardReveal.initialImagePath !== null &&
-    typeof snapshot.activeRewardReveal.initialImagePath !== "string"
-  ) {
-    return false;
+  const candidate = value as Partial<UnlockedReward>;
+  return (
+    typeof candidate.rewardId === "string" &&
+    typeof candidate.dinosaurName === "string" &&
+    typeof candidate.imagePath === "string" &&
+    typeof candidate.earnedAt === "string" &&
+    typeof candidate.milestoneSolvedCount === "number"
+  );
+}
+
+function normalizeUnlockedRewardsForSession(unlockedRewards: unknown): UnlockedReward[] {
+  if (!Array.isArray(unlockedRewards)) {
+    return [];
   }
 
-  return true;
+  const rewardById = new Map<string, UnlockedReward>();
+  for (const unlockedReward of unlockedRewards) {
+    if (!isUnlockedReward(unlockedReward)) {
+      continue;
+    }
+
+    const rewardId = toTrimmedValue(unlockedReward.rewardId);
+    const dinosaurName = toTrimmedValue(unlockedReward.dinosaurName);
+    const imagePath = toTrimmedValue(unlockedReward.imagePath);
+    const earnedAt = toTrimmedValue(unlockedReward.earnedAt);
+    const milestoneSolvedCount = toNonNegativeInteger(unlockedReward.milestoneSolvedCount);
+    if (!rewardId || !dinosaurName || !imagePath || !earnedAt) {
+      continue;
+    }
+
+    rewardById.set(rewardId, {
+      rewardId,
+      dinosaurName,
+      imagePath,
+      earnedAt,
+      milestoneSolvedCount,
+    });
+  }
+
+  return Array.from(rewardById.values()).sort((leftReward, rightReward) => {
+    const milestoneDelta =
+      leftReward.milestoneSolvedCount - rightReward.milestoneSolvedCount;
+    if (milestoneDelta !== 0) {
+      return milestoneDelta;
+    }
+
+    const earnedAtDelta =
+      Date.parse(leftReward.earnedAt) - Date.parse(rightReward.earnedAt);
+    if (!Number.isNaN(earnedAtDelta) && earnedAtDelta !== 0) {
+      return earnedAtDelta;
+    }
+
+    return leftReward.rewardId.localeCompare(rightReward.rewardId);
+  });
+}
+
+function normalizeActiveRewardRevealState(
+  activeRewardReveal: unknown,
+  unlockedRewardsCount: number,
+): ActiveRewardRevealState {
+  if (!activeRewardReveal || typeof activeRewardReveal !== "object") {
+    return {
+      ...resolveNextRewardTarget(unlockedRewardsCount),
+      initialStatus: "missing",
+      initialImagePath: null,
+    };
+  }
+
+  const parsedReveal = activeRewardReveal as Partial<ActiveRewardRevealState>;
+  const dinosaurName = toTrimmedValue(parsedReveal.dinosaurName);
+  const milestoneSolvedCount = toNonNegativeInteger(parsedReveal.milestoneSolvedCount);
+  const initialStatus =
+    parsedReveal.initialStatus === "ready" ||
+    parsedReveal.initialStatus === "generating" ||
+    parsedReveal.initialStatus === "missing"
+      ? parsedReveal.initialStatus
+      : "missing";
+  const initialImagePath =
+    parsedReveal.initialImagePath === null
+      ? null
+      : toTrimmedValue(parsedReveal.initialImagePath);
+
+  if (!dinosaurName) {
+    return {
+      ...resolveNextRewardTarget(unlockedRewardsCount),
+      initialStatus: "missing",
+      initialImagePath: null,
+    };
+  }
+
+  return {
+    dinosaurName,
+    milestoneSolvedCount,
+    initialStatus,
+    initialImagePath,
+  };
+}
+
+function toPersistedPlayerProfileSnapshot(
+  value: unknown,
+): PersistedPlayerProfileSnapshot | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const snapshot = value as Partial<PersistedPlayerProfileSnapshot>;
+  if (!snapshot.gameSession || typeof snapshot.gameSession !== "object") {
+    return null;
+  }
+
+  const gameSession = snapshot.gameSession as Partial<LiveGameSessionState> &
+    Partial<PersistedPlayerGameSessionSnapshot>;
+  const unlockedRewards = normalizeUnlockedRewardsForSession(gameSession.unlockedRewards);
+  const unlockedHybrids = normalizeUnlockedHybridRewardsForSession(
+    gameSession.unlockedHybrids,
+  );
+  const totalProblemsSolved = toNonNegativeInteger(gameSession.totalProblemsSolved);
+  const totalProblemsAttempted = Math.max(
+    totalProblemsSolved,
+    toNonNegativeInteger(gameSession.totalProblemsAttempted),
+  );
+  const currentStreak = toNonNegativeInteger(gameSession.currentStreak);
+  const amberBalance =
+    typeof gameSession.amberBalance === "number"
+      ? toNonNegativeInteger(gameSession.amberBalance)
+      : totalProblemsSolved;
+  const amberImagePath =
+    gameSession.amberImagePath === null
+      ? null
+      : toTrimmedValue(gameSession.amberImagePath);
+
+  return {
+    gameSession: {
+      totalProblemsSolved,
+      totalProblemsAttempted,
+      currentStreak,
+      amberBalance,
+      amberImagePath,
+      unlockedRewards,
+      unlockedHybrids,
+    },
+    activeRewardReveal: normalizeActiveRewardRevealState(
+      snapshot.activeRewardReveal,
+      unlockedRewards.length,
+    ),
+  };
+}
+
+function toPersistedPlayerGameSessionSnapshot(
+  gameSession: LiveGameSessionState,
+): PersistedPlayerGameSessionSnapshot {
+  const totalProblemsSolved = toNonNegativeInteger(gameSession.totalProblemsSolved);
+  const totalProblemsAttempted = Math.max(
+    totalProblemsSolved,
+    toNonNegativeInteger(gameSession.totalProblemsAttempted),
+  );
+  const currentStreak = toNonNegativeInteger(gameSession.currentStreak);
+  const amberBalance =
+    typeof gameSession.amberBalance === "number"
+      ? toNonNegativeInteger(gameSession.amberBalance)
+      : totalProblemsSolved;
+  const amberImagePath =
+    gameSession.amberImagePath === null ? null : toTrimmedValue(gameSession.amberImagePath);
+
+  return {
+    totalProblemsSolved,
+    totalProblemsAttempted,
+    currentStreak,
+    amberBalance,
+    amberImagePath,
+    unlockedRewards: normalizeUnlockedRewardsForSession(gameSession.unlockedRewards),
+    unlockedHybrids: normalizeUnlockedHybridRewardsForSession(gameSession.unlockedHybrids),
+  };
+}
+
+function buildPersistedPlayerProfileSnapshot(input: {
+  gameSession: LiveGameSessionState;
+  activeRewardReveal: ActiveRewardRevealState;
+}): PersistedPlayerProfileSnapshot {
+  const persistedGameSession = toPersistedPlayerGameSessionSnapshot(input.gameSession);
+
+  return {
+    gameSession: persistedGameSession,
+    activeRewardReveal: normalizeActiveRewardRevealState(
+      input.activeRewardReveal,
+      persistedGameSession.unlockedRewards.length,
+    ),
+  };
 }
 
 function resolveNextRewardTarget(unlockedRewardsCount: number): {
@@ -632,26 +748,99 @@ function normalizeUnlockedHybridRewardsForSession(
 }
 
 function hydrateLiveGameSessionState(
-  persistedState: LiveGameSessionState,
+  persistedState: PersistedPlayerGameSessionSnapshot,
 ): LiveGameSessionState {
+  const baselineSession = createFreshLiveGameSessionState();
+  const totalProblemsSolved = toNonNegativeInteger(persistedState.totalProblemsSolved);
+  const totalProblemsAttempted = Math.max(
+    totalProblemsSolved,
+    toNonNegativeInteger(persistedState.totalProblemsAttempted),
+  );
+
   return {
-    ...persistedState,
-    currentStreak:
-      typeof persistedState.currentStreak === "number"
-        ? toNonNegativeInteger(persistedState.currentStreak)
-        : 0,
+    ...baselineSession,
+    totalProblemsSolved,
+    totalProblemsAttempted,
+    currentStreak: toNonNegativeInteger(persistedState.currentStreak),
     amberBalance:
       typeof persistedState.amberBalance === "number"
         ? toNonNegativeInteger(persistedState.amberBalance)
-        : toNonNegativeInteger(persistedState.totalProblemsSolved),
+        : totalProblemsSolved,
     amberImagePath:
       persistedState.amberImagePath === null
         ? null
         : toTrimmedValue(persistedState.amberImagePath),
+    unlockedRewards: normalizeUnlockedRewardsForSession(persistedState.unlockedRewards),
     unlockedHybrids: normalizeUnlockedHybridRewardsForSession(
-      (persistedState as Partial<LiveGameSessionState>).unlockedHybrids,
+      persistedState.unlockedHybrids,
     ),
   };
+}
+
+function isStorageQuotaExceededError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const parsedError = error as {
+    name?: unknown;
+    code?: unknown;
+    message?: unknown;
+  };
+  if (parsedError.name === "QuotaExceededError") {
+    return true;
+  }
+  if (parsedError.code === 22 || parsedError.code === 1014) {
+    return true;
+  }
+
+  const message = typeof parsedError.message === "string" ? parsedError.message : "";
+  return message.toLowerCase().includes("quota");
+}
+
+function isLikelyMoreAdvancedProfileSnapshot(
+  candidateSnapshot: PersistedPlayerProfileSnapshot,
+  baselineSnapshot: PersistedPlayerProfileSnapshot,
+): boolean {
+  const candidateSolved = toNonNegativeInteger(
+    candidateSnapshot.gameSession.totalProblemsSolved,
+  );
+  const baselineSolved = toNonNegativeInteger(
+    baselineSnapshot.gameSession.totalProblemsSolved,
+  );
+  if (candidateSolved !== baselineSolved) {
+    return candidateSolved > baselineSolved;
+  }
+
+  const candidateUnlockedRewardsCount =
+    candidateSnapshot.gameSession.unlockedRewards.length;
+  const baselineUnlockedRewardsCount =
+    baselineSnapshot.gameSession.unlockedRewards.length;
+  if (candidateUnlockedRewardsCount !== baselineUnlockedRewardsCount) {
+    return candidateUnlockedRewardsCount > baselineUnlockedRewardsCount;
+  }
+
+  const candidateUnlockedHybridsCount =
+    candidateSnapshot.gameSession.unlockedHybrids.length;
+  const baselineUnlockedHybridsCount =
+    baselineSnapshot.gameSession.unlockedHybrids.length;
+  if (candidateUnlockedHybridsCount !== baselineUnlockedHybridsCount) {
+    return candidateUnlockedHybridsCount > baselineUnlockedHybridsCount;
+  }
+
+  const candidateAttempted = toNonNegativeInteger(
+    candidateSnapshot.gameSession.totalProblemsAttempted,
+  );
+  const baselineAttempted = toNonNegativeInteger(
+    baselineSnapshot.gameSession.totalProblemsAttempted,
+  );
+  if (candidateAttempted !== baselineAttempted) {
+    return candidateAttempted > baselineAttempted;
+  }
+
+  const candidateAmber = toNonNegativeInteger(candidateSnapshot.gameSession.amberBalance);
+  const baselineAmber = toNonNegativeInteger(baselineSnapshot.gameSession.amberBalance);
+  return candidateAmber > baselineAmber;
 }
 
 export default function Home() {
@@ -665,6 +854,7 @@ export default function Home() {
   const [sessionStartError, setSessionStartError] = useState<string | null>(null);
   const [sessionStartStatus, setSessionStartStatus] = useState<string | null>(null);
   const [isSessionStarted, setIsSessionStarted] = useState(false);
+  const [isLocalProfileBackupEnabled, setIsLocalProfileBackupEnabled] = useState(true);
   const [rewardGenerationNotice, setRewardGenerationNotice] =
     useState<string | null>(null);
   const [isNextProblemReady, setIsNextProblemReady] = useState(false);
@@ -855,7 +1045,7 @@ export default function Home() {
   }, [isHybridFusionInProgress, isHybridLabOpen, selectedHybridReward]);
 
   const handleStartSession = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
+    async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       setSessionStartError(null);
       setSessionStartStatus(null);
@@ -863,20 +1053,112 @@ export default function Home() {
 
       try {
         const normalizedPlayerName = normalizePlayerProfileName(playerNameDraft);
-        const persistedProfile = readPlayerProfileSnapshot<PersistedPlayerProfileSnapshot>(
-          window.localStorage,
-          normalizedPlayerName,
-        );
+        const localPersistedProfile =
+          readPlayerProfileSnapshot<PersistedPlayerProfileSnapshot>(
+            window.localStorage,
+            normalizedPlayerName,
+          );
+        let remotePersistedProfile:
+          | {
+              schemaVersion: number;
+              playerName: string;
+              snapshot: PersistedPlayerProfileSnapshot;
+              updatedAtMs: number;
+            }
+          | null = null;
+        let remoteProfileReadError: Error | null = null;
 
-        if (persistedProfile && isPersistedPlayerProfileSnapshot(persistedProfile.snapshot)) {
+        try {
+          remotePersistedProfile =
+            await fetchPlayerProfileSnapshot<PersistedPlayerProfileSnapshot>({
+              playerName: normalizedPlayerName,
+            });
+        } catch (error) {
+          remoteProfileReadError =
+            error instanceof Error
+              ? error
+              : new Error("Unable to load shared player profile.");
+        }
+
+        const localValidSnapshot =
+          localPersistedProfile
+            ? toPersistedPlayerProfileSnapshot(localPersistedProfile.snapshot)
+            : null;
+        const remoteValidSnapshot =
+          remotePersistedProfile
+            ? toPersistedPlayerProfileSnapshot(remotePersistedProfile.snapshot)
+            : null;
+        const shouldPreferLocalOverRemote =
+          !!localValidSnapshot &&
+          !!remoteValidSnapshot &&
+          isLikelyMoreAdvancedProfileSnapshot(localValidSnapshot, remoteValidSnapshot);
+
+        if (remoteValidSnapshot && !shouldPreferLocalOverRemote) {
           const hydratedSession = hydrateLiveGameSessionState(
-            persistedProfile.snapshot.gameSession,
+            remoteValidSnapshot.gameSession,
           );
           setGameSession(hydratedSession);
-          setActiveRewardReveal(persistedProfile.snapshot.activeRewardReveal);
+          setActiveRewardReveal(remoteValidSnapshot.activeRewardReveal);
+
+          if (isLocalProfileBackupEnabled) {
+            try {
+              writePlayerProfileSnapshot(
+                window.localStorage,
+                normalizedPlayerName,
+                remoteValidSnapshot,
+              );
+            } catch (error) {
+              if (isStorageQuotaExceededError(error)) {
+                setIsLocalProfileBackupEnabled(false);
+              } else {
+                console.error(
+                  "Failed to store local backup after loading shared profile.",
+                  error,
+                );
+              }
+            }
+          }
+
           setSessionStartStatus(
-            `Loaded ${persistedProfile.playerName}'s profile from this browser.`,
+            `Loaded ${remotePersistedProfile?.playerName ?? normalizedPlayerName}'s shared profile.`,
           );
+        } else if (localValidSnapshot && localPersistedProfile) {
+          const hydratedSession = hydrateLiveGameSessionState(
+            localValidSnapshot.gameSession,
+          );
+          setGameSession(hydratedSession);
+          setActiveRewardReveal(localValidSnapshot.activeRewardReveal);
+
+          if (remoteProfileReadError) {
+            setSessionStartStatus(
+              `Loaded ${localPersistedProfile.playerName}'s profile from this browser. Shared sync is currently unavailable.`,
+            );
+          } else {
+            try {
+              await savePlayerProfileSnapshot({
+                playerName: normalizedPlayerName,
+                snapshot: localValidSnapshot,
+                updatedAtMs: Date.now(),
+              });
+              if (remoteValidSnapshot && shouldPreferLocalOverRemote) {
+                setSessionStartStatus(
+                  `Loaded ${localPersistedProfile.playerName}'s profile from this browser and synced newer progress to shared storage.`,
+                );
+              } else {
+                setSessionStartStatus(
+                  `Loaded ${localPersistedProfile.playerName}'s profile from this browser and synced it to shared storage.`,
+                );
+              }
+            } catch (error) {
+              console.error(
+                "Failed to sync local profile snapshot to shared storage.",
+                error,
+              );
+              setSessionStartStatus(
+                `Loaded ${localPersistedProfile.playerName}'s profile from this browser. Shared sync is currently unavailable.`,
+              );
+            }
+          }
         } else {
           const freshSession = createFreshLiveGameSessionState();
           setGameSession(freshSession);
@@ -885,7 +1167,21 @@ export default function Home() {
             initialStatus: "missing",
             initialImagePath: null,
           });
-          setSessionStartStatus("Started a new profile for this player.");
+
+          if (remoteProfileReadError) {
+            setSessionStartStatus(
+              "Started a new profile for this player. Shared sync is currently unavailable.",
+            );
+          } else {
+            setSessionStartStatus("Started a new profile for this player.");
+          }
+        }
+
+        if (remoteProfileReadError) {
+          console.error(
+            "Failed to load shared player profile; used browser backup/new profile.",
+            remoteProfileReadError,
+          );
         }
 
         completedProblemIdRef.current = null;
@@ -900,7 +1196,7 @@ export default function Home() {
         );
       }
     },
-    [playerNameDraft],
+    [isLocalProfileBackupEnabled, playerNameDraft],
   );
 
   useEffect(() => {
@@ -908,21 +1204,48 @@ export default function Home() {
       return;
     }
 
-    const playerProfileSnapshot: PersistedPlayerProfileSnapshot = {
+    const playerProfileSnapshot = buildPersistedPlayerProfileSnapshot({
       gameSession,
       activeRewardReveal,
-    };
+    });
 
-    try {
-      writePlayerProfileSnapshot(
-        window.localStorage,
-        activePlayerName,
-        playerProfileSnapshot,
-      );
-    } catch (error) {
-      console.error("Failed to persist player profile to localStorage.", error);
+    if (isLocalProfileBackupEnabled) {
+      try {
+        writePlayerProfileSnapshot(
+          window.localStorage,
+          activePlayerName,
+          playerProfileSnapshot,
+        );
+      } catch (error) {
+        if (isStorageQuotaExceededError(error)) {
+          setIsLocalProfileBackupEnabled(false);
+        } else {
+          console.error("Failed to persist player profile to localStorage.", error);
+        }
+      }
     }
-  }, [activePlayerName, activeRewardReveal, gameSession, isSessionStarted]);
+
+    const persistStartedAtMs = Date.now();
+    const syncTimer = window.setTimeout(() => {
+      void savePlayerProfileSnapshot({
+        playerName: activePlayerName,
+        snapshot: playerProfileSnapshot,
+        updatedAtMs: persistStartedAtMs,
+      }).catch((error) => {
+        console.error("Failed to persist player profile to shared storage.", error);
+      });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(syncTimer);
+    };
+  }, [
+    activePlayerName,
+    activeRewardReveal,
+    gameSession,
+    isLocalProfileBackupEnabled,
+    isSessionStarted,
+  ]);
 
   const syncRewardImageStatus = useCallback(async (assetName: string) => {
     const normalizedAssetName = assetName.trim();
