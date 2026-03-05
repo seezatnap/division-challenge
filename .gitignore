@@ -14,6 +14,7 @@
 /coverage
 /.npm-cache/
 /.playwright-browsers/
+/.sqlite/
 
 # next.js
 /.next/

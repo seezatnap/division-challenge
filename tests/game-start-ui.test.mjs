@@ -11,7 +11,7 @@ async function readRepoFile(relativePath) {
   return readFile(path.join(repoRoot, relativePath), "utf8");
 }
 
-test("home page requires player name to start and wires localStorage profile persistence", async () => {
+test("home page requires player name to start and wires shared profile persistence with local backup", async () => {
   const pageSource = await readRepoFile("src/app/page.tsx");
 
   for (const fragment of [
@@ -20,6 +20,8 @@ test("home page requires player name to start and wires localStorage profile per
     "Operator ID",
     "Use this Operator ID to log in later and resume your progress on this device.",
     "normalizePlayerProfileName",
+    "fetchPlayerProfileSnapshot",
+    "savePlayerProfileSnapshot",
     "readPlayerProfileSnapshot",
     "writePlayerProfileSnapshot",
     "window.localStorage",

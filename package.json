@@ -9,13 +9,18 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "node --test",
-    "test:visual": "node --test --test-concurrency=1 tests/workspace-visual-layout.visual.mjs tests/jp3-design-visual.test.mjs"
+    "test:visual": "node --test --test-concurrency=1 tests/workspace-visual-layout.visual.mjs tests/jp3-design-visual.test.mjs",
+    "db:reward-cache:path": "node scripts/reward-cache-db-cli.mjs path",
+    "db:reward-cache:list": "node scripts/reward-cache-db-cli.mjs list",
+    "db:reward-cache:get": "node scripts/reward-cache-db-cli.mjs get",
+    "db:reward-cache:delete": "node scripts/reward-cache-db-cli.mjs delete"
   },
   "dependencies": {
     "@google/genai": "^1.41.0",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

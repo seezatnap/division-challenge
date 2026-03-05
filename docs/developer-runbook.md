@@ -37,9 +37,27 @@ Reward image status endpoint:
 - `GET /api/rewards/image-status?dinosaurName=Velociraptor`
 - Returns `ready`, `generating`, or `missing`
 
-## 3. Reward image file storage behavior
+Reward cache database endpoints:
 
-Server-side reward image caching is filesystem-backed:
+- `GET /api/rewards/cache` (list all sqlite-backed cache records)
+- `GET /api/rewards/cache?dinosaurName=Velociraptor` (single record)
+- `DELETE /api/rewards/cache?dinosaurName=Velociraptor` (delete cache record + files)
+
+Player profile endpoint:
+
+- `GET /api/player-profiles?playerName=Gus` (load profile)
+- `PUT /api/player-profiles` with JSON body `{ "playerName": "Gus", "snapshot": { ... }, "updatedAtMs": 123 }`
+
+## 3. Reward image storage behavior (sqlite + filesystem)
+
+Server-side reward cache metadata/status is sqlite-backed:
+
+- SQLite directory: `<repo-root>/.sqlite/`
+- Default database file: `division-challenge.sqlite3`
+- Full default path: `<repo-root>/.sqlite/division-challenge.sqlite3`
+- Optional override: `SQLITE_DB_FILE=<dbfile>` (still stored under `<repo-root>/.sqlite/`)
+
+Image binaries remain filesystem-backed:
 
 - Output directory: `public/rewards/`
 - File naming: slugified dinosaur name (for example, `tyrannosaurus-rex.png`)
@@ -48,7 +66,9 @@ Server-side reward image caching is filesystem-backed:
   - Checks for existing disk image before generating
   - Tracks in-flight generation by cache key to avoid duplicate concurrent generation
 
-The status route reads both disk cache and in-flight generation state.
+The status route reads disk cache + in-flight state and mirrors status into sqlite.
+
+Player profiles are sqlite-backed in the same database file (`player_profiles` table) and are shared across browsers for the same app/server instance.
 
 ## 4. Player save file behavior (File System Access API)
 
@@ -113,3 +133,12 @@ Notes:
 
 - Test runner: Node built-in test runner (`node --test`)
 - Tests transpile TypeScript modules on the fly for isolated module-level validation
+
+## 7. Reward cache CLI helpers
+
+```bash
+npm run db:reward-cache:path
+npm run db:reward-cache:list
+npm run db:reward-cache:get -- "Tyrannosaurus Rex"
+npm run db:reward-cache:delete -- "Tyrannosaurus Rex"
+```

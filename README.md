@@ -38,9 +38,22 @@ node --test tests/player-journey-smoke.test.mjs
 
 ## Storage behavior (summary)
 
+- Server-side reward cache metadata/status is stored in sqlite at `<repo-root>/.sqlite/<dbfile>` (default: `.sqlite/division-challenge.sqlite3`).
+- Set `SQLITE_DB_FILE` to override the sqlite filename under `.sqlite/`.
 - Reward image cache writes generated files to `public/rewards/` with deterministic slug names and metadata sidecars.
+- Player profiles (for example, amber balance/progress) are persisted to shared sqlite via `/api/player-profiles`, so the same player name can load across browsers on the same app instance.
+- Browser `localStorage` is still written as a backup/migration source.
 - Save/load prefers File System Access API when available and uses player-named JSON files (for example, `rex-save.json`).
 - If File System Access API is unavailable, save/load falls back to JSON export/import with the same schema validation rules.
+
+## Reward Cache CLI
+
+```bash
+npm run db:reward-cache:path
+npm run db:reward-cache:list
+npm run db:reward-cache:get -- "Tyrannosaurus Rex"
+npm run db:reward-cache:delete -- "Tyrannosaurus Rex"
+```
 
 ## Feature Architecture Baseline
 
