@@ -22,7 +22,11 @@ import {
   type BusStopActiveStepFocus,
   buildBringDownAnimationSourceByStepId,
   buildBusStopRenderModel,
+  computeMultiplicationCarryDigits,
+  computeSubtractionBorrowMarks,
+  type SubtractionBorrowMark,
   createLiveWorkspaceTypingState,
+  playWorkspaceSoundEffect,
   resolveInlineWorkspaceEntryValue,
   sanitizeInlineWorkspaceEntryValue,
   type BusStopWorkRow,
@@ -66,6 +70,8 @@ interface WorkspaceInlineEntryProps {
   isLockingIn: boolean;
   isErrorPulse: boolean;
   isRetryLocked: boolean;
+  borrowReplacementDigitText?: string | null;
+  borrowShowsReceivedOne?: boolean;
   style?: CSSProperties;
   onInput?: (event: FormEvent<HTMLSpanElement>) => void;
   onKeyDown?: (event: KeyboardEvent<HTMLSpanElement>) => void;
@@ -76,6 +82,7 @@ interface InlineDigitCellContext {
   stepId: string;
   expectedDigits: readonly string[];
   activeDigitIndex: number;
+  isRightToLeftEntry: boolean;
 }
 
 interface ActiveEditableEntryLocator {
@@ -130,12 +137,25 @@ function resolveExpectedStepDigits(expectedValue: string): string[] {
   return Array.from(sanitizeInlineWorkspaceEntryValue(expectedValue));
 }
 
-function resolveActiveDigitIndex(currentValue: string, expectedDigitCount: number): number {
+function resolveActiveDigitIndex(
+  currentValue: string,
+  expectedDigitCount: number,
+  isRightToLeftEntry = false,
+): number {
   if (expectedDigitCount <= 1) {
     return 0;
   }
 
+  if (isRightToLeftEntry) {
+    return Math.max(expectedDigitCount - 1 - currentValue.length, 0);
+  }
+
   return Math.min(currentValue.length, expectedDigitCount - 1);
+}
+
+/** Multiply and subtraction results are worked ones-place first, the way they are computed by hand. */
+function isRightToLeftEntryStepKind(stepKind: LongDivisionStep["kind"]): boolean {
+  return stepKind === "multiply-result" || stepKind === "subtraction-result";
 }
 
 function collapseBringDownWorkRows(workRows: readonly BusStopWorkRow[]): CollapsedWorkRow[] {
@@ -183,25 +203,28 @@ function WorkspaceInlineEntry({
   isLockingIn,
   isErrorPulse,
   isRetryLocked,
+  borrowReplacementDigitText,
+  borrowShowsReceivedOne,
   style,
   onInput,
   onKeyDown,
   onPaste,
 }: WorkspaceInlineEntryProps) {
   const isEditable = isInteractive && !isFilled && !isAutoEntry && !isRetryLocked && Boolean(targetId);
+  const hasBorrowAdornment = Boolean(borrowReplacementDigitText) || Boolean(borrowShowsReceivedOne);
 
   return (
     <span
       aria-label={isEditable ? "Inline workspace entry" : undefined}
       aria-invalid={isErrorPulse ? true : undefined}
-      className={buildInlineEntryClassName({
+      className={`${buildInlineEntryClassName({
         lane,
         isFilled,
         isActive,
         isLockingIn,
         isErrorPulse,
         isRetryLocked,
-      })}
+      })}${hasBorrowAdornment ? " borrow-annotated-digit" : ""}`}
       contentEditable={isEditable}
       data-entry-active={isActive ? "true" : "false"}
       data-entry-auto={isAutoEntry ? "true" : "false"}
@@ -227,7 +250,29 @@ function WorkspaceInlineEntry({
       suppressContentEditableWarning={isEditable}
       tabIndex={isEditable ? 0 : undefined}
     >
-      {renderInlineEntryText(value)}
+      {hasBorrowAdornment ? (
+        // Multi-node children only when a borrow mark is shown: the plain
+        // string child below keeps React on the setTextContent fast path,
+        // which the input handlers rely on after wiping the editable node.
+        <>
+          {renderInlineEntryText(value)}
+          {borrowReplacementDigitText ? (
+            <>
+              <span aria-hidden="true" className="borrow-strike-line" />
+              <span aria-hidden="true" className="borrow-replacement-digit">
+                {borrowReplacementDigitText}
+              </span>
+            </>
+          ) : null}
+          {borrowShowsReceivedOne ? (
+            <span aria-hidden="true" className="borrow-received-one">
+              1
+            </span>
+          ) : null}
+        </>
+      ) : (
+        renderInlineEntryText(value)
+      )}
     </span>
   );
 }
@@ -429,7 +474,11 @@ export function BusStopLongDivisionRenderer({
     return {
       stepId: activeWorkRow.stepId,
       targetId: activeWorkRow.targetId,
-      digitIndex: resolveActiveDigitIndex(resolvedRowValue, resolvedDigitCount),
+      digitIndex: resolveActiveDigitIndex(
+        resolvedRowValue,
+        resolvedDigitCount,
+        isRightToLeftEntryStepKind(activeWorkRow.kind),
+      ),
     };
   }, [
     liveTypingEnabled,
@@ -448,6 +497,125 @@ export function BusStopLongDivisionRenderer({
         : "",
     [activeEditableEntryLocator],
   );
+
+  const subtractionBorrowOverlay = useMemo(() => {
+    if (!liveTypingEnabled) {
+      return null;
+    }
+
+    const activeRowIndex = renderModel.workRows.findIndex((row) => row.isActive);
+    const activeRow = activeRowIndex >= 0 ? renderModel.workRows[activeRowIndex] : null;
+    if (!activeRow || activeRow.kind !== "subtraction-result") {
+      return null;
+    }
+
+    const focus = renderModel.activeStepFocus;
+    if (
+      focus.stepKind !== "subtraction-result" ||
+      focus.workingValueText === null ||
+      focus.multiplyValueText === null
+    ) {
+      return null;
+    }
+
+    const borrowMarks = computeSubtractionBorrowMarks(
+      Number(focus.workingValueText),
+      Number(focus.multiplyValueText),
+    );
+    if (borrowMarks.length === 0) {
+      return null;
+    }
+
+    // The minuend digits are displayed either in the previous
+    // subtraction + bring-down rows, or in the dividend line itself when this
+    // is the first subtraction of the problem.
+    const minuendSourceStepIds = new Set<string>();
+    for (let rowIndex = activeRowIndex - 2; rowIndex >= 0; rowIndex -= 1) {
+      const candidateRow = renderModel.workRows[rowIndex];
+      if (candidateRow.kind === "bring-down") {
+        minuendSourceStepIds.add(candidateRow.stepId);
+        continue;
+      }
+      if (candidateRow.kind === "subtraction-result") {
+        minuendSourceStepIds.add(candidateRow.stepId);
+      }
+      break;
+    }
+
+    const typedDigitCount = (draftEntryValues[activeRow.stepId] ?? "").length;
+    const struckPositions = new Set(borrowMarks.map((mark) => mark.positionFromRight));
+    const visibleMarksByColumnIndex = new Map<number, SubtractionBorrowMark>();
+    const receivedOneColumnIndexes = new Set<number>();
+    for (const mark of borrowMarks) {
+      if (typedDigitCount < mark.revealAtTypedDigitCount) {
+        continue;
+      }
+      // Once this place's own borrow is revealed, its replacement reads as a
+      // teen value: 8 lends to become 7, then borrows to become 17.
+      const showsOwnBorrow =
+        mark.alsoBorrowsFromNextPlace && typedDigitCount >= mark.positionFromRight;
+      visibleMarksByColumnIndex.set(activeRow.columnIndex - mark.positionFromRight, {
+        ...mark,
+        replacementDigitText: showsOwnBorrow
+          ? `1${mark.replacementDigitText}`
+          : mark.replacementDigitText,
+      });
+      // The borrowing place gets a small leading "1" — except cascade
+      // intermediaries, whose strike + replacement already tell the story.
+      const borrowerPosition = mark.revealAtTypedDigitCount;
+      if (!struckPositions.has(borrowerPosition)) {
+        receivedOneColumnIndexes.add(activeRow.columnIndex - borrowerPosition);
+      }
+    }
+    if (visibleMarksByColumnIndex.size === 0) {
+      return null;
+    }
+
+    return {
+      visibleMarksByColumnIndex,
+      receivedOneColumnIndexes,
+      minuendSourceStepIds,
+      isMinuendInDividendLine: minuendSourceStepIds.size === 0,
+    };
+  }, [liveTypingEnabled, renderModel.workRows, renderModel.activeStepFocus, draftEntryValues]);
+
+  // Carries for the active multiply row (divisor × quotient digit), shown
+  // above the divisor digit they roll into as the student works right-to-left.
+  const divisorCarryByPosition = useMemo(() => {
+    if (!liveTypingEnabled) {
+      return null;
+    }
+
+    const focus = renderModel.activeStepFocus;
+    if (focus.stepKind !== "multiply-result" || !focus.quotientDigitText) {
+      return null;
+    }
+
+    const activeRow = renderModel.workRows.find((row) => row.isActive);
+    if (!activeRow || activeRow.kind !== "multiply-result") {
+      return null;
+    }
+
+    const typedDigitCount = (draftEntryValues[activeRow.stepId] ?? "").length;
+    const carryDigits = computeMultiplicationCarryDigits(
+      renderModel.divisorText,
+      focus.quotientDigitText,
+    );
+    const visibleCarryByPosition = new Map<number, number>();
+    carryDigits.forEach((carryDigit, positionFromRight) => {
+      if (carryDigit > 0 && typedDigitCount >= positionFromRight) {
+        visibleCarryByPosition.set(positionFromRight, carryDigit);
+      }
+    });
+
+    return visibleCarryByPosition.size > 0 ? visibleCarryByPosition : null;
+  }, [
+    liveTypingEnabled,
+    renderModel.activeStepFocus,
+    renderModel.workRows,
+    renderModel.divisorText,
+    draftEntryValues,
+  ]);
 
   const clearBringDownAnimationTimeout = useCallback(() => {
     if (!bringDownAnimationTimeoutRef.current) {
@@ -667,6 +835,7 @@ export function BusStopLongDivisionRenderer({
 
   const triggerEntryErrorFeedback = useCallback(
     (stepId: string) => {
+      playWorkspaceSoundEffect("digit-error");
       const timeoutKey = `${stepIdentity}:${stepId}`;
       const existingPulseTimeout = errorPulseTimeoutByStepIdRef.current.get(timeoutKey);
       const existingRetryLockTimeout = retryLockTimeoutByStepIdRef.current.get(timeoutKey);
@@ -764,10 +933,13 @@ export function BusStopLongDivisionRenderer({
       }
 
       if (transition.lockedStepId) {
+        playWorkspaceSoundEffect(
+          transition.state.revealedStepCount >= steps.length ? "problem-complete" : "step-lock-in",
+        );
         queueLockInAnimation(transition.lockedStepId);
       }
     },
-    [onStepValidation, queueLockInAnimation, stepIdentity],
+    [onStepValidation, queueLockInAnimation, stepIdentity, steps.length],
   );
 
   const queueBringDownAnimationForStep = useCallback(
@@ -872,8 +1044,26 @@ export function BusStopLongDivisionRenderer({
     [applyInlineEntryTransition],
   );
 
+  const applyStepDigitSuffixTransition = useCallback(
+    (stepId: string, expectedDigits: readonly string[], suffixLength: number) => {
+      const boundedSuffixLength = Math.min(
+        Math.max(Math.trunc(suffixLength), 0),
+        expectedDigits.length,
+      );
+      const nextValue =
+        boundedSuffixLength === 0
+          ? ""
+          : expectedDigits.slice(expectedDigits.length - boundedSuffixLength).join("");
+      applyInlineEntryTransition(stepId, nextValue);
+    },
+    [applyInlineEntryTransition],
+  );
+
   const handleInlineDigitInput = useCallback(
-    ({ stepId, expectedDigits, activeDigitIndex }: InlineDigitCellContext, event: FormEvent<HTMLSpanElement>) => {
+    (
+      { stepId, expectedDigits, activeDigitIndex, isRightToLeftEntry }: InlineDigitCellContext,
+      event: FormEvent<HTMLSpanElement>,
+    ) => {
       if (expectedDigits.length === 0) {
         event.currentTarget.textContent = "";
         return;
@@ -893,13 +1083,26 @@ export function BusStopLongDivisionRenderer({
         return;
       }
 
+      playWorkspaceSoundEffect("digit-correct");
+      if (isRightToLeftEntry) {
+        applyStepDigitSuffixTransition(
+          stepId,
+          expectedDigits,
+          expectedDigits.length - activeDigitIndex,
+        );
+        return;
+      }
+
       applyStepDigitPrefixTransition(stepId, expectedDigits, activeDigitIndex + 1);
     },
-    [applyStepDigitPrefixTransition, triggerEntryErrorFeedback],
+    [applyStepDigitPrefixTransition, applyStepDigitSuffixTransition, triggerEntryErrorFeedback],
   );
 
   const handleInlineDigitKeyDown = useCallback(
-    ({ stepId, expectedDigits, activeDigitIndex }: InlineDigitCellContext, event: KeyboardEvent<HTMLSpanElement>) => {
+    (
+      { stepId, expectedDigits, activeDigitIndex, isRightToLeftEntry }: InlineDigitCellContext,
+      event: KeyboardEvent<HTMLSpanElement>,
+    ) => {
       if (event.key === "Enter") {
         event.preventDefault();
         return;
@@ -907,6 +1110,13 @@ export function BusStopLongDivisionRenderer({
 
       if (event.key === "Backspace") {
         event.preventDefault();
+        if (isRightToLeftEntry) {
+          const typedSuffixLength = expectedDigits.length - 1 - activeDigitIndex;
+          if (typedSuffixLength > 0) {
+            applyStepDigitSuffixTransition(stepId, expectedDigits, typedSuffixLength - 1);
+          }
+          return;
+        }
         if (activeDigitIndex > 0) {
           applyStepDigitPrefixTransition(stepId, expectedDigits, activeDigitIndex - 1);
         }
@@ -917,11 +1127,14 @@ export function BusStopLongDivisionRenderer({
         event.preventDefault();
       }
     },
-    [applyStepDigitPrefixTransition],
+    [applyStepDigitPrefixTransition, applyStepDigitSuffixTransition],
   );
 
   const handleInlineDigitPaste = useCallback(
-    ({ stepId, expectedDigits, activeDigitIndex }: InlineDigitCellContext, event: ClipboardEvent<HTMLSpanElement>) => {
+    (
+      { stepId, expectedDigits, activeDigitIndex, isRightToLeftEntry }: InlineDigitCellContext,
+      event: ClipboardEvent<HTMLSpanElement>,
+    ) => {
       event.preventDefault();
 
       if (expectedDigits.length === 0) {
@@ -937,11 +1150,16 @@ export function BusStopLongDivisionRenderer({
       let acceptedDigitCount = 0;
       for (
         let pastedIndex = 0;
-        pastedIndex < pastedDigits.length && activeDigitIndex + acceptedDigitCount < expectedDigits.length;
+        pastedIndex < pastedDigits.length;
         pastedIndex += 1
       ) {
-        const expectedDigit = expectedDigits[activeDigitIndex + acceptedDigitCount];
-        if (pastedDigits[pastedIndex] !== expectedDigit) {
+        const targetDigitIndex = isRightToLeftEntry
+          ? activeDigitIndex - acceptedDigitCount
+          : activeDigitIndex + acceptedDigitCount;
+        if (targetDigitIndex < 0 || targetDigitIndex >= expectedDigits.length) {
+          break;
+        }
+        if (pastedDigits[pastedIndex] !== expectedDigits[targetDigitIndex]) {
           break;
         }
 
@@ -955,13 +1173,23 @@ export function BusStopLongDivisionRenderer({
         return;
       }
 
+      playWorkspaceSoundEffect("digit-correct");
+      if (isRightToLeftEntry) {
+        applyStepDigitSuffixTransition(
+          stepId,
+          expectedDigits,
+          expectedDigits.length - 1 - activeDigitIndex + acceptedDigitCount,
+        );
+        return;
+      }
+
       applyStepDigitPrefixTransition(
         stepId,
         expectedDigits,
         activeDigitIndex + acceptedDigitCount,
       );
     },
-    [applyStepDigitPrefixTransition, triggerEntryErrorFeedback],
+    [applyStepDigitPrefixTransition, applyStepDigitSuffixTransition, triggerEntryErrorFeedback],
   );
 
   return (
@@ -999,6 +1227,7 @@ export function BusStopLongDivisionRenderer({
                 stepId: cell.stepId,
                 expectedDigits,
                 activeDigitIndex,
+                isRightToLeftEntry: false,
               };
               const isCellRetryLocked = Boolean(retryLockedStepIds[cell.stepId]);
               const isCellErrorPulse = Boolean(errorPulseStepIds[cell.stepId]);
@@ -1052,7 +1281,24 @@ export function BusStopLongDivisionRenderer({
             data-step-focus={activeStepFocus.shouldHighlightDivisor ? "active" : "idle"}
             data-step-focus-kind={activeStepFocus.shouldHighlightDivisor ? activeStepFocus.stepKind : "none"}
           >
-            {renderModel.divisorText}
+            {Array.from(renderModel.divisorText).map((digit, digitIndex) => {
+              const positionFromRight = renderModel.divisorText.length - 1 - digitIndex;
+              const carryDigit = divisorCarryByPosition?.get(positionFromRight);
+
+              return (
+                <span
+                  className={carryDigit ? "borrow-annotated-digit" : undefined}
+                  key={`divisor-digit-${digitIndex}`}
+                >
+                  {digit}
+                  {carryDigit ? (
+                    <span aria-hidden="true" className="divisor-carry-digit">
+                      {carryDigit}
+                    </span>
+                  ) : null}
+                </span>
+              );
+            })}
           </p>
           <div className="bracket-stack">
             <p className="dividend-line" data-bring-down-source-step-id={bringDownAnimationStepId ?? ""}>
@@ -1064,10 +1310,17 @@ export function BusStopLongDivisionRenderer({
                   activeStepFocus.workingDividendWindow !== null &&
                   digitIndex >= activeStepFocus.workingDividendWindow.startColumnIndex &&
                   digitIndex <= activeStepFocus.workingDividendWindow.endColumnIndex;
+                const borrowMark = subtractionBorrowOverlay?.isMinuendInDividendLine
+                  ? subtractionBorrowOverlay.visibleMarksByColumnIndex.get(digitIndex)
+                  : undefined;
+                const showsReceivedOne = Boolean(
+                  subtractionBorrowOverlay?.isMinuendInDividendLine &&
+                    subtractionBorrowOverlay.receivedOneColumnIndexes.has(digitIndex),
+                );
 
                 return (
                   <span
-                    className={`dividend-digit${isBringDownSourceDigit ? " dividend-digit-bring-down-origin" : ""}${isStepFocusedDigit ? " context-value-glow" : ""}`}
+                    className={`dividend-digit${isBringDownSourceDigit ? " dividend-digit-bring-down-origin" : ""}${isStepFocusedDigit ? " context-value-glow" : ""}${borrowMark || showsReceivedOne ? " borrow-annotated-digit" : ""}`}
                     data-bring-down-origin={isBringDownSourceDigit ? "active" : "idle"}
                     data-dividend-digit-index={digitIndex}
                     data-step-focus={isStepFocusedDigit ? "active" : "idle"}
@@ -1075,6 +1328,19 @@ export function BusStopLongDivisionRenderer({
                     key={`dividend-digit-${digitIndex}`}
                   >
                     {digit}
+                    {borrowMark ? (
+                      <>
+                        <span aria-hidden="true" className="borrow-strike-line" />
+                        <span aria-hidden="true" className="borrow-replacement-digit">
+                          {borrowMark.replacementDigitText}
+                        </span>
+                      </>
+                    ) : null}
+                    {showsReceivedOne ? (
+                      <span aria-hidden="true" className="borrow-received-one">
+                        1
+                      </span>
+                    ) : null}
                   </span>
                 );
               })}
@@ -1112,10 +1378,13 @@ export function BusStopLongDivisionRenderer({
                     1,
                   );
                   const rowDigits = Array.from(resolvedRowValue);
+                  const isRightToLeftRow = isRightToLeftEntryStepKind(row.kind);
                   const activeDigitIndex = resolveActiveDigitIndex(
                     resolvedRowValue,
                     resolvedDigitCount,
+                    isRightToLeftRow,
                   );
+                  const rowSuffixStartIndex = resolvedDigitCount - rowDigits.length;
                   const isAutoEntryRow = row.kind === "bring-down" && liveTypingEnabled;
                   const isRowRetryLocked = Boolean(retryLockedStepIds[row.stepId]);
                   const isRowErrorPulse = Boolean(errorPulseStepIds[row.stepId]);
@@ -1175,13 +1444,36 @@ export function BusStopLongDivisionRenderer({
                             stepId: row.stepId,
                             expectedDigits,
                             activeDigitIndex,
+                            isRightToLeftEntry: isRightToLeftRow,
                           };
-                          const isResolvedDigitFilled = digitIndex < rowDigits.length;
+                          const isResolvedDigitFilled = isRightToLeftRow
+                            ? digitIndex >= rowSuffixStartIndex
+                            : digitIndex < rowDigits.length;
                           const isFocusedPendingDigit =
                             row.isActive && !row.isFilled && digitIndex === activeDigitIndex;
+                          const isMinuendSourceCell = Boolean(
+                            subtractionBorrowOverlay &&
+                              !subtractionBorrowOverlay.isMinuendInDividendLine &&
+                              subtractionBorrowOverlay.minuendSourceStepIds.has(row.stepId),
+                          );
+                          const cellBorrowMark = isMinuendSourceCell
+                            ? subtractionBorrowOverlay?.visibleMarksByColumnIndex.get(
+                                primaryValueStartColumn - 1 + digitIndex,
+                              )
+                            : undefined;
+                          const cellShowsReceivedOne = Boolean(
+                            isMinuendSourceCell &&
+                              subtractionBorrowOverlay?.receivedOneColumnIndexes.has(
+                                primaryValueStartColumn - 1 + digitIndex,
+                              ),
+                          );
 
                           return (
                             <WorkspaceInlineEntry
+                              borrowReplacementDigitText={
+                                cellBorrowMark?.replacementDigitText ?? null
+                              }
+                              borrowShowsReceivedOne={cellShowsReceivedOne}
                               digitIndex={digitIndex}
                               isErrorPulse={isRowErrorPulse && digitIndex === activeDigitIndex}
                               isActive={row.isActive && digitIndex === activeDigitIndex}
@@ -1217,12 +1509,37 @@ export function BusStopLongDivisionRenderer({
                                 gridColumnStart: primaryColumnOffset + digitIndex + 1,
                               }}
                               targetId={row.targetId}
-                              value={rowDigits[digitIndex] ?? ""}
+                              value={
+                                isRightToLeftRow
+                                  ? rowDigits[digitIndex - rowSuffixStartIndex] ?? ""
+                                  : rowDigits[digitIndex] ?? ""
+                              }
                             />
                           );
                         })}
                         {bringDownCompanion && companionColumnIndex !== null ? (
                           <WorkspaceInlineEntry
+                            borrowReplacementDigitText={
+                              subtractionBorrowOverlay &&
+                              !subtractionBorrowOverlay.isMinuendInDividendLine &&
+                              subtractionBorrowOverlay.minuendSourceStepIds.has(
+                                bringDownCompanion.stepId,
+                              )
+                                ? subtractionBorrowOverlay.visibleMarksByColumnIndex.get(
+                                    bringDownCompanion.columnIndex,
+                                  )?.replacementDigitText ?? null
+                                : null
+                            }
+                            borrowShowsReceivedOne={Boolean(
+                              subtractionBorrowOverlay &&
+                                !subtractionBorrowOverlay.isMinuendInDividendLine &&
+                                subtractionBorrowOverlay.minuendSourceStepIds.has(
+                                  bringDownCompanion.stepId,
+                                ) &&
+                                subtractionBorrowOverlay.receivedOneColumnIndexes.has(
+                                  bringDownCompanion.columnIndex,
+                                ),
+                            )}
                             digitIndex={0}
                             isErrorPulse={Boolean(errorPulseStepIds[bringDownCompanion.stepId])}
                             isActive={bringDownCompanion.isActive}

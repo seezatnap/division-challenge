@@ -1,17 +1,17 @@
-import type { LongDivisionStep, LongDivisionStepKind } from "@/features/contracts";
+import type { WorkspaceStep, WorkspaceStepKind } from "@/features/contracts";
 
 export type LongDivisionStepValidationOutcome = "correct" | "incorrect" | "complete";
 export type DinoStepFeedbackTone = "encouragement" | "retry" | "celebration";
 
 export interface DinoStepFeedbackHintHook {
   readonly id: string;
-  readonly stepKind: LongDivisionStepKind;
+  readonly stepKind: WorkspaceStepKind;
   readonly tone: DinoStepFeedbackTone;
   readonly messageKey: string;
 }
 
 export interface LongDivisionStepValidationRequest {
-  readonly steps: readonly LongDivisionStep[];
+  readonly steps: readonly WorkspaceStep[];
   readonly currentStepIndex: number;
   readonly submittedValue: string;
 }
@@ -21,9 +21,9 @@ export interface LongDivisionStepValidationResult {
   readonly didAdvance: boolean;
   readonly isProblemComplete: boolean;
   readonly currentStepIndex: number;
-  readonly currentStepId: LongDivisionStep["id"];
+  readonly currentStepId: WorkspaceStep["id"];
   readonly focusStepIndex: number | null;
-  readonly focusStepId: LongDivisionStep["id"] | null;
+  readonly focusStepId: WorkspaceStep["id"] | null;
   readonly expectedValue: string;
   readonly normalizedSubmittedValue: string | null;
   readonly hintHook: DinoStepFeedbackHintHook;
@@ -36,16 +36,20 @@ const STEP_CORRECT_HINT_KEYS = {
   "multiply-result": "dino.feedback.correct.multiply-result",
   "subtraction-result": "dino.feedback.correct.subtraction-result",
   "bring-down": "dino.feedback.correct.bring-down",
-} as const satisfies Record<LongDivisionStepKind, string>;
+  "partial-product": "dino.feedback.correct.partial-product",
+  "product-sum": "dino.feedback.correct.product-sum",
+} as const satisfies Record<WorkspaceStepKind, string>;
 
 const STEP_RETRY_HINT_KEYS = {
   "quotient-digit": "dino.feedback.retry.quotient-digit",
   "multiply-result": "dino.feedback.retry.multiply-result",
   "subtraction-result": "dino.feedback.retry.subtraction-result",
   "bring-down": "dino.feedback.retry.bring-down",
-} as const satisfies Record<LongDivisionStepKind, string>;
+  "partial-product": "dino.feedback.retry.partial-product",
+  "product-sum": "dino.feedback.retry.product-sum",
+} as const satisfies Record<WorkspaceStepKind, string>;
 
-function assertStepList(steps: readonly LongDivisionStep[]): void {
+function assertStepList(steps: readonly WorkspaceStep[]): void {
   if (!Array.isArray(steps) || steps.length === 0) {
     throw new Error("steps must include at least one long-division step.");
   }
@@ -67,7 +71,7 @@ function normalizeIntegerAnswer(rawValue: string): string | null {
   return trimmedValue.replace(/^0+(?=\d)/, "");
 }
 
-function createCorrectHintHook(stepKind: LongDivisionStepKind): DinoStepFeedbackHintHook {
+function createCorrectHintHook(stepKind: WorkspaceStepKind): DinoStepFeedbackHintHook {
   return {
     id: `dino-feedback:correct:${stepKind}`,
     stepKind,
@@ -76,7 +80,7 @@ function createCorrectHintHook(stepKind: LongDivisionStepKind): DinoStepFeedback
   };
 }
 
-function createRetryHintHook(stepKind: LongDivisionStepKind): DinoStepFeedbackHintHook {
+function createRetryHintHook(stepKind: WorkspaceStepKind): DinoStepFeedbackHintHook {
   return {
     id: `dino-feedback:retry:${stepKind}`,
     stepKind,
@@ -85,7 +89,7 @@ function createRetryHintHook(stepKind: LongDivisionStepKind): DinoStepFeedbackHi
   };
 }
 
-function createCompletionHintHook(stepKind: LongDivisionStepKind): DinoStepFeedbackHintHook {
+function createCompletionHintHook(stepKind: WorkspaceStepKind): DinoStepFeedbackHintHook {
   return {
     id: "dino-feedback:complete:problem",
     stepKind,

@@ -17,15 +17,23 @@ import {
   solveLongDivision,
   type LongDivisionStepValidationResult,
 } from "@/features/division-engine";
+import {
+  generateMultiplicationProblem,
+  solveLongMultiplication,
+} from "@/features/multiplication-engine";
 import { DinoGalleryPanel } from "@/features/gallery/components/dino-gallery-panel";
 import { ScrollIndicators } from "@/features/gallery/components/scroll-indicators";
 import { IslaSornaToolbar } from "./isla-sorna-toolbar";
 import {
   type ActiveInputLane,
   type DivisionProblem,
+  type GameMode,
   type LongDivisionStep,
+  type LongMultiplicationStep,
+  type MultiplicationProblem,
   type UnlockedHybridReward,
   type UnlockedReward,
+  type WorkspaceStep,
 } from "@/features/contracts";
 import { EarnedRewardRevealPanel } from "@/features/rewards/components/earned-reward-reveal-panel";
 import {
@@ -46,6 +54,7 @@ import {
   type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
+import { LiveMultiplicationWorkspacePanel } from "@/features/workspace-ui/components/live-multiplication-workspace-panel";
 import {
   fetchPlayerProfileSnapshot,
   normalizePlayerProfileName,
@@ -66,14 +75,34 @@ const workspacePreviewProblem: DivisionProblem = {
 
 const workspacePreviewSolution = solveLongDivision(workspacePreviewProblem);
 
+export type GameModeChoice = GameMode | "mixed";
+export type DifficultyChoice = "easy" | "medium" | "hard";
+
+type LiveWorkspaceProblem = DivisionProblem | MultiplicationProblem;
+
+function isMultiplicationProblem(
+  problem: LiveWorkspaceProblem,
+): problem is MultiplicationProblem {
+  return "multiplicand" in problem;
+}
+
+interface SolvedCountByMode {
+  division: number;
+  multiplication: number;
+}
+
 interface LiveGameSessionState {
-  activeProblem: DivisionProblem;
-  steps: readonly LongDivisionStep[];
+  activeMode: GameMode;
+  activeProblem: LiveWorkspaceProblem;
+  steps: readonly WorkspaceStep[];
   sessionSolvedProblems: number;
   sessionAttemptedProblems: number;
   currentStreak: number;
   totalProblemsSolved: number;
   totalProblemsAttempted: number;
+  solvedByMode: SolvedCountByMode;
+  preferredGameMode: GameModeChoice;
+  preferredDifficulty: DifficultyChoice;
   amberBalance: number;
   amberImagePath: string | null;
   unlockedRewards: readonly UnlockedReward[];
@@ -91,6 +120,9 @@ interface PersistedPlayerGameSessionSnapshot {
   totalProblemsSolved: number;
   totalProblemsAttempted: number;
   currentStreak: number;
+  solvedByMode: SolvedCountByMode;
+  preferredGameMode: GameModeChoice;
+  preferredDifficulty: DifficultyChoice;
   amberBalance: number;
   amberImagePath: string | null;
   unlockedRewards: readonly UnlockedReward[];
@@ -106,9 +138,8 @@ const INITIAL_TOTAL_PROBLEMS_SOLVED = 0;
 const INITIAL_TOTAL_PROBLEMS_ATTEMPTED = 0;
 const INITIAL_SESSION_PROBLEMS_SOLVED = 0;
 const INITIAL_SESSION_PROBLEMS_ATTEMPTED = 0;
-const AMBER_EARNED_PER_SOLVED_PROBLEM = 1;
-const AMBER_COST_PER_DINO_UNLOCK = 5;
-const AMBER_COST_PER_HYBRID_CREATION = 2;
+const AMBER_COST_PER_DINO_UNLOCK = 10;
+const AMBER_COST_PER_HYBRID_CREATION = 8;
 const AMBER_REWARD_ASSET_NAME = "Amber Resonance Crystal";
 const LIVE_PROBLEM_MIN_DIVISOR = 3;
 const LIVE_PROBLEM_MAX_DIVISOR = 12;
@@ -169,6 +200,67 @@ function toTrimmedValue(value: unknown): string | null {
 
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
+const GAME_MODE_CHOICE_OPTIONS: readonly { value: GameModeChoice; label: string }[] = [
+  { value: "division", label: "Division" },
+  { value: "multiplication", label: "Multiplication" },
+  { value: "mixed", label: "Mixed Ops" },
+];
+
+const ENGINE_LEVEL_BY_DIFFICULTY: Record<DifficultyChoice, number> = {
+  easy: 1,
+  medium: 3,
+  hard: 5,
+};
+
+const AMBER_EARNED_BY_DIFFICULTY: Record<DifficultyChoice, number> = {
+  easy: 1,
+  medium: 2,
+  hard: 4,
+};
+
+const DIFFICULTY_CHOICE_OPTIONS: readonly {
+  value: DifficultyChoice;
+  label: string;
+}[] = [
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
+];
+
+function toGameModeChoice(value: unknown): GameModeChoice {
+  return value === "multiplication" || value === "mixed" ? value : "division";
+}
+
+function toDifficultyChoice(value: unknown): DifficultyChoice {
+  if (value === "easy" || value === "medium" || value === "hard") {
+    return value;
+  }
+
+  // Legacy profiles stored a numeric engine level (1-5); map it onto the bands.
+  if (typeof value === "number" && Number.isInteger(value)) {
+    if (value >= 4) {
+      return "hard";
+    }
+    if (value === 3) {
+      return "medium";
+    }
+  }
+
+  return "easy";
+}
+
+function toSolvedCountByMode(
+  value: unknown,
+  fallbackDivisionSolvedCount: number,
+): SolvedCountByMode {
+  const record = (value && typeof value === "object" ? value : {}) as Partial<SolvedCountByMode>;
+
+  return {
+    division: toNonNegativeInteger(record.division ?? fallbackDivisionSolvedCount),
+    multiplication: toNonNegativeInteger(record.multiplication),
+  };
 }
 
 function normalizeHybridPair(input: {
@@ -450,6 +542,9 @@ function toPersistedPlayerProfileSnapshot(
       totalProblemsSolved,
       totalProblemsAttempted,
       currentStreak,
+      solvedByMode: toSolvedCountByMode(gameSession.solvedByMode, totalProblemsSolved),
+      preferredGameMode: toGameModeChoice(gameSession.preferredGameMode),
+      preferredDifficulty: toDifficultyChoice(gameSession.preferredDifficulty),
       amberBalance,
       amberImagePath,
       unlockedRewards,
@@ -482,6 +577,9 @@ function toPersistedPlayerGameSessionSnapshot(
     totalProblemsSolved,
     totalProblemsAttempted,
     currentStreak,
+    solvedByMode: toSolvedCountByMode(gameSession.solvedByMode, totalProblemsSolved),
+    preferredGameMode: toGameModeChoice(gameSession.preferredGameMode),
+    preferredDifficulty: toDifficultyChoice(gameSession.preferredDifficulty),
     amberBalance,
     amberImagePath,
     unlockedRewards: normalizeUnlockedRewardsForSession(gameSession.unlockedRewards),
@@ -628,6 +726,119 @@ function resolveNextLiveProblem(totalProblemsSolved: number): {
   };
 }
 
+interface NextLiveProblemResolution {
+  mode: GameMode;
+  problem: LiveWorkspaceProblem;
+  steps: readonly WorkspaceStep[];
+}
+
+function resolveModeForNextProblem(preferredGameMode: GameModeChoice): GameMode {
+  if (preferredGameMode === "mixed") {
+    return Math.random() < 0.5 ? "division" : "multiplication";
+  }
+
+  return preferredGameMode;
+}
+
+
+function resolveNextDivisionProblemForLevel(
+  totalProblemsSolved: number,
+  difficultyLevel: number,
+): { problem: DivisionProblem; steps: readonly LongDivisionStep[] } {
+  if (difficultyLevel === LIVE_PROBLEM_FIXED_DIFFICULTY_LEVEL) {
+    return resolveNextLiveProblem(totalProblemsSolved);
+  }
+
+  try {
+    const problem = generateDivisionProblem({
+      difficultyLevel,
+      remainderMode: "forbid",
+    });
+    const normalizedProblem: DivisionProblem = {
+      ...problem,
+      id: `live-problem-${totalProblemsSolved + 1}-${problem.id}`,
+    };
+
+    return {
+      problem: normalizedProblem,
+      steps: solveLongDivision(normalizedProblem).steps,
+    };
+  } catch {
+    return resolveNextLiveProblem(totalProblemsSolved);
+  }
+}
+
+function resolveNextMultiplicationProblem(
+  totalProblemsSolved: number,
+  difficultyLevel: number,
+): { problem: MultiplicationProblem; steps: readonly LongMultiplicationStep[] } {
+  const problem = generateMultiplicationProblem({ difficultyLevel });
+  const normalizedProblem: MultiplicationProblem = {
+    ...problem,
+    id: `live-problem-${totalProblemsSolved + 1}-${problem.id}`,
+  };
+
+  return {
+    problem: normalizedProblem,
+    steps: solveLongMultiplication(normalizedProblem).steps,
+  };
+}
+
+function resolveNextProblemForPreferences(input: {
+  preferredGameMode: GameModeChoice;
+  preferredDifficulty: DifficultyChoice;
+  totalProblemsSolved: number;
+}): NextLiveProblemResolution {
+  const mode = resolveModeForNextProblem(input.preferredGameMode);
+  const difficultyLevel = ENGINE_LEVEL_BY_DIFFICULTY[input.preferredDifficulty];
+
+  if (mode === "multiplication") {
+    const resolution = resolveNextMultiplicationProblem(
+      input.totalProblemsSolved,
+      difficultyLevel,
+    );
+    return { mode, ...resolution };
+  }
+
+  const resolution = resolveNextDivisionProblemForLevel(
+    input.totalProblemsSolved,
+    difficultyLevel,
+  );
+  return { mode, ...resolution };
+}
+
+function incrementSolvedByMode(currentState: LiveGameSessionState): SolvedCountByMode {
+  return {
+    ...currentState.solvedByMode,
+    [currentState.activeMode]: currentState.solvedByMode[currentState.activeMode] + 1,
+  };
+}
+
+function resolveNextProblemAfterSolve(
+  currentState: LiveGameSessionState,
+): NextLiveProblemResolution {
+  return resolveNextProblemForPreferences({
+    preferredGameMode: currentState.preferredGameMode,
+    preferredDifficulty: currentState.preferredDifficulty,
+    totalProblemsSolved: currentState.totalProblemsSolved + 1,
+  });
+}
+
+function withFreshActiveProblem(session: LiveGameSessionState): LiveGameSessionState {
+  const resolution = resolveNextProblemForPreferences({
+    preferredGameMode: session.preferredGameMode,
+    preferredDifficulty: session.preferredDifficulty,
+    totalProblemsSolved: session.totalProblemsSolved,
+  });
+
+  return {
+    ...session,
+    activeMode: resolution.mode,
+    activeProblem: resolution.problem,
+    steps: resolution.steps,
+  };
+}
+
 function formatActiveInputLane(lane: ActiveInputLane | null): string {
   if (!lane) {
     return "ready";
@@ -646,6 +857,7 @@ function formatActiveInputLane(lane: ActiveInputLane | null): string {
 }
 
 const initialLiveGameSessionState: LiveGameSessionState = {
+  activeMode: "division",
   activeProblem: workspacePreviewProblem,
   steps: workspacePreviewSolution.steps,
   sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
@@ -653,6 +865,9 @@ const initialLiveGameSessionState: LiveGameSessionState = {
   currentStreak: 0,
   totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
   totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
+  solvedByMode: { division: 0, multiplication: 0 },
+  preferredGameMode: "division",
+  preferredDifficulty: "easy",
   amberBalance: 0,
   amberImagePath: null,
   unlockedRewards: [],
@@ -667,6 +882,7 @@ const initialActiveRewardRevealState: ActiveRewardRevealState = {
 
 function createFreshLiveGameSessionState(): LiveGameSessionState {
   return {
+    activeMode: "division",
     activeProblem: workspacePreviewProblem,
     steps: workspacePreviewSolution.steps,
     sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
@@ -674,6 +890,9 @@ function createFreshLiveGameSessionState(): LiveGameSessionState {
     currentStreak: 0,
     totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
     totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
+    solvedByMode: { division: 0, multiplication: 0 },
+    preferredGameMode: "division",
+    preferredDifficulty: "easy",
     amberBalance: 0,
     amberImagePath: null,
     unlockedRewards: [],
@@ -762,6 +981,9 @@ function hydrateLiveGameSessionState(
     totalProblemsSolved,
     totalProblemsAttempted,
     currentStreak: toNonNegativeInteger(persistedState.currentStreak),
+    solvedByMode: toSolvedCountByMode(persistedState.solvedByMode, totalProblemsSolved),
+    preferredGameMode: toGameModeChoice(persistedState.preferredGameMode),
+    preferredDifficulty: toDifficultyChoice(persistedState.preferredDifficulty),
     amberBalance:
       typeof persistedState.amberBalance === "number"
         ? toNonNegativeInteger(persistedState.amberBalance)
@@ -1097,7 +1319,7 @@ export default function Home() {
           const hydratedSession = hydrateLiveGameSessionState(
             remoteValidSnapshot.gameSession,
           );
-          setGameSession(hydratedSession);
+          setGameSession(withFreshActiveProblem(hydratedSession));
           setActiveRewardReveal(remoteValidSnapshot.activeRewardReveal);
 
           if (isLocalProfileBackupEnabled) {
@@ -1126,7 +1348,7 @@ export default function Home() {
           const hydratedSession = hydrateLiveGameSessionState(
             localValidSnapshot.gameSession,
           );
-          setGameSession(hydratedSession);
+          setGameSession(withFreshActiveProblem(hydratedSession));
           setActiveRewardReveal(localValidSnapshot.activeRewardReveal);
 
           if (remoteProfileReadError) {
@@ -1161,7 +1383,7 @@ export default function Home() {
           }
         } else {
           const freshSession = createFreshLiveGameSessionState();
-          setGameSession(freshSession);
+          setGameSession(withFreshActiveProblem(freshSession));
           setActiveRewardReveal({
             ...resolveNextRewardTarget(freshSession.unlockedRewards.length),
             initialStatus: "missing",
@@ -1584,23 +1806,27 @@ export default function Home() {
 
   const advanceToNextProblem = useCallback(() => {
     const currentState = gameSessionRef.current;
-    const nextTotalProblemsSolved = currentState.totalProblemsSolved + 1;
-    const { problem: nextProblem, steps: nextSteps } =
-      resolveNextLiveProblem(nextTotalProblemsSolved);
     const solvedWithoutErrors = !hadErrorInCurrentProblemRef.current;
+    const nextSolvedByMode = incrementSolvedByMode(currentState);
+    const next = resolveNextProblemAfterSolve(currentState);
 
     setGameSession({
-      activeProblem: nextProblem,
-      steps: nextSteps,
+      activeMode: next.mode,
+      activeProblem: next.problem,
+      steps: next.steps,
       sessionSolvedProblems: currentState.sessionSolvedProblems + 1,
       sessionAttemptedProblems: currentState.sessionAttemptedProblems + 1,
       currentStreak: solvedWithoutErrors
         ? currentState.currentStreak + 1
         : 0,
-      totalProblemsSolved: nextTotalProblemsSolved,
+      totalProblemsSolved: currentState.totalProblemsSolved + 1,
       totalProblemsAttempted: currentState.totalProblemsAttempted + 1,
+      solvedByMode: nextSolvedByMode,
+      preferredGameMode: currentState.preferredGameMode,
+      preferredDifficulty: currentState.preferredDifficulty,
       amberBalance:
-        currentState.amberBalance + AMBER_EARNED_PER_SOLVED_PROBLEM,
+        currentState.amberBalance +
+        AMBER_EARNED_BY_DIFFICULTY[currentState.preferredDifficulty],
       amberImagePath: currentState.amberImagePath,
       unlockedRewards: currentState.unlockedRewards,
       unlockedHybrids: currentState.unlockedHybrids,
@@ -1611,6 +1837,42 @@ export default function Home() {
       void requestAmberImageGeneration();
     }
   }, [requestAmberImageGeneration]);
+
+  const handleSelectGameMode = useCallback((nextGameMode: GameModeChoice) => {
+    const currentState = gameSessionRef.current;
+    if (currentState.preferredGameMode === nextGameMode) {
+      return;
+    }
+
+    const shouldSwapActiveProblem =
+      nextGameMode === "mixed" || currentState.activeMode !== nextGameMode;
+    const nextSession: LiveGameSessionState = {
+      ...currentState,
+      preferredGameMode: nextGameMode,
+    };
+
+    setGameSession(
+      shouldSwapActiveProblem ? withFreshActiveProblem(nextSession) : nextSession,
+    );
+    if (shouldSwapActiveProblem) {
+      setIsNextProblemReady(false);
+    }
+  }, []);
+
+  const handleSelectDifficulty = useCallback((nextDifficulty: DifficultyChoice) => {
+    const currentState = gameSessionRef.current;
+    if (currentState.preferredDifficulty === nextDifficulty) {
+      return;
+    }
+
+    setGameSession(
+      withFreshActiveProblem({
+        ...currentState,
+        preferredDifficulty: nextDifficulty,
+      }),
+    );
+    setIsNextProblemReady(false);
+  }, []);
 
   const handleTradeAmberForDinosaur = useCallback(() => {
     const currentState = gameSessionRef.current;
@@ -1759,9 +2021,14 @@ export default function Home() {
     [],
   );
 
-  const activeLaneLabel = formatActiveInputLane(
-    gameSession.steps[0] ? "quotient" : null,
-  );
+  const activeLaneLabel =
+    gameSession.activeMode === "multiplication"
+      ? gameSession.steps[0]
+        ? "partial product"
+        : "ready"
+      : formatActiveInputLane(gameSession.steps[0] ? "quotient" : null);
+  const activeModeLabel =
+    gameSession.activeMode === "multiplication" ? "Multiplication" : "Division";
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
@@ -1780,7 +2047,8 @@ export default function Home() {
                 InGen System Login
               </h1>
               <p className="research-center-subtitle">
-                Authenticate operator credentials to access the InGen Division Dashboard.
+                Authenticate operator credentials to access the InGen math sequencers:
+                long division and long multiplication.
               </p>
             </div>
 
@@ -1838,7 +2106,11 @@ export default function Home() {
       <div className="jurassic-content">
         <header className="jurassic-panel jurassic-hero motif-canopy">
           <p className="eyebrow">Dinosaur Genomic Sequencing Console</p>
-          <h1 className="hero-title">InGen Division Dashboard</h1>
+          <h1 className="hero-title">
+            {gameSession.activeMode === "multiplication"
+              ? "InGen Multiplication Dashboard"
+              : "InGen Division Dashboard"}
+          </h1>
         </header>
 
         <div className="jurassic-layout">
@@ -1851,22 +2123,80 @@ export default function Home() {
               <div>
                 <p className="surface-kicker">Game Workspace</p>
                 <h2 className="surface-title" id="game-surface-heading">
-                  DNA Division Sequencer
+                  {gameSession.activeMode === "multiplication"
+                    ? "DNA Multiplication Sequencer"
+                    : "DNA Division Sequencer"}
                 </h2>
               </div>
               <p className="status-chip">
-                Live target: {activeLaneLabel} | Player: {activePlayerName} | Solved:{" "}
-                {gameSession.totalProblemsSolved} | Amber: {gameSession.amberBalance}
+                Mode: {activeModeLabel} | Live target: {activeLaneLabel} | Player:{" "}
+                {activePlayerName} | Solved: {gameSession.totalProblemsSolved} | Amber:{" "}
+                {gameSession.amberBalance}
               </p>
             </div>
 
-            <LiveDivisionWorkspacePanel
-              key={gameSession.activeProblem.id}
-              dividend={gameSession.activeProblem.dividend}
-              divisor={gameSession.activeProblem.divisor}
-              onStepValidation={handleWorkspaceStepValidation}
-              steps={gameSession.steps}
-            />
+            <div className="mission-config" data-ui-surface="mission-config">
+              <div className="mission-config-group" role="group" aria-label="Sequencer mode">
+                <span className="mission-config-label">Sequencer Mode</span>
+                <div className="mode-toggle">
+                  {GAME_MODE_CHOICE_OPTIONS.map((option) => (
+                    <button
+                      className="mode-toggle-button"
+                      data-selected={
+                        gameSession.preferredGameMode === option.value ? "true" : "false"
+                      }
+                      data-ui-action={`select-mode-${option.value}`}
+                      key={option.value}
+                      onClick={() => handleSelectGameMode(option.value)}
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mission-config-group" role="group" aria-label="Difficulty">
+                <span className="mission-config-label">Difficulty</span>
+                <div className="mode-toggle">
+                  {DIFFICULTY_CHOICE_OPTIONS.map((option) => (
+                    <button
+                      className="mode-toggle-button"
+                      data-selected={
+                        gameSession.preferredDifficulty === option.value ? "true" : "false"
+                      }
+                      data-ui-action={`select-difficulty-${option.value}`}
+                      key={option.value}
+                      onClick={() => handleSelectDifficulty(option.value)}
+                      type="button"
+                    >
+                      {option.label}
+                      <span className="mode-toggle-points">
+                        +{AMBER_EARNED_BY_DIFFICULTY[option.value]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {gameSession.activeMode === "multiplication" &&
+            isMultiplicationProblem(gameSession.activeProblem) ? (
+              <LiveMultiplicationWorkspacePanel
+                key={gameSession.activeProblem.id}
+                multiplicand={gameSession.activeProblem.multiplicand}
+                multiplier={gameSession.activeProblem.multiplier}
+                onStepValidation={handleWorkspaceStepValidation}
+                steps={gameSession.steps as readonly LongMultiplicationStep[]}
+              />
+            ) : (
+              <LiveDivisionWorkspacePanel
+                key={gameSession.activeProblem.id}
+                dividend={(gameSession.activeProblem as DivisionProblem).dividend}
+                divisor={(gameSession.activeProblem as DivisionProblem).divisor}
+                onStepValidation={handleWorkspaceStepValidation}
+                steps={gameSession.steps as readonly LongDivisionStep[]}
+              />
+            )}
             {isNextProblemReady ? (
               <div className="next-problem-action-row">
                 <button
@@ -1911,7 +2241,8 @@ export default function Home() {
                 <div className="amber-bank-copy">
                   <p className="amber-bank-balance">Amber: {gameSession.amberBalance}</p>
                   <p className="amber-bank-note">
-                    Each solved problem adds +{AMBER_EARNED_PER_SOLVED_PROBLEM} amber.
+                    Amber per solve: Easy +{AMBER_EARNED_BY_DIFFICULTY.easy}, Medium +
+                    {AMBER_EARNED_BY_DIFFICULTY.medium}, Hard +{AMBER_EARNED_BY_DIFFICULTY.hard}.
                   </p>
                 </div>
               </section>

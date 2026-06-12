@@ -392,6 +392,78 @@ body {
   white-space: nowrap;
 }
 
+.mission-config {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 0.45rem;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 0.65rem 0.8rem;
+}
+
+.mission-config-group {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.mission-config-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: color-mix(in srgb, var(--jp-panel-text) 72%, transparent);
+}
+
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid rgba(211, 160, 58, 0.5);
+  border-radius: 0.45rem;
+  overflow: hidden;
+}
+
+.mode-toggle-button {
+  appearance: none;
+  border: none;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--jp-panel-text);
+  font-family: var(--font-jurassic-body), sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  padding: 0.42rem 0.8rem;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.mode-toggle-button + .mode-toggle-button {
+  border-left: 1px solid rgba(211, 160, 58, 0.35);
+}
+
+.mode-toggle-button:hover {
+  background: rgba(211, 160, 58, 0.16);
+}
+
+.mode-toggle-button:focus-visible {
+  outline: 2px solid rgba(188, 34, 34, 0.92);
+  outline-offset: -2px;
+}
+
+.mode-toggle-button[data-selected="true"] {
+  background: rgba(211, 160, 58, 0.3);
+  color: var(--jp-amber-bright);
+  box-shadow: inset 0 0 0.55rem rgba(211, 160, 58, 0.35);
+  text-shadow: 0 0 0.3rem rgba(244, 212, 141, 0.5);
+}
+
+.mode-toggle-points {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--jp-amber-bright);
+  opacity: 0.85;
+}
+
 .game-grid {
   margin-top: 1rem;
   display: grid;
@@ -850,6 +922,246 @@ body {
 
 .inline-entry-lock-in[data-entry-lock-pulse="bring-down"]::after {
   border-color: rgba(244, 212, 141, 0.72);
+}
+
+/* Long-multiplication notation (partial-product stack) */
+.mult-renderer {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.mult-notation {
+  --mult-column-count: 1;
+  --mult-cell-width: 2.2rem;
+  --mult-cell-gap: 0.45rem;
+  --mult-op-column-width: 1.1rem;
+  --mult-grid-width: calc(
+    (var(--mult-column-count) * var(--mult-cell-width)) +
+      ((var(--mult-column-count) - 1) * var(--mult-cell-gap))
+  );
+  display: grid;
+  gap: 0.56rem;
+  justify-content: start;
+}
+
+.mult-statement {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.mult-statement-row,
+.mult-work-row {
+  display: grid;
+  grid-template-columns: var(--mult-op-column-width) var(--mult-grid-width);
+  column-gap: 0.4rem;
+  align-items: center;
+  min-height: 1.52rem;
+}
+
+.mult-row-op {
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 1.04rem;
+  color: var(--jp-panel-text);
+  text-align: center;
+}
+
+.mult-digit-track {
+  display: grid;
+  grid-template-columns: repeat(var(--mult-column-count), minmax(0, var(--mult-cell-width)));
+  column-gap: var(--mult-cell-gap);
+  align-items: center;
+  width: var(--mult-grid-width);
+  min-height: 1.52rem;
+}
+
+.mult-static-digit {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 1ch;
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 1.04rem;
+  letter-spacing: 0.05em;
+  color: var(--jp-panel-text);
+}
+
+.mult-statement {
+  position: relative;
+}
+
+/* Overlaid above the multiplicand so appearing carries never shift the layout. */
+.mult-carry-row {
+  position: absolute;
+  top: -1.02rem;
+  left: 0;
+  width: 100%;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.mult-carry-row .mult-digit-track {
+  min-height: 0;
+  align-items: end;
+}
+
+.mult-work-rows {
+  position: relative;
+}
+
+/* Addition carries hover above the first partial-product row during the sum step. */
+.mult-sum-carry-row {
+  top: -0.92rem;
+  min-height: 0;
+}
+
+/* Borrow notation: strike the lending digit, float its reduced value at its
+   upper left (clear of the bracket bar), and prefix the borrowing digit with
+   a small "1". */
+.borrow-annotated-digit {
+  position: relative;
+}
+
+.borrow-strike-line {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 50%;
+  border-top: 0.1rem solid color-mix(in srgb, var(--jp-amber-bright) 82%, transparent);
+  transform: rotate(-14deg);
+  pointer-events: none;
+}
+
+.borrow-replacement-digit {
+  position: absolute;
+  top: -0.42em;
+  left: -0.5em;
+  font-size: 0.66em;
+  font-style: italic;
+  line-height: 1;
+  color: var(--jp-amber-bright);
+  text-shadow: 0 0 0.26rem rgba(244, 212, 141, 0.5);
+  animation: mult-carry-pop-in 220ms ease-out;
+  pointer-events: none;
+}
+
+/* Multiply-step carry floated above the divisor digit it rolls into. */
+.divisor-carry-digit {
+  position: absolute;
+  top: -0.72em;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6em;
+  font-style: italic;
+  line-height: 1;
+  color: var(--jp-amber-bright);
+  text-shadow: 0 0 0.26rem rgba(244, 212, 141, 0.5);
+  animation: mult-carry-pop-in 220ms ease-out;
+  pointer-events: none;
+}
+
+.borrow-received-one {
+  position: absolute;
+  top: -0.22em;
+  left: -0.5em;
+  font-size: 0.6em;
+  font-style: italic;
+  line-height: 1;
+  color: var(--jp-amber-bright);
+  text-shadow: 0 0 0.26rem rgba(244, 212, 141, 0.5);
+  animation: mult-carry-pop-in 220ms ease-out;
+  pointer-events: none;
+}
+
+.mult-carry-digit {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 1ch;
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  font-style: italic;
+  color: var(--jp-amber-bright);
+  text-shadow: 0 0 0.26rem rgba(244, 212, 141, 0.5);
+  animation: mult-carry-pop-in 220ms ease-out;
+}
+
+@keyframes mult-carry-pop-in {
+  from {
+    transform: translateY(0.24rem) scale(0.7);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.mult-multiplier-digit-active {
+  background: rgba(244, 212, 141, 0.16);
+  outline: 0.13rem solid rgba(244, 212, 141, 0.72);
+  outline-offset: 0.14rem;
+  border-radius: 0.4rem;
+}
+
+.mult-statement-rule .mult-digit-track {
+  position: relative;
+}
+
+.mult-statement-rule .mult-digit-track::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.3rem;
+  border-bottom: 0.12rem solid color-mix(in srgb, var(--jp-panel-text) 55%, transparent);
+  pointer-events: none;
+}
+
+.mult-work-rows {
+  /* Reserve headroom for the addition-carry overlay above the first row. */
+  margin-top: 0.95rem;
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.mult-work-row[data-step-kind="product-sum"] .mult-digit-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -0.22rem;
+  border-top: 0.12rem solid color-mix(in srgb, var(--jp-panel-text) 55%, transparent);
+  pointer-events: none;
+}
+
+.mult-work-row[data-step-kind="product-sum"] .mult-digit-track {
+  position: relative;
+}
+
+.mult-work-row .inline-entry[data-entry-auto="true"] {
+  color: color-mix(in srgb, var(--jp-panel-text) 62%, transparent);
+}
+
+.inline-entry-lock-in[data-entry-lock-pulse="partial-product"] {
+  animation-duration: 320ms;
+}
+
+.inline-entry-lock-in[data-entry-lock-pulse="product-sum"] {
+  animation-duration: 340ms;
+}
+
+.inline-entry-lock-in[data-entry-lock-pulse="product-sum"]::after {
+  border-color: rgba(244, 212, 141, 0.72);
+}
+
+.context-value-glow[data-step-focus-kind="partial-product"] {
+  --context-glow-duration: 1.4s;
+}
+
+.context-value-glow[data-step-focus-kind="product-sum"] {
+  --context-glow-duration: 1.6s;
 }
 
 @keyframes inline-entry-lock-in {

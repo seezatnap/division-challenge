@@ -9,3 +9,6 @@ export const workspaceUiModule: FeatureModuleDescriptor = {
 
 export * from "./bus-stop-long-division-renderer";
 export * from "./live-division-workspace-panel";
+export * from "./long-multiplication-renderer";
+export * from "./live-multiplication-workspace-panel";
+export * from "./ui-sound-effects";

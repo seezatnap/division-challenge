@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Alegreya_Sans, Cinzel, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
+import { UiSoundEffects } from "@/features/workspace-ui/components/ui-sound-effects";
+
 const jurassicDisplay = Cinzel({
   variable: "--font-jurassic-display",
   subsets: ["latin"],
@@ -22,7 +24,7 @@ const jurassicMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "InGen Division Dashboard",
-  description: "Jurassic-themed long-division practice game.",
+  description: "Jurassic-themed long-division and long-multiplication practice game.",
 };
 
 export default function RootLayout({
@@ -43,6 +45,7 @@ export default function RootLayout({
       <body
         className={`${jurassicDisplay.variable} ${jurassicBody.variable} ${jurassicMono.variable} antialiased`}
       >
+        <UiSoundEffects />
         <div className="jp3-frame" data-ui-frame="wood-border">
           <div className="jp3-frame-bolt jp3-frame-bolt--tl" aria-hidden="true" />
           <div className="jp3-frame-bolt jp3-frame-bolt--tr" aria-hidden="true" />

@@ -296,3 +296,57 @@ test("home page wires dino coach guidance to the active step context", async () 
     assert.ok(source.includes(fragment), `Expected feedback wiring fragment: ${fragment}`);
   }
 });
+
+test("computeSubtractionBorrowMarks reports lenders, cascades, and reveal timing", async () => {
+  const { computeSubtractionBorrowMarks } = await busStopRenderModelModule;
+
+  // 615 - 342: tens (1) borrows from hundreds (6 -> 5) while working the tens digit.
+  assert.deepEqual(computeSubtractionBorrowMarks(615, 342), [
+    {
+      positionFromRight: 2,
+      replacementDigitText: "5",
+      revealAtTypedDigitCount: 1,
+      alsoBorrowsFromNextPlace: false,
+    },
+  ]);
+
+  // 405 - 218: ones borrows through the zero (0 -> 9), then tens borrows (4 -> 3).
+  // The zero's replacement (9) already folds its own borrow in, so no teen value.
+  assert.deepEqual(computeSubtractionBorrowMarks(405, 218), [
+    {
+      positionFromRight: 1,
+      replacementDigitText: "9",
+      revealAtTypedDigitCount: 0,
+      alsoBorrowsFromNextPlace: false,
+    },
+    {
+      positionFromRight: 2,
+      replacementDigitText: "3",
+      revealAtTypedDigitCount: 1,
+      alsoBorrowsFromNextPlace: false,
+    },
+  ]);
+
+  // 580 - 387: the 8 lends to the ones (-> 7), then itself borrows from the 5,
+  // so its replacement becomes 17 once the tens borrow is revealed.
+  assert.deepEqual(computeSubtractionBorrowMarks(580, 387), [
+    {
+      positionFromRight: 1,
+      replacementDigitText: "7",
+      revealAtTypedDigitCount: 0,
+      alsoBorrowsFromNextPlace: true,
+    },
+    {
+      positionFromRight: 2,
+      replacementDigitText: "4",
+      revealAtTypedDigitCount: 1,
+      alsoBorrowsFromNextPlace: false,
+    },
+  ]);
+
+  // No borrowing needed.
+  assert.deepEqual(computeSubtractionBorrowMarks(38, 36), []);
+
+  // Invalid input (would go negative) yields no marks.
+  assert.deepEqual(computeSubtractionBorrowMarks(5, 9), []);
+});

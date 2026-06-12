@@ -256,6 +256,73 @@ function buildActiveStepFocusByStepId({
   return focusByStepId;
 }
 
+export interface SubtractionBorrowMark {
+  /** Minuend digit position from the right (ones = 0) that lends to the place below it. */
+  positionFromRight: number;
+  /** The reduced digit shown above the struck-through original. */
+  replacementDigitText: string;
+  /** The mark appears once this many result digits have been typed. */
+  revealAtTypedDigitCount: number;
+  /**
+   * True when this place later borrows from the place above it, so its
+   * replacement gains a leading "1" (e.g. 8 lends to become 7, then borrows
+   * to become 17) once that later borrow is revealed. Stays false for
+   * cascade zeros, whose replacement (9) already folds the borrow in.
+   */
+  alsoBorrowsFromNextPlace: boolean;
+}
+
+/**
+ * Walks a hand-worked subtraction right-to-left and reports every place that
+ * lends to the place below it, including cascades through zeros.
+ */
+export function computeSubtractionBorrowMarks(
+  minuendValue: number,
+  subtrahendValue: number,
+): readonly SubtractionBorrowMark[] {
+  if (
+    !Number.isInteger(minuendValue) ||
+    !Number.isInteger(subtrahendValue) ||
+    subtrahendValue < 0 ||
+    subtrahendValue > minuendValue
+  ) {
+    return [];
+  }
+
+  const minuendDigits = Array.from(String(minuendValue)).reverse().map(Number);
+  const subtrahendDigits = Array.from(String(subtrahendValue)).reverse().map(Number);
+  const marks: SubtractionBorrowMark[] = [];
+  let borrow = 0;
+
+  for (let position = 0; position < minuendDigits.length; position += 1) {
+    const workingDigit = minuendDigits[position] - borrow;
+    const subtrahendDigit = subtrahendDigits[position] ?? 0;
+
+    if (workingDigit < subtrahendDigit) {
+      borrow = 1;
+      const lenderDigit = minuendDigits[position + 1] ?? 0;
+      marks.push({
+        positionFromRight: position + 1,
+        replacementDigitText: String((lenderDigit - 1 + 10) % 10),
+        revealAtTypedDigitCount: position,
+        alsoBorrowsFromNextPlace: false,
+      });
+    } else {
+      borrow = 0;
+    }
+  }
+
+  for (const mark of marks) {
+    mark.alsoBorrowsFromNextPlace =
+      mark.replacementDigitText !== "9" &&
+      marks.some(
+        (laterMark) => laterMark.revealAtTypedDigitCount === mark.positionFromRight,
+      );
+  }
+
+  return marks;
+}
+
 export function resolveSingleActiveCellGlowState(
   steps: readonly LongDivisionStep[],
   revealedStepCount?: number,

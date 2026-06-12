@@ -1,4 +1,4 @@
-import type { LongDivisionStep } from "@/features/contracts";
+import type { WorkspaceStep } from "@/features/contracts";
 import type {
   LongDivisionStepValidationRequest,
   LongDivisionStepValidationResult,
@@ -19,7 +19,7 @@ export interface CreateLiveWorkspaceTypingStateInput {
 }
 
 export interface ResolveInlineWorkspaceEntryValueInput {
-  stepId: LongDivisionStep["id"];
+  stepId: WorkspaceStep["id"];
   lockedValue: string;
   isFilled: boolean;
   draftEntryValues: WorkspaceDraftEntryValues;
@@ -30,15 +30,15 @@ export type LiveWorkspaceStepValidator = (
 ) => LongDivisionStepValidationResult;
 
 export interface ApplyLiveWorkspaceEntryInputRequest {
-  steps: readonly LongDivisionStep[];
+  steps: readonly WorkspaceStep[];
   state: LiveWorkspaceTypingState;
-  stepId: LongDivisionStep["id"];
+  stepId: WorkspaceStep["id"];
   rawValue: string;
   validateStep: LiveWorkspaceStepValidator;
 }
 
 export interface TryAutoAdvanceBringDownStepRequest {
-  steps: readonly LongDivisionStep[];
+  steps: readonly WorkspaceStep[];
   state: LiveWorkspaceTypingState;
   validateStep: LiveWorkspaceStepValidator;
 }
@@ -47,7 +47,7 @@ export interface LiveWorkspaceEntryInputTransition {
   state: LiveWorkspaceTypingState;
   sanitizedValue: string;
   validation: LongDivisionStepValidationResult | null;
-  lockedStepId: LongDivisionStep["id"] | null;
+  lockedStepId: WorkspaceStep["id"] | null;
   didAdvance: boolean;
 }
 
@@ -69,7 +69,7 @@ function clampRevealedStepCount(stepCount: number, revealedStepCount?: number): 
   return Math.min(Math.max(Math.trunc(revealedStepCount), 0), stepCount);
 }
 
-function resolveStepIndexById(steps: readonly LongDivisionStep[], stepId: string): number {
+function resolveStepIndexById(steps: readonly WorkspaceStep[], stepId: string): number {
   const stepIndex = steps.findIndex((step) => step.id === stepId);
 
   if (stepIndex < 0) {
@@ -79,7 +79,7 @@ function resolveStepIndexById(steps: readonly LongDivisionStep[], stepId: string
   return stepIndex;
 }
 
-function resolveExpectedDigitCount(step: LongDivisionStep): number {
+function resolveExpectedDigitCount(step: WorkspaceStep): number {
   const expectedDigits = sanitizeInlineWorkspaceEntryValue(step.expectedValue);
   return Math.max(expectedDigits.length, 1);
 }

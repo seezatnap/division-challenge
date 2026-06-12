@@ -60,9 +60,22 @@ npm run db:reward-cache:delete -- "Tyrannosaurus Rex"
 The v2 foundation includes these feature domains under `src/features/`:
 
 - `division-engine`
+- `multiplication-engine`
 - `workspace-ui`
 - `rewards`
 - `gallery`
 - `persistence`
+
+## Game Modes & Difficulty
+
+The mission config bar (above the workspace) lets the player choose:
+
+- **Sequencer Mode**: Division, Multiplication, or Mixed Ops (alternates randomly per problem).
+- **Difficulty**: Easy (+1 amber per solve), Medium (+2), or Hard (+4). Unlocking a dinosaur
+  costs 10 amber; creating a hybrid costs 4 amber.
+
+Multiplication problems use the standard partial-product stack: one row per multiplier digit
+(typed right-to-left, ones place first, with place-holder zeros auto-filled), then a final
+sum row for multi-digit multipliers.
 
 Each feature has a typed entrypoint (`index.ts`) and subfolders to support incremental implementation in later tasks.

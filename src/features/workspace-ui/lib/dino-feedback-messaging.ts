@@ -75,6 +75,26 @@ const FEEDBACK_TEMPLATE_BY_MESSAGE_KEY: Record<string, DinoFeedbackTemplate> = {
     text: "Not yet, explorer. Bring down the next dividend digit.",
     note: "Drop the next digit beside the remainder to build the next working value.",
   },
+  "dino.feedback.correct.partial-product": {
+    statusLabel: "Partial Product Locked",
+    text: "Roarsome! That partial product row is dino-accurate.",
+    note: "Follow the amber glow to the next row of the stack.",
+  },
+  "dino.feedback.correct.product-sum": {
+    statusLabel: "Herd Math Complete",
+    text: "Mighty sum! The partial products stacked up perfectly.",
+    note: "The final product is locked in. Queue the next challenge.",
+  },
+  "dino.feedback.retry.partial-product": {
+    statusLabel: "Retry The Partial Product",
+    text: "The raptor snapped at that row. Multiply digit by digit and mind the carries.",
+    note: "Multiply the top number by the glowing multiplier digit, right to left.",
+  },
+  "dino.feedback.retry.product-sum": {
+    statusLabel: "Retry The Sum",
+    text: "Tiny fossil slip in the addition. Re-add the partial product rows.",
+    note: "Add each column from the right and carry into the next place.",
+  },
   "dino.feedback.complete.problem": {
     statusLabel: "Console Sequence Complete",
     text: "Trail computation complete. Run log marked VERIFIED.",
