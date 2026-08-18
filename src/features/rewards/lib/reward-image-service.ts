@@ -41,12 +41,16 @@ export interface RewardImageGenerationRequest {
   dossierPromptBlock?: string;
 }
 
+/** Where an image came from; recorded alongside every stored image. */
+export type RewardImageSource = "openai" | "fallback-svg" | "filesystem-migration" | "unknown";
+
 export interface GeneratedRewardImage {
   dinosaurName: string;
   prompt: string;
   model: string;
   mimeType: string;
   imageBase64: string;
+  source?: RewardImageSource;
 }
 
 export interface RewardImageApiErrorResponseBody {

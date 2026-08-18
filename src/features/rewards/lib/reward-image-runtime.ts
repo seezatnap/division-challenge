@@ -1,6 +1,6 @@
 import { isAmberRewardAssetName } from "./dino-dossiers";
 import { createFallbackRewardImage } from "./fallback-reward-image";
-import { resolveRewardImageWithFilesystemCache } from "./reward-image-cache";
+import { resolveRewardImageWithCache } from "./reward-image-cache";
 import { createOpenAiImageRequestConfig, createOpenAiTextRequestConfig } from "./openai";
 import {
   generateOpenAiDinosaurImage,
@@ -107,15 +107,16 @@ export async function generateRewardImage(
 ): Promise<GeneratedRewardImage> {
   const request = parseRewardImageGenerationRequest(payload);
 
-  return resolveRewardImageWithFilesystemCache(request, async (parsedRequest) => {
+  return resolveRewardImageWithCache(request, async (parsedRequest) => {
     try {
-      return await generateRewardImageFromDescription(parsedRequest, dependencies);
+      const generatedImage = await generateRewardImageFromDescription(parsedRequest, dependencies);
+      return { ...generatedImage, source: "openai" };
     } catch (error) {
       if (!shouldUseFallbackRewardImage(error)) {
         throw error;
       }
 
-      return createFallbackRewardImage(parsedRequest.dinosaurName);
+      return { ...createFallbackRewardImage(parsedRequest.dinosaurName), source: "fallback-svg" };
     }
   });
 }

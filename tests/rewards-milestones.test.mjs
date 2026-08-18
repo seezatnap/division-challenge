@@ -37,14 +37,14 @@ async function loadRewardMilestonesModule() {
   const dinosaursModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/dinosaurs.ts",
   );
-  const imageCacheModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/reward-image-cache.ts",
+  const imageSlugModuleUrl = await transpileTypeScriptToDataUrl(
+    "src/features/rewards/lib/reward-image-slug.ts",
   );
   const milestonesModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/milestones.ts",
     {
       "./dinosaurs": dinosaursModuleUrl,
-      "./reward-image-cache": imageCacheModuleUrl,
+      "./reward-image-slug": imageSlugModuleUrl,
     },
   );
 

@@ -12,3 +12,4 @@ export * from "./prefetch";
 export * from "./earned-reward-reveal";
 export * from "./dino-dossiers";
 export * from "./openai-dossier-service";
+export * from "./reward-image-slug";

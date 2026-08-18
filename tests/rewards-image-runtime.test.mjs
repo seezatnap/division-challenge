@@ -9,12 +9,12 @@ import {
 } from "./helpers/rewards-module-loader.mjs";
 
 /**
- * Loads the runtime with the filesystem cache stubbed out: the cache simply
+ * Loads the runtime with the reward image cache stubbed out: the cache simply
  * invokes the supplied generator so the two-stage pipeline can be observed.
  */
 const runtimeModule = loadRewardsOpenAiModuleUrls().then(async (urls) => {
   const cacheStubUrl = toDataUrl(`
-    export async function resolveRewardImageWithFilesystemCache(request, generate) {
+    export async function resolveRewardImageWithCache(request, generate) {
       return await generate(request);
     }
   `);
@@ -102,6 +102,7 @@ test("generateRewardImage asks Luna for the exact description, then renders it w
   );
   assert.equal(result.imageBase64, "YWJjZA==");
   assert.equal(result.model, "gpt-image-2");
+  assert.equal(result.source, "openai");
   assert.equal(result.prompt, calls[1].body.prompt);
 });
 
@@ -185,6 +186,7 @@ test("generateRewardImage falls back to the local SVG when the image provider fa
   assert.equal(result.dinosaurName, "Compsognathus");
   assert.equal(result.mimeType, "image/svg+xml");
   assert.equal(result.model, "local-fallback-svg");
+  assert.equal(result.source, "fallback-svg");
 
   await assert.rejects(
     runtime.generateRewardImage({ dinosaurName: "   " }, createDependencies({

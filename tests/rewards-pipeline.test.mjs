@@ -1,71 +1,25 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
-import ts from "typescript";
+import { loadTypeScriptModule } from "../scripts/lib/load-typescript-module.mjs";
 
-const testDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(testDir, "..");
-
-function toDataUrl(source) {
-  return `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-}
-
-async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
-  const absolutePath = path.join(repoRoot, relativePath);
-  const source = await readFile(absolutePath, "utf8");
-
-  let compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      target: ts.ScriptTarget.ES2022,
-    },
-    fileName: absolutePath,
-  }).outputText;
-
-  for (const [specifier, replacement] of Object.entries(replacements)) {
-    compiled = compiled.replaceAll(`from "${specifier}"`, `from "${replacement}"`);
-    compiled = compiled.replaceAll(`from '${specifier}'`, `from "${replacement}"`);
-  }
-
-  return toDataUrl(compiled);
-}
+// Isolate the database used by this test file (the modules read the URL when
+// the first query runs, so it must be set before any cache call).
+const databaseDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-pipeline-db-"));
+process.env.TURSO_DATABASE_URL = `file:${path.join(databaseDirectory, "pipeline.sqlite3")}`;
 
 async function loadRewardPipelineModules() {
-  const dinosaursModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/dinosaurs.ts",
-  );
-  const imageCacheModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/reward-image-cache.ts",
-  );
-  const milestonesModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/milestones.ts",
-    {
-      "./dinosaurs": dinosaursModuleUrl,
-      "./reward-image-cache": imageCacheModuleUrl,
-    },
-  );
-  const prefetchModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/prefetch.ts",
-    {
-      "./dinosaurs": dinosaursModuleUrl,
-      "./reward-image-cache": imageCacheModuleUrl,
-    },
-  );
-  const revealModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/earned-reward-reveal.ts",
-  );
-
-  const [dinosaurs, rewardImageCache, milestones, prefetch, earnedRewardReveal] =
+  const [dinosaurs, rewardImageCache, milestones, prefetch, earnedRewardReveal, objectStorage] =
     await Promise.all([
-      import(dinosaursModuleUrl),
-      import(imageCacheModuleUrl),
-      import(milestonesModuleUrl),
-      import(prefetchModuleUrl),
-      import(revealModuleUrl),
+      loadTypeScriptModule("src/features/rewards/lib/dinosaurs.ts"),
+      loadTypeScriptModule("src/features/rewards/lib/reward-image-cache.ts"),
+      loadTypeScriptModule("src/features/rewards/lib/milestones.ts"),
+      loadTypeScriptModule("src/features/rewards/lib/prefetch.ts"),
+      loadTypeScriptModule("src/features/rewards/lib/earned-reward-reveal.ts"),
+      loadTypeScriptModule("src/features/persistence/lib/object-storage.ts"),
     ]);
 
   return {
@@ -74,6 +28,7 @@ async function loadRewardPipelineModules() {
     milestones,
     prefetch,
     earnedRewardReveal,
+    objectStorage,
   };
 }
 
@@ -118,9 +73,9 @@ test("reward milestones trigger at 5-solve boundaries with deterministic dinosau
 });
 
 test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight calls", async () => {
-  const { prefetch, rewardImageCache } = await rewardPipelineModules;
+  const { prefetch, rewardImageCache, objectStorage } = await rewardPipelineModules;
 
-  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-pipeline-"));
+  const storage = objectStorage.createInMemoryRewardImageStorage();
   let generatorInvocationCount = 0;
   let releaseGenerationGate = () => {};
   let markGenerationStarted = () => {};
@@ -141,14 +96,14 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
   const skippedResult = await prefetch.triggerNearMilestoneRewardPrefetch({
     totalProblemsSolved: 1,
     generateImage,
-    cacheOptions: { outputDirectory: cacheDirectory },
+    cacheOptions: { storage },
   });
   assert.equal(skippedResult.status, "skipped-not-near-milestone");
 
   const startedResult = await prefetch.triggerNearMilestoneRewardPrefetch({
     totalProblemsSolved: 2,
     generateImage,
-    cacheOptions: { outputDirectory: cacheDirectory },
+    cacheOptions: { storage },
   });
   assert.equal(startedResult.status, "prefetch-started");
   assert.equal(startedResult.target.dinosaurName, "Tyrannosaurus Rex");
@@ -157,14 +112,14 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
   const dedupedResult = await prefetch.triggerNearMilestoneRewardPrefetch({
     totalProblemsSolved: 3,
     generateImage,
-    cacheOptions: { outputDirectory: cacheDirectory },
+    cacheOptions: { storage },
   });
   assert.equal(dedupedResult.status, "prefetch-already-in-flight");
   assert.equal(dedupedResult.target.dinosaurName, "Tyrannosaurus Rex");
 
   const generatingStatus = await rewardImageCache.getRewardImageGenerationStatus(
     "Tyrannosaurus Rex",
-    { outputDirectory: cacheDirectory },
+    { storage },
   );
   assert.deepEqual(generatingStatus, {
     dinosaurName: "Tyrannosaurus Rex",
@@ -173,17 +128,17 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
   });
 
   releaseGenerationGate();
-  await rewardImageCache.resolveRewardImageWithFilesystemCache(
+  await rewardImageCache.resolveRewardImageWithCache(
     { dinosaurName: "Tyrannosaurus Rex" },
     async () => {
       assert.fail("existing in-flight prefetch should satisfy resolve without another generator call");
     },
-    { outputDirectory: cacheDirectory },
+    { storage },
   );
 
   const readyStatus = await rewardImageCache.getRewardImageGenerationStatus(
     "Tyrannosaurus Rex",
-    { outputDirectory: cacheDirectory },
+    { storage },
   );
   assert.equal(readyStatus.dinosaurName, "Tyrannosaurus Rex");
   assert.equal(readyStatus.status, "ready");
@@ -196,9 +151,13 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
 });
 
 test("earned reward reveal polling waits for in-flight prefetched generation and reveals the deterministic reward image", async () => {
-  const { milestones, prefetch, rewardImageCache, earnedRewardReveal } = await rewardPipelineModules;
+  const { milestones, prefetch, rewardImageCache, earnedRewardReveal, objectStorage } =
+    await rewardPipelineModules;
 
-  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-pipeline-"));
+  const storage = objectStorage.createInMemoryRewardImageStorage();
+  // The database is shared across this file's tests; start from a clean slate
+  // for the deterministic first reward.
+  await rewardImageCache.deleteRewardImageCacheEntry("Tyrannosaurus Rex", { storage });
   let releaseGenerationGate = () => {};
   let markGenerationStarted = () => {};
   const generationGate = new Promise((resolve) => {
@@ -217,7 +176,7 @@ test("earned reward reveal polling waits for in-flight prefetched generation and
   const prefetchResult = await prefetch.triggerNearMilestoneRewardPrefetch({
     totalProblemsSolved: 2,
     generateImage,
-    cacheOptions: { outputDirectory: cacheDirectory },
+    cacheOptions: { storage },
   });
   assert.equal(prefetchResult.status, "prefetch-started");
   await generationStarted;
@@ -237,19 +196,17 @@ test("earned reward reveal polling waits for in-flight prefetched generation and
     pollIntervalMs: 5,
     maxPollAttempts: 3,
     pollStatus: (dinosaurName) =>
-      rewardImageCache.getRewardImageGenerationStatus(dinosaurName, {
-        outputDirectory: cacheDirectory,
-      }),
+      rewardImageCache.getRewardImageGenerationStatus(dinosaurName, { storage }),
     wait: async () => {
       waitInvocationCount += 1;
       if (waitInvocationCount === 1) {
         releaseGenerationGate();
-        await rewardImageCache.resolveRewardImageWithFilesystemCache(
+        await rewardImageCache.resolveRewardImageWithCache(
           { dinosaurName: earnedReward.dinosaurName },
           async () => {
             assert.fail("polling flow should reuse in-flight prefetch instead of generating a duplicate image");
           },
-          { outputDirectory: cacheDirectory },
+          { storage },
         );
       }
     },

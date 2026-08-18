@@ -40,10 +40,10 @@ node --test tests/player-journey-smoke.test.mjs
 
 ## Storage behavior (summary)
 
-- Server-side reward cache metadata/status is stored in sqlite at `<repo-root>/.sqlite/<dbfile>` (default: `.sqlite/division-challenge.sqlite3`).
-- Set `SQLITE_DB_FILE` to override the sqlite filename under `.sqlite/`.
-- Reward image cache writes generated files to `public/rewards/` with deterministic slug names and metadata sidecars.
-- Player profiles (for example, amber balance/progress) are persisted to shared sqlite via `/api/player-profiles`, so the same player name can load across browsers on the same app instance.
+- Server-side state (a record of every reward image ever generated, generation status, player profiles) lives in one libsql database: Turso when `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` are set, otherwise a local SQLite file at `<repo-root>/.sqlite/division-challenge.sqlite3` (`SQLITE_DB_FILE` overrides the name).
+- Reward image binaries are uploaded to Cloudflare R2 (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`; optional `R2_PUBLIC_BASE_URL` to serve them straight from R2). Without R2 configured they are kept under `.reward-images/` for local development.
+- `npm run db:migrate:rewards` moves images/profiles from the old `public/rewards/` + local sqlite layout into R2/Turso; see `docs/developer-runbook.md` §3.
+- Player profiles (for example, amber balance/progress) are persisted to the shared database via `/api/player-profiles`, so the same player name can load across browsers.
 - Browser `localStorage` is still written as a backup/migration source.
 - Save/load prefers File System Access API when available and uses player-named JSON files (for example, `rex-save.json`).
 - If File System Access API is unavailable, save/load falls back to JSON export/import with the same schema validation rules.

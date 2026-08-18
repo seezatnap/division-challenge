@@ -1,22 +1,46 @@
-import { existsSync, mkdirSync } from "node:fs";
-import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import path from "node:path";
+/**
+ * Reward image cache: binaries live in object storage (Cloudflare R2), and the
+ * database keeps a row for every image ever created (`reward_images`) plus the
+ * current image / generation status per reward slug (`reward_image_states`).
+ * In-flight generation is tracked in memory so concurrent requests for the
+ * same reward share one render.
+ */
+
+import { createHash, randomUUID } from "node:crypto";
+
+import {
+  executeDatabaseBatch,
+  executeDatabaseStatement,
+  getDatabaseLocation,
+  type DatabaseLocationSnapshot,
+  type DatabaseRow,
+} from "@/features/persistence/lib/database";
+import {
+  getDefaultRewardImageStorage,
+  type RewardImageStorage,
+} from "@/features/persistence/lib/object-storage";
 
 import type {
   GeneratedRewardImage,
   RewardImageGenerationRequest,
+  RewardImageSource,
 } from "./reward-image-service";
+import {
+  REWARD_IMAGE_EXTENSIONS,
+  parseRewardImageFileName,
+  toRewardImageCacheSlug,
+  type RewardImageExtension,
+} from "./reward-image-slug";
 
-const DEFAULT_REWARD_IMAGE_DIRECTORY = path.join(process.cwd(), "public", "rewards");
-const CACHE_METADATA_SUFFIX = ".metadata.json";
-const DEFAULT_CACHE_MODEL = "filesystem-cache";
-const SQLITE_DIRECTORY_NAME = ".sqlite";
-const DEFAULT_SQLITE_DATABASE_FILE = "division-challenge.sqlite3";
+const DEFAULT_CACHE_MODEL = "unknown-model";
+/** A persisted "generating" flag older than this is considered abandoned. */
+const GENERATING_STATUS_TTL_MS = 5 * 60 * 1000;
 const inFlightRewardImageGenerations = new Map<string, Promise<GeneratedRewardImage>>();
 
-const SUPPORTED_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "svg"] as const;
-type SupportedImageExtension = (typeof SUPPORTED_IMAGE_EXTENSIONS)[number];
+const SUPPORTED_IMAGE_EXTENSIONS = REWARD_IMAGE_EXTENSIONS;
+export type SupportedImageExtension = RewardImageExtension;
+
+export { parseRewardImageFileName, toRewardImageCacheSlug };
 
 const MIME_TYPE_BY_EXTENSION: Readonly<Record<SupportedImageExtension, string>> = {
   png: "image/png",
@@ -36,24 +60,39 @@ const MIME_TYPE_TO_EXTENSION: Readonly<Record<string, SupportedImageExtension>> 
   "image/svg+xml": "svg",
 };
 
-interface RewardImageCacheMetadata {
+export type RewardImageGenerationStatus = "ready" | "generating" | "missing";
+
+export type { RewardImageSource } from "./reward-image-service";
+
+export interface RewardImageCacheOptions {
+  /** Object storage backend; defaults to R2 (or the local fallback) from the environment. */
+  storage?: RewardImageStorage;
+}
+
+export interface PersistRewardImageOptions extends RewardImageCacheOptions {
+  /** Creation timestamp override (used by migrations to keep original times). */
+  createdAtMs?: number;
+  /** Source override; otherwise inferred from the image envelope. */
+  source?: RewardImageSource;
+}
+
+/** One row of `reward_images`: an image that was created and uploaded. */
+export interface RewardImageRecord {
+  id: string;
+  slug: string;
   dinosaurName: string;
   prompt: string;
   model: string;
   mimeType: string;
-}
-
-export interface FilesystemRewardImageCacheOptions {
-  outputDirectory?: string;
-}
-
-export interface CachedRewardImageFile {
-  absolutePath: string;
   extension: SupportedImageExtension;
-  modifiedTimeMs: number;
+  storageKey: string;
+  byteSize: number;
+  sha256: string;
+  source: RewardImageSource;
+  createdAtMs: number;
+  /** URL the browser should load: R2 public URL when configured, else the app proxy path. */
+  imagePath: string;
 }
-
-export type RewardImageGenerationStatus = "ready" | "generating" | "missing";
 
 export interface RewardImageGenerationStatusSnapshot {
   dinosaurName: string;
@@ -66,36 +105,32 @@ export type RewardImagePrefetchStatus =
   | "already-in-flight"
   | "started";
 
-export interface RewardCacheDatabaseLocationSnapshot {
-  projectRoot: string;
-  sqliteDirectory: string;
-  databaseFile: string;
-  databasePath: string;
-}
+export type RewardCacheDatabaseLocationSnapshot = DatabaseLocationSnapshot;
 
+/** Current state of one reward slug joined with its live image (if any). */
 export interface RewardImageCacheDatabaseRecord {
   slug: string;
   dinosaurName: string;
-  prompt: string;
-  model: string;
-  mimeType: string;
-  extension: SupportedImageExtension;
-  absoluteImagePath: string;
-  imagePath: string | null;
-  updatedAtMs: number;
   status: RewardImageGenerationStatus;
   statusUpdatedAtMs: number;
+  imageId: string | null;
+  prompt: string | null;
+  model: string | null;
+  mimeType: string | null;
+  extension: SupportedImageExtension | null;
+  storageKey: string | null;
+  byteSize: number | null;
+  sha256: string | null;
+  source: RewardImageSource | null;
+  imagePath: string | null;
+  updatedAtMs: number;
 }
 
 export interface DeleteRewardImageCacheEntryResult {
   dinosaurName: string;
   deletedDatabaseRecord: boolean;
-}
-
-type JsonObject = Record<string, unknown>;
-
-function isRecord(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null;
+  deletedImageCount: number;
+  deletedStorageKeys: readonly string[];
 }
 
 function getTrimmedNonEmptyString(value: unknown): string | null {
@@ -108,11 +143,12 @@ function getTrimmedNonEmptyString(value: unknown): string | null {
 }
 
 function toNonNegativeInteger(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  const numericValue = typeof value === "bigint" ? Number(value) : value;
+  if (typeof numericValue !== "number" || !Number.isFinite(numericValue)) {
     return null;
   }
 
-  return Math.max(0, Math.floor(value));
+  return Math.max(0, Math.floor(numericValue));
 }
 
 function normalizeDinosaurName(dinosaurName: string): string {
@@ -125,120 +161,31 @@ function normalizeDinosaurName(dinosaurName: string): string {
   return normalizedName;
 }
 
-function resolveOutputDirectory(options: FilesystemRewardImageCacheOptions): string {
-  const configuredOutputDirectory = getTrimmedNonEmptyString(options.outputDirectory);
-  return configuredOutputDirectory ?? DEFAULT_REWARD_IMAGE_DIRECTORY;
+function resolveStorage(options: RewardImageCacheOptions): RewardImageStorage {
+  return options.storage ?? getDefaultRewardImageStorage();
 }
 
 function toInFlightRewardImageGenerationKey(
   dinosaurName: string,
-  options: FilesystemRewardImageCacheOptions,
+  storage: RewardImageStorage,
 ): string {
-  const slug = toRewardImageCacheSlug(dinosaurName);
-  const outputDirectory = path.resolve(resolveOutputDirectory(options));
-  return `${outputDirectory}:${slug}`;
-}
-
-function isNotFoundError(error: unknown): boolean {
-  return isRecord(error) && error.code === "ENOENT";
-}
-
-function resolveGitProjectRootDirectory(startDirectory: string = process.cwd()): string {
-  let currentDirectory = path.resolve(startDirectory);
-
-  while (true) {
-    if (existsSync(path.join(currentDirectory, ".git"))) {
-      return currentDirectory;
-    }
-
-    const parentDirectory = path.dirname(currentDirectory);
-    if (parentDirectory === currentDirectory) {
-      return path.resolve(startDirectory);
-    }
-
-    currentDirectory = parentDirectory;
-  }
-}
-
-function resolveSqliteDatabaseFileName(): string {
-  return (
-    getTrimmedNonEmptyString(process.env.SQLITE_DB_FILE) ??
-    getTrimmedNonEmptyString(process.env.REWARD_CACHE_DB_FILE) ??
-    DEFAULT_SQLITE_DATABASE_FILE
-  );
+  return `${storage.id}:${toRewardImageCacheSlug(dinosaurName)}`;
 }
 
 export function getRewardCacheDatabaseLocation(): RewardCacheDatabaseLocationSnapshot {
-  const projectRoot = resolveGitProjectRootDirectory();
-  const sqliteDirectory = path.join(projectRoot, SQLITE_DIRECTORY_NAME);
-  const databaseFile = resolveSqliteDatabaseFileName();
-
-  return {
-    projectRoot,
-    sqliteDirectory,
-    databaseFile,
-    databasePath: path.join(sqliteDirectory, databaseFile),
-  };
+  return getDatabaseLocation();
 }
 
-function getCacheMetadataPath(absoluteImagePath: string): string {
-  return `${absoluteImagePath}${CACHE_METADATA_SUFFIX}`;
-}
-
-function toRewardImagePublicPath(
-  dinosaurName: string,
-  extension: SupportedImageExtension,
-  modifiedTimeMs?: number,
-): string {
-  const baseImagePath = `/rewards/${toRewardImageCacheSlug(dinosaurName)}.${extension}`;
-  if (typeof modifiedTimeMs !== "number" || Number.isNaN(modifiedTimeMs)) {
-    return baseImagePath;
-  }
-
-  return `${baseImagePath}?v=${Math.max(0, Math.floor(modifiedTimeMs))}`;
-}
-
-function getMimeTypeForExtension(extension: SupportedImageExtension): string {
+export function getMimeTypeForExtension(extension: SupportedImageExtension): string {
   return MIME_TYPE_BY_EXTENSION[extension];
 }
 
-function getExtensionForMimeType(mimeType: string): SupportedImageExtension {
+export function getExtensionForMimeType(mimeType: string): SupportedImageExtension {
   const normalizedMimeType = getTrimmedNonEmptyString(mimeType)?.toLowerCase() ?? "";
   return MIME_TYPE_TO_EXTENSION[normalizedMimeType] ?? "png";
 }
 
-function toFallbackCachedPrompt(dinosaurName: string): string {
-  return `Cached dinosaur reward image for ${dinosaurName}.`;
-}
-
-function readMetadataString(value: unknown, fallback: string): string {
-  return getTrimmedNonEmptyString(value) ?? fallback;
-}
-
-function asRewardImageCacheMetadata(
-  parsedValue: unknown,
-  dinosaurName: string,
-  mimeType: string,
-): RewardImageCacheMetadata {
-  if (!isRecord(parsedValue)) {
-    return {
-      dinosaurName,
-      prompt: toFallbackCachedPrompt(dinosaurName),
-      model: DEFAULT_CACHE_MODEL,
-      mimeType,
-    };
-  }
-
-  const parsedDinosaurName = readMetadataString(parsedValue.dinosaurName, dinosaurName);
-  return {
-    dinosaurName: parsedDinosaurName,
-    prompt: readMetadataString(parsedValue.prompt, toFallbackCachedPrompt(parsedDinosaurName)),
-    model: readMetadataString(parsedValue.model, DEFAULT_CACHE_MODEL),
-    mimeType: readMetadataString(parsedValue.mimeType, mimeType),
-  };
-}
-
-function toSupportedImageExtension(
+export function toSupportedImageExtension(
   extension: unknown,
   fallbackMimeType: string,
 ): SupportedImageExtension {
@@ -253,321 +200,25 @@ function toSupportedImageExtension(
   return getExtensionForMimeType(fallbackMimeType);
 }
 
-async function readRewardImageCacheMetadata(
-  absoluteImagePath: string,
-  dinosaurName: string,
-  mimeType: string,
-): Promise<RewardImageCacheMetadata> {
-  const metadataPath = getCacheMetadataPath(absoluteImagePath);
-
-  try {
-    const rawMetadata = await readFile(metadataPath, "utf8");
-    return asRewardImageCacheMetadata(JSON.parse(rawMetadata), dinosaurName, mimeType);
-  } catch {
-    return asRewardImageCacheMetadata(null, dinosaurName, mimeType);
-  }
+function toFallbackCachedPrompt(dinosaurName: string): string {
+  return `Cached dinosaur reward image for ${dinosaurName}.`;
 }
 
-interface Sqlite3Database {
-  run: (
-    sql: string,
-    params: readonly unknown[],
-    callback: (error: Error | null) => void,
-  ) => void;
-  get: (
-    sql: string,
-    params: readonly unknown[],
-    callback: (error: Error | null, row?: unknown) => void,
-  ) => void;
-  all: (
-    sql: string,
-    params: readonly unknown[],
-    callback: (error: Error | null, rows?: unknown[]) => void,
-  ) => void;
+function normalizeRewardImageSource(value: unknown): RewardImageSource {
+  return value === "openai" ||
+    value === "fallback-svg" ||
+    value === "filesystem-migration" ||
+    value === "unknown"
+    ? value
+    : "unknown";
 }
 
-interface Sqlite3Driver {
-  Database: new (
-    filename: string,
-    callback: (error: Error | null) => void,
-  ) => Sqlite3Database;
-  verbose?: () => Sqlite3Driver;
-}
-
-interface RewardImageCacheDatabaseMetadataRow {
-  dinosaur_name?: unknown;
-  prompt?: unknown;
-  model?: unknown;
-  mime_type?: unknown;
-  extension?: unknown;
-  absolute_image_path?: unknown;
-}
-
-interface RewardImageCacheDatabaseRecordRow {
-  slug?: unknown;
-  dinosaur_name?: unknown;
-  prompt?: unknown;
-  model?: unknown;
-  mime_type?: unknown;
-  extension?: unknown;
-  absolute_image_path?: unknown;
-  updated_at_ms?: unknown;
-  generation_status?: unknown;
-  generation_image_path?: unknown;
-  generation_updated_at_ms?: unknown;
-}
-
-const requireFromWorkspace = createRequire(path.join(process.cwd(), "package.json"));
-
-let sqlite3Driver: Sqlite3Driver | null = null;
-let rewardCacheDatabasePromise: Promise<Sqlite3Database> | null = null;
-
-function resolveSqlite3Driver(): Sqlite3Driver {
-  if (sqlite3Driver) {
-    return sqlite3Driver;
+function inferRewardImageSource(image: GeneratedRewardImage): RewardImageSource {
+  if (image.source) {
+    return image.source;
   }
 
-  try {
-    const resolvedDriver = requireFromWorkspace("sqlite3") as Sqlite3Driver;
-    sqlite3Driver =
-      typeof resolvedDriver.verbose === "function" ? resolvedDriver.verbose() : resolvedDriver;
-    return sqlite3Driver;
-  } catch (cause) {
-    throw new Error("The sqlite3 package is required for reward cache persistence.", {
-      cause,
-    });
-  }
-}
-
-function runSqliteStatement(
-  database: Sqlite3Database,
-  sql: string,
-  params: readonly unknown[] = [],
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    database.run(sql, params, (error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
-function getSqliteRow<TRow>(
-  database: Sqlite3Database,
-  sql: string,
-  params: readonly unknown[] = [],
-): Promise<TRow | null> {
-  return new Promise((resolve, reject) => {
-    database.get(sql, params, (error, row) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve((row ?? null) as TRow | null);
-    });
-  });
-}
-
-function allSqliteRows<TRow>(
-  database: Sqlite3Database,
-  sql: string,
-  params: readonly unknown[] = [],
-): Promise<readonly TRow[]> {
-  return new Promise((resolve, reject) => {
-    database.all(sql, params, (error, rows) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve((rows ?? []) as readonly TRow[]);
-    });
-  });
-}
-
-async function initializeRewardCacheDatabase(database: Sqlite3Database): Promise<void> {
-  await runSqliteStatement(database, "PRAGMA journal_mode = WAL;");
-  await runSqliteStatement(database, "PRAGMA foreign_keys = ON;");
-  await runSqliteStatement(
-    database,
-    `
-      CREATE TABLE IF NOT EXISTS reward_image_cache (
-        slug TEXT PRIMARY KEY,
-        dinosaur_name TEXT NOT NULL,
-        prompt TEXT NOT NULL,
-        model TEXT NOT NULL,
-        mime_type TEXT NOT NULL,
-        extension TEXT NOT NULL,
-        absolute_image_path TEXT NOT NULL,
-        updated_at_ms INTEGER NOT NULL
-      )
-    `,
-  );
-  await runSqliteStatement(
-    database,
-    `
-      CREATE TABLE IF NOT EXISTS reward_image_generation_status (
-        slug TEXT PRIMARY KEY,
-        dinosaur_name TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('ready', 'generating', 'missing')),
-        image_path TEXT,
-        updated_at_ms INTEGER NOT NULL
-      )
-    `,
-  );
-  await runSqliteStatement(
-    database,
-    `
-      CREATE INDEX IF NOT EXISTS reward_image_generation_status_updated_at_idx
-      ON reward_image_generation_status(updated_at_ms DESC)
-    `,
-  );
-}
-
-async function getRewardCacheDatabase(): Promise<Sqlite3Database> {
-  if (rewardCacheDatabasePromise) {
-    return rewardCacheDatabasePromise;
-  }
-
-  rewardCacheDatabasePromise = (async () => {
-    const databaseLocation = getRewardCacheDatabaseLocation();
-    mkdirSync(databaseLocation.sqliteDirectory, { recursive: true });
-
-    const driver = resolveSqlite3Driver();
-    const database = await new Promise<Sqlite3Database>((resolve, reject) => {
-      const instance = new driver.Database(databaseLocation.databasePath, (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(instance);
-      });
-    });
-
-    await initializeRewardCacheDatabase(database);
-    return database;
-  })();
-
-  try {
-    return await rewardCacheDatabasePromise;
-  } catch (error) {
-    rewardCacheDatabasePromise = null;
-    throw error;
-  }
-}
-
-async function readRewardImageCacheMetadataFromDatabase(
-  dinosaurName: string,
-  expectedCachedFile: CachedRewardImageFile,
-): Promise<RewardImageCacheMetadata | null> {
-  const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
-
-  try {
-    const database = await getRewardCacheDatabase();
-    const row = await getSqliteRow<RewardImageCacheDatabaseMetadataRow>(
-      database,
-      `
-        SELECT
-          dinosaur_name,
-          prompt,
-          model,
-          mime_type,
-          extension,
-          absolute_image_path
-        FROM reward_image_cache
-        WHERE slug = ?
-        LIMIT 1
-      `,
-      [toRewardImageCacheSlug(normalizedDinosaurName)],
-    );
-
-    if (!row) {
-      return null;
-    }
-
-    const databaseExtension = toSupportedImageExtension(row.extension, String(row.mime_type ?? ""));
-    const databaseAbsoluteImagePath = getTrimmedNonEmptyString(row.absolute_image_path);
-    if (
-      databaseExtension !== expectedCachedFile.extension ||
-      !databaseAbsoluteImagePath ||
-      path.resolve(databaseAbsoluteImagePath) !== path.resolve(expectedCachedFile.absolutePath)
-    ) {
-      return null;
-    }
-
-    const mimeType = readMetadataString(row.mime_type, getMimeTypeForExtension(databaseExtension));
-    const resolvedDinosaurName = readMetadataString(row.dinosaur_name, normalizedDinosaurName);
-
-    return {
-      dinosaurName: resolvedDinosaurName,
-      prompt: readMetadataString(row.prompt, toFallbackCachedPrompt(resolvedDinosaurName)),
-      model: readMetadataString(row.model, DEFAULT_CACHE_MODEL),
-      mimeType,
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function upsertRewardImageCacheMetadataInDatabase(input: {
-  dinosaurName: string;
-  prompt: string;
-  model: string;
-  mimeType: string;
-  extension: SupportedImageExtension;
-  absoluteImagePath: string;
-  updatedAtMs: number;
-}): Promise<void> {
-  const normalizedDinosaurName = normalizeDinosaurName(input.dinosaurName);
-  const normalizedPrompt =
-    getTrimmedNonEmptyString(input.prompt) ?? toFallbackCachedPrompt(normalizedDinosaurName);
-  const normalizedModel = getTrimmedNonEmptyString(input.model) ?? DEFAULT_CACHE_MODEL;
-  const normalizedMimeType =
-    getTrimmedNonEmptyString(input.mimeType) ?? getMimeTypeForExtension(input.extension);
-  const normalizedAbsoluteImagePath = path.resolve(input.absoluteImagePath);
-  const normalizedUpdatedAtMs = toNonNegativeInteger(input.updatedAtMs) ?? Date.now();
-
-  const database = await getRewardCacheDatabase();
-  await runSqliteStatement(
-    database,
-    `
-      INSERT INTO reward_image_cache (
-        slug,
-        dinosaur_name,
-        prompt,
-        model,
-        mime_type,
-        extension,
-        absolute_image_path,
-        updated_at_ms
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(slug) DO UPDATE SET
-        dinosaur_name = excluded.dinosaur_name,
-        prompt = excluded.prompt,
-        model = excluded.model,
-        mime_type = excluded.mime_type,
-        extension = excluded.extension,
-        absolute_image_path = excluded.absolute_image_path,
-        updated_at_ms = excluded.updated_at_ms
-    `,
-    [
-      toRewardImageCacheSlug(normalizedDinosaurName),
-      normalizedDinosaurName,
-      normalizedPrompt,
-      normalizedModel,
-      normalizedMimeType,
-      input.extension,
-      normalizedAbsoluteImagePath,
-      normalizedUpdatedAtMs,
-    ],
-  );
+  return image.model === "local-fallback-svg" ? "fallback-svg" : "openai";
 }
 
 function normalizeGenerationStatus(value: unknown): RewardImageGenerationStatus | null {
@@ -578,232 +229,329 @@ function normalizeGenerationStatus(value: unknown): RewardImageGenerationStatus 
   return null;
 }
 
-async function writeRewardImageGenerationStatusToDatabase(input: {
+/**
+ * Browser-facing path for an image: the object's public R2 URL when the bucket
+ * is exposed, otherwise the app route that streams it (`/rewards/<slug>.<ext>`).
+ */
+export function toRewardImagePublicPath(
+  image: Pick<RewardImageRecord, "slug" | "extension" | "storageKey" | "createdAtMs">,
+  storage: RewardImageStorage,
+): string {
+  const publicUrl = storage.toPublicUrl(image.storageKey);
+  if (publicUrl) {
+    return publicUrl;
+  }
+
+  return `/rewards/${image.slug}.${image.extension}?v=${image.createdAtMs}`;
+}
+
+function createRewardImageId(createdAtMs: number): string {
+  return `${createdAtMs}-${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+}
+
+function toRewardImageStorageKey(
+  storage: RewardImageStorage,
+  slug: string,
+  imageId: string,
+  extension: SupportedImageExtension,
+): string {
+  return `${storage.keyPrefix}/${slug}/${imageId}.${extension}`;
+}
+
+// ---------------------------------------------------------------------------
+// Row mapping
+// ---------------------------------------------------------------------------
+
+const REWARD_IMAGE_COLUMNS = `
+  images.id AS image_id,
+  images.slug AS image_slug,
+  images.dinosaur_name AS image_dinosaur_name,
+  images.prompt AS image_prompt,
+  images.model AS image_model,
+  images.mime_type AS image_mime_type,
+  images.extension AS image_extension,
+  images.storage_key AS image_storage_key,
+  images.byte_size AS image_byte_size,
+  images.sha256 AS image_sha256,
+  images.source AS image_source,
+  images.created_at_ms AS image_created_at_ms
+`;
+
+function toRewardImageRecordFromRow(
+  row: DatabaseRow,
+  storage: RewardImageStorage,
+): RewardImageRecord | null {
+  const id = getTrimmedNonEmptyString(row.image_id);
+  const slug = getTrimmedNonEmptyString(row.image_slug);
+  const dinosaurName = getTrimmedNonEmptyString(row.image_dinosaur_name);
+  const storageKey = getTrimmedNonEmptyString(row.image_storage_key);
+  if (!id || !slug || !dinosaurName || !storageKey) {
+    return null;
+  }
+
+  const mimeType = getTrimmedNonEmptyString(row.image_mime_type) ?? "image/png";
+  const extension = toSupportedImageExtension(row.image_extension, mimeType);
+  const createdAtMs = toNonNegativeInteger(row.image_created_at_ms) ?? 0;
+
+  return {
+    id,
+    slug,
+    dinosaurName,
+    prompt: getTrimmedNonEmptyString(row.image_prompt) ?? toFallbackCachedPrompt(dinosaurName),
+    model: getTrimmedNonEmptyString(row.image_model) ?? DEFAULT_CACHE_MODEL,
+    mimeType,
+    extension,
+    storageKey,
+    byteSize: toNonNegativeInteger(row.image_byte_size) ?? 0,
+    sha256: getTrimmedNonEmptyString(row.image_sha256) ?? "",
+    source: normalizeRewardImageSource(row.image_source),
+    createdAtMs,
+    imagePath: toRewardImagePublicPath({ slug, extension, storageKey, createdAtMs }, storage),
+  };
+}
+
+function toDatabaseRecordFromRow(
+  row: DatabaseRow,
+  storage: RewardImageStorage,
+): RewardImageCacheDatabaseRecord | null {
+  const slug = getTrimmedNonEmptyString(row.state_slug);
+  const dinosaurName = getTrimmedNonEmptyString(row.state_dinosaur_name);
+  if (!slug || !dinosaurName) {
+    return null;
+  }
+
+  const image = toRewardImageRecordFromRow(row, storage);
+  const persistedStatus = normalizeGenerationStatus(row.state_status) ?? "missing";
+  const statusUpdatedAtMs = toNonNegativeInteger(row.state_updated_at_ms) ?? 0;
+  const status: RewardImageGenerationStatus = image
+    ? "ready"
+    : persistedStatus === "generating" && Date.now() - statusUpdatedAtMs <= GENERATING_STATUS_TTL_MS
+      ? "generating"
+      : "missing";
+
+  return {
+    slug,
+    dinosaurName,
+    status,
+    statusUpdatedAtMs,
+    imageId: image?.id ?? null,
+    prompt: image?.prompt ?? null,
+    model: image?.model ?? null,
+    mimeType: image?.mimeType ?? null,
+    extension: image?.extension ?? null,
+    storageKey: image?.storageKey ?? null,
+    byteSize: image?.byteSize ?? null,
+    sha256: image?.sha256 ?? null,
+    source: image?.source ?? null,
+    imagePath: image?.imagePath ?? null,
+    updatedAtMs: image?.createdAtMs ?? statusUpdatedAtMs,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Database access
+// ---------------------------------------------------------------------------
+
+async function readStateRow(slug: string): Promise<DatabaseRow | null> {
+  const result = await executeDatabaseStatement({
+    sql: `
+      SELECT
+        states.slug AS state_slug,
+        states.dinosaur_name AS state_dinosaur_name,
+        states.status AS state_status,
+        states.updated_at_ms AS state_updated_at_ms,
+        ${REWARD_IMAGE_COLUMNS}
+      FROM reward_image_states AS states
+      LEFT JOIN reward_images AS images
+        ON images.id = states.current_image_id
+      WHERE states.slug = ?
+      LIMIT 1
+    `,
+    args: [slug],
+  });
+
+  return result.rows[0] ?? null;
+}
+
+async function writeRewardImageState(input: {
+  slug: string;
   dinosaurName: string;
   status: RewardImageGenerationStatus;
-  imagePath: string | null;
+  currentImageId: string | null;
   updatedAtMs: number;
 }): Promise<void> {
-  const normalizedDinosaurName = normalizeDinosaurName(input.dinosaurName);
-  const database = await getRewardCacheDatabase();
-  await runSqliteStatement(
-    database,
-    `
-      INSERT INTO reward_image_generation_status (
+  await executeDatabaseStatement({
+    sql: `
+      INSERT INTO reward_image_states (
         slug,
         dinosaur_name,
         status,
-        image_path,
+        current_image_id,
         updated_at_ms
       )
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(slug) DO UPDATE SET
         dinosaur_name = excluded.dinosaur_name,
         status = excluded.status,
-        image_path = excluded.image_path,
+        current_image_id = excluded.current_image_id,
         updated_at_ms = excluded.updated_at_ms
     `,
-    [
-      toRewardImageCacheSlug(normalizedDinosaurName),
-      normalizedDinosaurName,
-      input.status,
-      input.imagePath,
-      toNonNegativeInteger(input.updatedAtMs) ?? Date.now(),
-    ],
-  );
+    args: [input.slug, input.dinosaurName, input.status, input.currentImageId, input.updatedAtMs],
+  });
 }
 
-async function safelyWriteRewardImageGenerationStatusToDatabase(input: {
-  dinosaurName: string;
-  status: RewardImageGenerationStatus;
-  imagePath: string | null;
-  updatedAtMs: number;
-}): Promise<void> {
+async function safelyWriteRewardImageState(
+  input: Parameters<typeof writeRewardImageState>[0],
+): Promise<void> {
   try {
-    await writeRewardImageGenerationStatusToDatabase(input);
-  } catch {
-    // Keep filesystem cache behavior operational when sqlite status writes fail.
+    await writeRewardImageState(input);
+  } catch (error) {
+    console.warn("[rewards] failed to persist reward image state", {
+      slug: input.slug,
+      status: input.status,
+      reason: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
-async function removeRewardImageCacheDatabaseEntries(dinosaurName: string): Promise<boolean> {
-  const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
-
-  try {
-    const database = await getRewardCacheDatabase();
-    const slug = toRewardImageCacheSlug(normalizedDinosaurName);
-    await runSqliteStatement(
-      database,
-      `
-        DELETE FROM reward_image_generation_status
-        WHERE slug = ?
-      `,
-      [slug],
-    );
-    await runSqliteStatement(
-      database,
-      `
-        DELETE FROM reward_image_cache
-        WHERE slug = ?
-      `,
-      [slug],
-    );
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function toRewardImageCacheSlug(dinosaurName: string): string {
-  const normalizedName = normalizeDinosaurName(dinosaurName);
-  const slug = normalizedName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  if (slug.length === 0) {
-    throw new Error("dinosaurName must include alphanumeric characters.");
-  }
-
-  return slug;
-}
-
-export async function findCachedRewardImageFile(
+/** Current live image for a reward, or null when none is recorded. */
+export async function findCurrentRewardImage(
   dinosaurName: string,
-  options: FilesystemRewardImageCacheOptions = {},
-): Promise<CachedRewardImageFile | null> {
+  options: RewardImageCacheOptions = {},
+): Promise<RewardImageRecord | null> {
   const slug = toRewardImageCacheSlug(dinosaurName);
-  const outputDirectory = resolveOutputDirectory(options);
-  const cachedFiles: CachedRewardImageFile[] = [];
-
-  for (const extension of SUPPORTED_IMAGE_EXTENSIONS) {
-    const absolutePath = path.join(outputDirectory, `${slug}.${extension}`);
-
-    try {
-      await access(absolutePath);
-      const fileStats = await stat(absolutePath);
-      cachedFiles.push({
-        absolutePath,
-        extension,
-        modifiedTimeMs: fileStats.mtimeMs,
-      });
-    } catch (error) {
-      if (!isNotFoundError(error)) {
-        throw error;
-      }
-    }
-  }
-
-  if (cachedFiles.length === 0) {
-    return null;
-  }
-
-  cachedFiles.sort((leftFile, rightFile) => rightFile.modifiedTimeMs - leftFile.modifiedTimeMs);
-  return cachedFiles[0];
+  const row = await readStateRow(slug);
+  return row ? toRewardImageRecordFromRow(row, resolveStorage(options)) : null;
 }
 
-export async function doesRewardImageExistOnDisk(
+/** Looks up an already-recorded image with identical bytes for this reward. */
+export async function findRewardImageBySha256(
   dinosaurName: string,
-  options: FilesystemRewardImageCacheOptions = {},
-): Promise<boolean> {
-  const cachedFile = await findCachedRewardImageFile(dinosaurName, options);
-  return cachedFile !== null;
+  sha256: string,
+  options: RewardImageCacheOptions = {},
+): Promise<RewardImageRecord | null> {
+  const slug = toRewardImageCacheSlug(dinosaurName);
+  const result = await executeDatabaseStatement({
+    sql: `
+      SELECT ${REWARD_IMAGE_COLUMNS}
+      FROM reward_images AS images
+      WHERE images.slug = ? AND images.sha256 = ?
+      ORDER BY images.created_at_ms DESC
+      LIMIT 1
+    `,
+    args: [slug, sha256],
+  });
+
+  const row = result.rows[0];
+  return row ? toRewardImageRecordFromRow(row, resolveStorage(options)) : null;
 }
 
+/** Every image ever created for a reward, newest first. */
+export async function listRewardImageHistory(
+  dinosaurName: string,
+  options: RewardImageCacheOptions = {},
+): Promise<readonly RewardImageRecord[]> {
+  const slug = toRewardImageCacheSlug(dinosaurName);
+  const storage = resolveStorage(options);
+  const result = await executeDatabaseStatement({
+    sql: `
+      SELECT ${REWARD_IMAGE_COLUMNS}
+      FROM reward_images AS images
+      WHERE images.slug = ?
+      ORDER BY images.created_at_ms DESC, images.id DESC
+    `,
+    args: [slug],
+  });
+
+  return result.rows
+    .map((row) => toRewardImageRecordFromRow(row, storage))
+    .filter((record): record is RewardImageRecord => record !== null);
+}
+
+export async function doesRewardImageExist(
+  dinosaurName: string,
+  options: RewardImageCacheOptions = {},
+): Promise<boolean> {
+  return (await findCurrentRewardImage(dinosaurName, options)) !== null;
+}
+
+/**
+ * Loads the current image bytes for a reward. When the database points at an
+ * object that is gone from storage the state is reset to `missing` so the next
+ * request regenerates instead of failing forever.
+ */
 export async function readCachedRewardImage(
   dinosaurName: string,
-  options: FilesystemRewardImageCacheOptions = {},
+  options: RewardImageCacheOptions = {},
 ): Promise<GeneratedRewardImage | null> {
   const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
-  const cachedFile = await findCachedRewardImageFile(normalizedDinosaurName, options);
-
-  if (!cachedFile) {
+  const storage = resolveStorage(options);
+  const currentImage = await findCurrentRewardImage(normalizedDinosaurName, options);
+  if (!currentImage) {
     return null;
   }
 
-  const imageBuffer = await readFile(cachedFile.absolutePath);
-  const fallbackMimeType = getMimeTypeForExtension(cachedFile.extension);
-  const metadataFromDatabase = await readRewardImageCacheMetadataFromDatabase(
-    normalizedDinosaurName,
-    cachedFile,
-  );
-  const metadata =
-    metadataFromDatabase ??
-    (await readRewardImageCacheMetadata(
-      cachedFile.absolutePath,
-      normalizedDinosaurName,
-      fallbackMimeType,
-    ));
-  if (!metadataFromDatabase) {
-    void upsertRewardImageCacheMetadataInDatabase({
-      dinosaurName: metadata.dinosaurName,
-      prompt: metadata.prompt,
-      model: metadata.model,
-      mimeType: metadata.mimeType,
-      extension: cachedFile.extension,
-      absoluteImagePath: cachedFile.absolutePath,
-      updatedAtMs: cachedFile.modifiedTimeMs,
-    }).catch(() => undefined);
+  const storedObject = await storage.getObject(currentImage.storageKey);
+  if (!storedObject) {
+    console.warn("[rewards] current reward image is missing from storage; resetting state", {
+      slug: currentImage.slug,
+      storageKey: currentImage.storageKey,
+    });
+    await safelyWriteRewardImageState({
+      slug: currentImage.slug,
+      dinosaurName: currentImage.dinosaurName,
+      status: "missing",
+      currentImageId: null,
+      updatedAtMs: Date.now(),
+    });
+    return null;
   }
 
   return {
-    dinosaurName: metadata.dinosaurName,
-    prompt: metadata.prompt,
-    model: metadata.model,
-    mimeType: metadata.mimeType,
-    imageBase64: imageBuffer.toString("base64"),
+    dinosaurName: currentImage.dinosaurName,
+    prompt: currentImage.prompt,
+    model: currentImage.model,
+    mimeType: currentImage.mimeType,
+    imageBase64: Buffer.from(storedObject.body).toString("base64"),
+    source: currentImage.source,
   };
 }
 
 export async function getRewardImageGenerationStatus(
   dinosaurName: string,
-  options: FilesystemRewardImageCacheOptions = {},
+  options: RewardImageCacheOptions = {},
 ): Promise<RewardImageGenerationStatusSnapshot> {
   const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
-  const cachedFile = await findCachedRewardImageFile(normalizedDinosaurName, options);
+  const storage = resolveStorage(options);
+  const slug = toRewardImageCacheSlug(normalizedDinosaurName);
 
-  if (cachedFile) {
-    const imagePath = toRewardImagePublicPath(
-      normalizedDinosaurName,
-      cachedFile.extension,
-      cachedFile.modifiedTimeMs,
-    );
-    await safelyWriteRewardImageGenerationStatusToDatabase({
-      dinosaurName: normalizedDinosaurName,
-      status: "ready",
-      imagePath,
-      updatedAtMs: cachedFile.modifiedTimeMs,
+  let record: RewardImageCacheDatabaseRecord | null = null;
+  try {
+    const row = await readStateRow(slug);
+    record = row ? toDatabaseRecordFromRow(row, storage) : null;
+  } catch (error) {
+    console.warn("[rewards] failed to read reward image state", {
+      slug,
+      reason: error instanceof Error ? error.message : String(error),
     });
+  }
 
+  if (record?.status === "ready" && record.imagePath) {
     return {
       dinosaurName: normalizedDinosaurName,
       status: "ready",
-      imagePath,
+      imagePath: record.imagePath,
     };
   }
 
-  const inFlightGeneration = getInFlightRewardImageGeneration(normalizedDinosaurName, options);
-  if (inFlightGeneration) {
-    await safelyWriteRewardImageGenerationStatusToDatabase({
-      dinosaurName: normalizedDinosaurName,
-      status: "generating",
-      imagePath: null,
-      updatedAtMs: Date.now(),
-    });
-
+  const inFlightGeneration = getInFlightRewardImageGeneration(normalizedDinosaurName, storage);
+  if (inFlightGeneration || record?.status === "generating") {
     return {
       dinosaurName: normalizedDinosaurName,
       status: "generating",
       imagePath: null,
     };
   }
-
-  await safelyWriteRewardImageGenerationStatusToDatabase({
-    dinosaurName: normalizedDinosaurName,
-    status: "missing",
-    imagePath: null,
-    updatedAtMs: Date.now(),
-  });
 
   return {
     dinosaurName: normalizedDinosaurName,
@@ -812,79 +560,120 @@ export async function getRewardImageGenerationStatus(
   };
 }
 
-export async function persistRewardImageToFilesystemCache(
+/**
+ * Uploads an image to object storage and records it: a new `reward_images`
+ * row (history is append-only) and the slug's state pointing at it.
+ */
+export async function persistRewardImage(
   image: GeneratedRewardImage,
-  options: FilesystemRewardImageCacheOptions = {},
-): Promise<string> {
+  options: PersistRewardImageOptions = {},
+): Promise<RewardImageRecord> {
   const normalizedDinosaurName = normalizeDinosaurName(image.dinosaurName);
-  const outputDirectory = resolveOutputDirectory(options);
-  const extension = getExtensionForMimeType(image.mimeType);
-  const absoluteImagePath = path.join(
-    outputDirectory,
-    `${toRewardImageCacheSlug(normalizedDinosaurName)}.${extension}`,
-  );
-  const metadataPath = getCacheMetadataPath(absoluteImagePath);
-  const imageBuffer = Buffer.from(image.imageBase64, "base64");
-
-  await mkdir(outputDirectory, { recursive: true });
-
+  const storage = resolveStorage(options);
   const slug = toRewardImageCacheSlug(normalizedDinosaurName);
-  for (const candidateExtension of SUPPORTED_IMAGE_EXTENSIONS) {
-    if (candidateExtension === extension) {
-      continue;
-    }
+  const extension = getExtensionForMimeType(image.mimeType);
+  const mimeType = getTrimmedNonEmptyString(image.mimeType) ?? getMimeTypeForExtension(extension);
+  const imageBuffer = Buffer.from(image.imageBase64, "base64");
+  const createdAtMs = toNonNegativeInteger(options.createdAtMs) ?? Date.now();
+  const id = createRewardImageId(createdAtMs);
+  const storageKey = toRewardImageStorageKey(storage, slug, id, extension);
+  const sha256 = createHash("sha256").update(imageBuffer).digest("hex");
+  const prompt = getTrimmedNonEmptyString(image.prompt) ?? toFallbackCachedPrompt(normalizedDinosaurName);
+  const model = getTrimmedNonEmptyString(image.model) ?? DEFAULT_CACHE_MODEL;
+  const source = options.source ?? inferRewardImageSource(image);
 
-    const siblingAbsolutePath = path.join(outputDirectory, `${slug}.${candidateExtension}`);
-    const siblingMetadataPath = getCacheMetadataPath(siblingAbsolutePath);
-    await rm(siblingAbsolutePath, { force: true }).catch(() => undefined);
-    await rm(siblingMetadataPath, { force: true }).catch(() => undefined);
-  }
+  await storage.putObject({
+    key: storageKey,
+    body: new Uint8Array(imageBuffer),
+    contentType: mimeType,
+  });
 
-  await writeFile(absoluteImagePath, imageBuffer);
+  await executeDatabaseBatch([
+    {
+      sql: `
+        INSERT INTO reward_images (
+          id,
+          slug,
+          dinosaur_name,
+          prompt,
+          model,
+          mime_type,
+          extension,
+          storage_key,
+          byte_size,
+          sha256,
+          source,
+          created_at_ms
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      args: [
+        id,
+        slug,
+        normalizedDinosaurName,
+        prompt,
+        model,
+        mimeType,
+        extension,
+        storageKey,
+        imageBuffer.byteLength,
+        sha256,
+        source,
+        createdAtMs,
+      ],
+    },
+    {
+      sql: `
+        INSERT INTO reward_image_states (
+          slug,
+          dinosaur_name,
+          status,
+          current_image_id,
+          updated_at_ms
+        )
+        VALUES (?, ?, 'ready', ?, ?)
+        ON CONFLICT(slug) DO UPDATE SET
+          dinosaur_name = excluded.dinosaur_name,
+          status = 'ready',
+          current_image_id = excluded.current_image_id,
+          updated_at_ms = excluded.updated_at_ms
+      `,
+      args: [slug, normalizedDinosaurName, id, createdAtMs],
+    },
+  ]);
 
-  const metadata: RewardImageCacheMetadata = {
+  return {
+    id,
+    slug,
     dinosaurName: normalizedDinosaurName,
-    prompt: getTrimmedNonEmptyString(image.prompt) ?? toFallbackCachedPrompt(normalizedDinosaurName),
-    model: getTrimmedNonEmptyString(image.model) ?? DEFAULT_CACHE_MODEL,
-    mimeType: getTrimmedNonEmptyString(image.mimeType) ?? getMimeTypeForExtension(extension),
-  };
-  await writeFile(metadataPath, JSON.stringify(metadata), "utf8");
-  const persistedFileStats = await stat(absoluteImagePath);
-  await upsertRewardImageCacheMetadataInDatabase({
-    dinosaurName: metadata.dinosaurName,
-    prompt: metadata.prompt,
-    model: metadata.model,
-    mimeType: metadata.mimeType,
+    prompt,
+    model,
+    mimeType,
     extension,
-    absoluteImagePath,
-    updatedAtMs: persistedFileStats.mtimeMs,
-  });
-  await safelyWriteRewardImageGenerationStatusToDatabase({
-    dinosaurName: metadata.dinosaurName,
-    status: "ready",
-    imagePath: toRewardImagePublicPath(
-      metadata.dinosaurName,
-      extension,
-      persistedFileStats.mtimeMs,
-    ),
-    updatedAtMs: persistedFileStats.mtimeMs,
-  });
-
-  return absoluteImagePath;
+    storageKey,
+    byteSize: imageBuffer.byteLength,
+    sha256,
+    source,
+    createdAtMs,
+    imagePath: toRewardImagePublicPath({ slug, extension, storageKey, createdAtMs }, storage),
+  };
 }
 
 function startInFlightRewardImageGeneration(
   request: RewardImageGenerationRequest,
   generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>,
-  options: FilesystemRewardImageCacheOptions,
+  options: RewardImageCacheOptions,
 ): Promise<GeneratedRewardImage> {
   const dinosaurName = normalizeDinosaurName(request.dinosaurName);
-  const inFlightGenerationKey = toInFlightRewardImageGenerationKey(dinosaurName, options);
+  const storage = resolveStorage(options);
+  const slug = toRewardImageCacheSlug(dinosaurName);
+  const inFlightGenerationKey = toInFlightRewardImageGenerationKey(dinosaurName, storage);
   const generationPromise = (async () => {
-    await safelyWriteRewardImageGenerationStatusToDatabase({
+    await safelyWriteRewardImageState({
+      slug,
       dinosaurName,
       status: "generating",
-      imagePath: null,
+      currentImageId: null,
       updatedAtMs: Date.now(),
     });
 
@@ -892,13 +681,14 @@ function startInFlightRewardImageGeneration(
       // Forward the whole request so the dossier block and any model override
       // reach the generator, not just the name.
       const generatedImage = await generateImage({ ...request, dinosaurName });
-      await persistRewardImageToFilesystemCache(generatedImage, options);
+      await persistRewardImage(generatedImage, { storage });
       return generatedImage;
     } catch (error) {
-      await safelyWriteRewardImageGenerationStatusToDatabase({
+      await safelyWriteRewardImageState({
+        slug,
         dinosaurName,
         status: "missing",
-        imagePath: null,
+        currentImageId: null,
         updatedAtMs: Date.now(),
       });
       throw error;
@@ -920,204 +710,152 @@ function startInFlightRewardImageGeneration(
 
 function getInFlightRewardImageGeneration(
   dinosaurName: string,
-  options: FilesystemRewardImageCacheOptions,
+  storage: RewardImageStorage,
 ): Promise<GeneratedRewardImage> | undefined {
-  const inFlightGenerationKey = toInFlightRewardImageGenerationKey(dinosaurName, options);
-  return inFlightRewardImageGenerations.get(inFlightGenerationKey);
+  return inFlightRewardImageGenerations.get(toInFlightRewardImageGenerationKey(dinosaurName, storage));
 }
 
-export async function prefetchRewardImageWithFilesystemCache(
+export async function prefetchRewardImage(
   request: RewardImageGenerationRequest,
   generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>,
-  options: FilesystemRewardImageCacheOptions = {},
+  options: RewardImageCacheOptions = {},
 ): Promise<RewardImagePrefetchStatus> {
   const normalizedDinosaurName = normalizeDinosaurName(request.dinosaurName);
-  const rewardImageExistsOnDisk = await doesRewardImageExistOnDisk(normalizedDinosaurName, options);
+  const storage = resolveStorage(options);
 
-  if (rewardImageExistsOnDisk) {
+  if (await doesRewardImageExist(normalizedDinosaurName, { storage })) {
     return "already-cached";
   }
 
-  const inFlightGeneration = getInFlightRewardImageGeneration(normalizedDinosaurName, options);
-
-  if (inFlightGeneration) {
+  if (getInFlightRewardImageGeneration(normalizedDinosaurName, storage)) {
     return "already-in-flight";
   }
 
-  startInFlightRewardImageGeneration(request, generateImage, options);
+  startInFlightRewardImageGeneration(request, generateImage, { storage });
   return "started";
 }
 
-export async function resolveRewardImageWithFilesystemCache(
+export async function resolveRewardImageWithCache(
   request: RewardImageGenerationRequest,
   generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>,
-  options: FilesystemRewardImageCacheOptions = {},
+  options: RewardImageCacheOptions = {},
 ): Promise<GeneratedRewardImage> {
   const normalizedDinosaurName = normalizeDinosaurName(request.dinosaurName);
-  const cachedImage = await readCachedRewardImage(normalizedDinosaurName, options);
+  const storage = resolveStorage(options);
+  const cachedImage = await readCachedRewardImage(normalizedDinosaurName, { storage });
 
   if (cachedImage) {
     return cachedImage;
   }
 
-  const inFlightGeneration = getInFlightRewardImageGeneration(normalizedDinosaurName, options);
-
+  const inFlightGeneration = getInFlightRewardImageGeneration(normalizedDinosaurName, storage);
   if (inFlightGeneration) {
     return inFlightGeneration;
   }
 
-  return startInFlightRewardImageGeneration(request, generateImage, options);
+  return startInFlightRewardImageGeneration(request, generateImage, { storage });
 }
 
-function toDatabaseRecordFromRow(
-  row: RewardImageCacheDatabaseRecordRow,
-): RewardImageCacheDatabaseRecord | null {
-  const dinosaurName = getTrimmedNonEmptyString(row.dinosaur_name);
-  if (!dinosaurName) {
-    return null;
-  }
+export async function listRewardImageCacheDatabaseRecords(
+  options: RewardImageCacheOptions = {},
+): Promise<readonly RewardImageCacheDatabaseRecord[]> {
+  const storage = resolveStorage(options);
 
-  const mimeType = readMetadataString(row.mime_type, "image/png");
-  const extension = toSupportedImageExtension(row.extension, mimeType);
-  const updatedAtMs = toNonNegativeInteger(row.updated_at_ms) ?? 0;
-  const status = normalizeGenerationStatus(row.generation_status) ?? "ready";
-  const statusUpdatedAtMs = toNonNegativeInteger(row.generation_updated_at_ms) ?? updatedAtMs;
-  const slug = getTrimmedNonEmptyString(row.slug) ?? toRewardImageCacheSlug(dinosaurName);
-  const imagePath =
-    status === "ready"
-      ? getTrimmedNonEmptyString(row.generation_image_path) ??
-        toRewardImagePublicPath(dinosaurName, extension, updatedAtMs)
-      : null;
-
-  return {
-    slug,
-    dinosaurName,
-    prompt: readMetadataString(row.prompt, toFallbackCachedPrompt(dinosaurName)),
-    model: readMetadataString(row.model, DEFAULT_CACHE_MODEL),
-    mimeType,
-    extension,
-    absoluteImagePath:
-      getTrimmedNonEmptyString(row.absolute_image_path) ??
-      path.join(resolveOutputDirectory({}), `${slug}.${extension}`),
-    imagePath,
-    updatedAtMs,
-    status,
-    statusUpdatedAtMs,
-  };
-}
-
-export async function listRewardImageCacheDatabaseRecords(): Promise<
-  readonly RewardImageCacheDatabaseRecord[]
-> {
   try {
-    const database = await getRewardCacheDatabase();
-    const rows = await allSqliteRows<RewardImageCacheDatabaseRecordRow>(
-      database,
-      `
+    const result = await executeDatabaseStatement({
+      sql: `
         SELECT
-          cache.slug,
-          cache.dinosaur_name,
-          cache.prompt,
-          cache.model,
-          cache.mime_type,
-          cache.extension,
-          cache.absolute_image_path,
-          cache.updated_at_ms,
-          status.status AS generation_status,
-          status.image_path AS generation_image_path,
-          status.updated_at_ms AS generation_updated_at_ms
-        FROM reward_image_cache AS cache
-        LEFT JOIN reward_image_generation_status AS status
-          ON status.slug = cache.slug
-        ORDER BY cache.updated_at_ms DESC, cache.dinosaur_name COLLATE NOCASE ASC
+          states.slug AS state_slug,
+          states.dinosaur_name AS state_dinosaur_name,
+          states.status AS state_status,
+          states.updated_at_ms AS state_updated_at_ms,
+          ${REWARD_IMAGE_COLUMNS}
+        FROM reward_image_states AS states
+        LEFT JOIN reward_images AS images
+          ON images.id = states.current_image_id
+        ORDER BY states.updated_at_ms DESC, states.dinosaur_name COLLATE NOCASE ASC
       `,
-    );
+      args: [],
+    });
 
-    const records: RewardImageCacheDatabaseRecord[] = [];
-    for (const row of rows) {
-      const record = toDatabaseRecordFromRow(row);
-      if (record) {
-        records.push(record);
-      }
-    }
-
-    return records;
-  } catch {
+    return result.rows
+      .map((row) => toDatabaseRecordFromRow(row, storage))
+      .filter((record): record is RewardImageCacheDatabaseRecord => record !== null);
+  } catch (error) {
+    console.warn("[rewards] failed to list reward image records", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }
 
 export async function getRewardImageCacheDatabaseRecord(
   dinosaurName: string,
+  options: RewardImageCacheOptions = {},
 ): Promise<RewardImageCacheDatabaseRecord | null> {
-  const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
+  const slug = toRewardImageCacheSlug(dinosaurName);
+  const storage = resolveStorage(options);
 
   try {
-    const database = await getRewardCacheDatabase();
-    const row = await getSqliteRow<RewardImageCacheDatabaseRecordRow>(
-      database,
-      `
-        SELECT
-          cache.slug,
-          cache.dinosaur_name,
-          cache.prompt,
-          cache.model,
-          cache.mime_type,
-          cache.extension,
-          cache.absolute_image_path,
-          cache.updated_at_ms,
-          status.status AS generation_status,
-          status.image_path AS generation_image_path,
-          status.updated_at_ms AS generation_updated_at_ms
-        FROM reward_image_cache AS cache
-        LEFT JOIN reward_image_generation_status AS status
-          ON status.slug = cache.slug
-        WHERE cache.slug = ?
-        LIMIT 1
-      `,
-      [toRewardImageCacheSlug(normalizedDinosaurName)],
-    );
-
-    return row ? toDatabaseRecordFromRow(row) : null;
-  } catch {
+    const row = await readStateRow(slug);
+    return row ? toDatabaseRecordFromRow(row, storage) : null;
+  } catch (error) {
+    console.warn("[rewards] failed to read reward image record", {
+      slug,
+      reason: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
 
+/**
+ * Removes every stored object and database row for a reward and marks the
+ * slug as missing so it regenerates on next request.
+ */
 export async function deleteRewardImageCacheEntry(
   dinosaurName: string,
-  options: FilesystemRewardImageCacheOptions = {},
+  options: RewardImageCacheOptions = {},
 ): Promise<DeleteRewardImageCacheEntryResult> {
   const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
-  const outputDirectory = resolveOutputDirectory(options);
+  const storage = resolveStorage(options);
   const slug = toRewardImageCacheSlug(normalizedDinosaurName);
+  const history = await listRewardImageHistory(normalizedDinosaurName, { storage });
 
-  for (const extension of SUPPORTED_IMAGE_EXTENSIONS) {
-    const absoluteImagePath = path.join(outputDirectory, `${slug}.${extension}`);
-    const metadataPath = getCacheMetadataPath(absoluteImagePath);
-
-    await rm(absoluteImagePath, { force: true }).catch((error) => {
-      if (!isNotFoundError(error)) {
-        throw error;
-      }
-    });
-    await rm(metadataPath, { force: true }).catch((error) => {
-      if (!isNotFoundError(error)) {
-        throw error;
-      }
-    });
+  const deletedStorageKeys: string[] = [];
+  for (const image of history) {
+    await storage.deleteObject(image.storageKey);
+    deletedStorageKeys.push(image.storageKey);
   }
 
-  const deletedDatabaseRecord = await removeRewardImageCacheDatabaseEntries(normalizedDinosaurName);
-  await safelyWriteRewardImageGenerationStatusToDatabase({
-    dinosaurName: normalizedDinosaurName,
-    status: "missing",
-    imagePath: null,
-    updatedAtMs: Date.now(),
-  });
+  let deletedDatabaseRecord = false;
+  try {
+    await executeDatabaseBatch([
+      { sql: "DELETE FROM reward_images WHERE slug = ?", args: [slug] },
+      {
+        sql: `
+          INSERT INTO reward_image_states (slug, dinosaur_name, status, current_image_id, updated_at_ms)
+          VALUES (?, ?, 'missing', NULL, ?)
+          ON CONFLICT(slug) DO UPDATE SET
+            dinosaur_name = excluded.dinosaur_name,
+            status = 'missing',
+            current_image_id = NULL,
+            updated_at_ms = excluded.updated_at_ms
+        `,
+        args: [slug, normalizedDinosaurName, Date.now()],
+      },
+    ]);
+    deletedDatabaseRecord = true;
+  } catch (error) {
+    console.warn("[rewards] failed to delete reward image records", {
+      slug,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return {
     dinosaurName: normalizedDinosaurName,
     deletedDatabaseRecord,
+    deletedImageCount: history.length,
+    deletedStorageKeys,
   };
 }

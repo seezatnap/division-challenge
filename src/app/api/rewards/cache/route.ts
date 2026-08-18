@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { getRewardImageStorageLocation } from "@/features/persistence/lib/object-storage";
 import {
   deleteRewardImageCacheEntry,
   getRewardCacheDatabaseLocation,
   getRewardImageCacheDatabaseRecord,
   listRewardImageCacheDatabaseRecords,
+  listRewardImageHistory,
 } from "@/features/rewards/lib/reward-image-cache";
 
 export const runtime = "nodejs";
@@ -38,14 +40,20 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const dinosaurName = parseDinosaurNameFromRequest(request);
     const databaseLocation = getRewardCacheDatabaseLocation();
+    const storageLocation = getRewardImageStorageLocation();
 
     if (dinosaurName) {
-      const record = await getRewardImageCacheDatabaseRecord(dinosaurName);
+      const [record, history] = await Promise.all([
+        getRewardImageCacheDatabaseRecord(dinosaurName),
+        listRewardImageHistory(dinosaurName),
+      ]);
       return NextResponse.json(
         {
           data: {
             database: databaseLocation,
+            storage: storageLocation,
             record,
+            history,
           },
         },
         { status: 200 },
@@ -57,6 +65,7 @@ export async function GET(request: Request): Promise<Response> {
       {
         data: {
           database: databaseLocation,
+          storage: storageLocation,
           count: records.length,
           records,
         },
@@ -86,6 +95,7 @@ export async function DELETE(request: Request): Promise<Response> {
         data: {
           ...deletionResult,
           database: getRewardCacheDatabaseLocation(),
+          storage: getRewardImageStorageLocation(),
         },
       },
       { status: 200 },

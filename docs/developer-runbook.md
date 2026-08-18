@@ -11,11 +11,14 @@ Install and start:
 
 ```bash
 npm ci
-cp .env.example .env.local   # then set OPENAI_API_KEY
+cp .env.example .env.local   # then set OPENAI_API_KEY (+ TURSO_* / R2_* for real storage)
 npm run dev
 ```
 
 App URL: `http://localhost:3000`
+
+Without `TURSO_*` / `R2_*` the app runs fully locally (SQLite file under `.sqlite/`, images under
+`.reward-images/`) so nothing external is needed for development; see §3.
 
 ## 2. OpenAI configuration (`OPENAI_API_KEY`)
 
@@ -30,9 +33,9 @@ All reward generation uses OpenAI only (no Google APIs):
 - `OPENAI_BASE_URL` (default `https://api.openai.com/v1`)
 
 Generation pipeline per reward asset: dossier (cached under `public/artifacts/dossiers`) →
-visual description (Luna) → image (gpt-image-2) → filesystem/sqlite cache. If the description
-call fails the render proceeds from the dossier alone; if the image call fails a local SVG
-fallback is stored instead. Note that OpenAI gates the GPT Image models behind API
+visual description (Luna) → image (gpt-image-2) → upload to R2 + database record. If the
+description call fails the render proceeds from the dossier alone; if the image call fails a
+local SVG fallback is stored instead (recorded with `source: "fallback-svg"`). Note that OpenAI gates the GPT Image models behind API
 Organization Verification in the developer console.
 
 If `OPENAI_API_KEY` is missing or blank, the image route stores the local fallback image and the
@@ -48,38 +51,74 @@ Reward image status endpoint:
 - `GET /api/rewards/image-status?dinosaurName=Velociraptor`
 - Returns `ready`, `generating`, or `missing`
 
-Reward cache database endpoints:
+Reward image record endpoints:
 
-- `GET /api/rewards/cache` (list all sqlite-backed cache records)
-- `GET /api/rewards/cache?dinosaurName=Velociraptor` (single record)
-- `DELETE /api/rewards/cache?dinosaurName=Velociraptor` (delete cache record + files)
+- `GET /api/rewards/cache` (current state of every reward: live image + generation status)
+- `GET /api/rewards/cache?dinosaurName=Velociraptor` (single record + full history of every
+  image ever created for it)
+- `DELETE /api/rewards/cache?dinosaurName=Velociraptor` (delete every stored object + row for it)
+- `GET /rewards/<slug>.<ext>` streams the current image for a reward from object storage (used
+  when no public R2 URL is configured, and for image paths saved before the R2 move)
 
 Player profile endpoint:
 
 - `GET /api/player-profiles?playerName=Gus` (load profile)
 - `PUT /api/player-profiles` with JSON body `{ "playerName": "Gus", "snapshot": { ... }, "updatedAtMs": 123 }`
 
-## 3. Reward image storage behavior (sqlite + filesystem)
+## 3. Storage: Turso database + Cloudflare R2 images
 
-Server-side reward cache metadata/status is sqlite-backed:
+All server-side state lives in one libsql database (`src/features/persistence/lib/database.ts`):
 
-- SQLite directory: `<repo-root>/.sqlite/`
-- Default database file: `division-challenge.sqlite3`
-- Full default path: `<repo-root>/.sqlite/division-challenge.sqlite3`
-- Optional override: `SQLITE_DB_FILE=<dbfile>` (still stored under `<repo-root>/.sqlite/`)
+- **Turso** when `TURSO_DATABASE_URL` (+ `TURSO_AUTH_TOKEN`) is set — this is the production setup.
+- **Local SQLite file** otherwise: `<repo-root>/.sqlite/division-challenge.sqlite3`
+  (`SQLITE_DB_FILE` overrides the file name; `TURSO_DATABASE_URL=file:/abs/path` also works).
+- The schema is created/migrated automatically on first connection (`schema_migrations` table).
 
-Image binaries remain filesystem-backed:
+Tables:
 
-- Output directory: `public/rewards/`
-- File naming: slugified dinosaur name (for example, `tyrannosaurus-rex.png`)
-- Metadata sidecar: `<image-file>.metadata.json`
-- Duplicate prevention:
-  - Checks for existing disk image before generating
-  - Tracks in-flight generation by cache key to avoid duplicate concurrent generation
+| table | purpose |
+| --- | --- |
+| `reward_images` | one row for **every** image ever created/uploaded: id, slug, dinosaur name, prompt, model, mime type, extension, R2 object key, byte size, sha256, source (`openai` / `fallback-svg` / `filesystem-migration`), created time |
+| `reward_image_states` | one row per reward slug: generation status (`ready` / `generating` / `missing`) and which `reward_images` row is the current image |
+| `player_profiles` | shared player profiles (unchanged schema) |
 
-The status route reads disk cache + in-flight state and mirrors status into sqlite.
+Reward image binaries live in object storage (`src/features/persistence/lib/object-storage.ts`):
 
-Player profiles are sqlite-backed in the same database file (`player_profiles` table) and are shared across browsers for the same app/server instance.
+- **Cloudflare R2** when `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
+  are set (S3-compatible API via `@aws-sdk/client-s3`). Object keys are
+  `<R2_KEY_PREFIX>/<slug>/<createdAtMs>-<id>.<ext>` — every generation gets a fresh, immutable key,
+  so history is preserved and CDN caches never go stale.
+- **Local directory fallback** (`.reward-images/`, override with `REWARD_IMAGE_STORAGE_DIRECTORY`)
+  when the R2 variables are absent — development only; a warning is logged once.
+
+Image URLs handed to the browser (`imagePath` in API responses / player profiles):
+
+- `R2_PUBLIC_BASE_URL` set → `https://<public-host>/<object-key>` (direct from R2; `next.config.ts`
+  adds the host to `images.remotePatterns` at build time, so set it for the build too).
+- otherwise → `/rewards/<slug>.<ext>?v=<createdAtMs>`, streamed by `src/app/rewards/[filename]/route.ts`.
+
+Duplicate prevention: the database state is checked before generating and in-flight generation is
+tracked per slug in memory (a persisted `generating` flag older than 5 minutes is treated as
+abandoned so a crashed instance cannot wedge a reward).
+
+### Migrating from the old layout (`public/rewards/` + local `.sqlite/`)
+
+`scripts/migrate-rewards-to-r2-and-turso.mjs` uploads every legacy image, records it (keeping the
+original file time as `created_at_ms`, `source: "filesystem-migration"`, prompt/model from the
+`.metadata.json` sidecar or the legacy `reward_image_cache` row), copies player profiles into the
+target database, and rewrites their stored `/rewards/...` image paths to the new URLs. It is
+idempotent (identical bytes are skipped by sha256; profile writes never clobber newer snapshots).
+
+```bash
+# 1. put TURSO_* and R2_* in .env.local
+npm run db:migrate:rewards -- --dry-run          # plan only
+npm run db:migrate:rewards                        # live run
+npm run db:reward-cache:list                      # verify
+rm -rf public/rewards                             # legacy files would shadow /rewards/<slug>.<ext>
+```
+
+Options: `--rewards-dir`, `--source-db`, `--skip-images`, `--skip-profiles`, `--player <name>`
+(repeatable), `--force`, `--allow-local-target` (migrate into a local file/dir target).
 
 ## 4. Player save file behavior (File System Access API)
 
@@ -147,9 +186,13 @@ Notes:
 
 ## 7. Reward cache CLI helpers
 
+These use the same modules as the app (via `scripts/lib/load-typescript-module.mjs`) and read
+`.env.local`, so they talk to whatever database/storage the app is configured for.
+
 ```bash
-npm run db:reward-cache:path
-npm run db:reward-cache:list
-npm run db:reward-cache:get -- "Tyrannosaurus Rex"
+npm run db:reward-cache:path                       # database + object storage locations
+npm run db:reward-cache:list                       # current state per reward
+npm run db:reward-cache:get -- "Tyrannosaurus Rex" # current record + full image history
 npm run db:reward-cache:delete -- "Tyrannosaurus Rex"
+npm run db:migrate:rewards -- --dry-run            # legacy → R2/Turso migration (see §3)
 ```

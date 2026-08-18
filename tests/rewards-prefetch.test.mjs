@@ -37,9 +37,12 @@ async function loadRewardPrefetchModule() {
   const dinosaursModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/dinosaurs.ts",
   );
-  const imageCacheModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/reward-image-cache.ts",
-  );
+  // The prefetch helpers receive their cache dependencies via injection in
+  // these tests, so the real (database + object storage) cache is stubbed.
+  const imageCacheModuleUrl = `data:text/javascript;base64,${Buffer.from(`
+    export async function doesRewardImageExist() { throw new Error("not stubbed"); }
+    export async function prefetchRewardImage() { throw new Error("not stubbed"); }
+  `).toString("base64")}`;
   const prefetchModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/prefetch.ts",
     {
@@ -101,11 +104,11 @@ test("triggerNearMilestoneRewardPrefetch skips all work when not near a mileston
       },
     },
     {
-      doesRewardImageExistOnDisk: async () => {
+      doesRewardImageExist: async () => {
         cacheCheckCount += 1;
         return false;
       },
-      prefetchRewardImageWithFilesystemCache: async () => {
+      prefetchRewardImage: async () => {
         prefetchCallCount += 1;
         return "started";
       },
@@ -130,12 +133,12 @@ test("triggerNearMilestoneRewardPrefetch checks cache first and skips generation
       },
     },
     {
-      doesRewardImageExistOnDisk: async (dinosaurName) => {
+      doesRewardImageExist: async (dinosaurName) => {
         cacheCheckCount += 1;
         assert.equal(dinosaurName, "Tyrannosaurus Rex");
         return true;
       },
-      prefetchRewardImageWithFilesystemCache: async () => {
+      prefetchRewardImage: async () => {
         prefetchCallCount += 1;
         return "started";
       },
@@ -160,12 +163,12 @@ test("triggerNearMilestoneRewardPrefetch starts background generation only when 
       },
     },
     {
-      doesRewardImageExistOnDisk: async (dinosaurName) => {
+      doesRewardImageExist: async (dinosaurName) => {
         cacheCheckCount += 1;
         assert.equal(dinosaurName, "Tyrannosaurus Rex");
         return false;
       },
-      prefetchRewardImageWithFilesystemCache: async (request) => {
+      prefetchRewardImage: async (request) => {
         prefetchCallCount += 1;
         assert.deepEqual(request, { dinosaurName: "Tyrannosaurus Rex" });
         return "started";
@@ -189,8 +192,8 @@ test("triggerNearMilestoneRewardPrefetch reports already-in-flight status when d
       },
     },
     {
-      doesRewardImageExistOnDisk: async () => false,
-      prefetchRewardImageWithFilesystemCache: async () => "already-in-flight",
+      doesRewardImageExist: async () => false,
+      prefetchRewardImage: async () => "already-in-flight",
     },
   );
 
@@ -211,8 +214,8 @@ test("triggerNearMilestoneRewardPrefetch reports skipped-already-cached when cac
       },
     },
     {
-      doesRewardImageExistOnDisk: async () => false,
-      prefetchRewardImageWithFilesystemCache: async () => "already-cached",
+      doesRewardImageExist: async () => false,
+      prefetchRewardImage: async () => "already-cached",
     },
   );
 

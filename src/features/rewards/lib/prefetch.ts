@@ -5,9 +5,9 @@ import {
   getRewardNumberForSolvedCount,
 } from "./dinosaurs";
 import {
-  doesRewardImageExistOnDisk,
-  prefetchRewardImageWithFilesystemCache,
-  type FilesystemRewardImageCacheOptions,
+  doesRewardImageExist,
+  prefetchRewardImage,
+  type RewardImageCacheOptions,
 } from "./reward-image-cache";
 import type { GeneratedRewardImage, RewardImageGenerationRequest } from "./reward-image-service";
 
@@ -109,12 +109,12 @@ export interface TriggerNearMilestoneRewardPrefetchRequest {
   generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>;
   unlockInterval?: number;
   prefetchProblemNumbers?: readonly number[];
-  cacheOptions?: FilesystemRewardImageCacheOptions;
+  cacheOptions?: RewardImageCacheOptions;
 }
 
 export interface TriggerNearMilestoneRewardPrefetchDependencies {
-  doesRewardImageExistOnDisk: typeof doesRewardImageExistOnDisk;
-  prefetchRewardImageWithFilesystemCache: typeof prefetchRewardImageWithFilesystemCache;
+  doesRewardImageExist: typeof doesRewardImageExist;
+  prefetchRewardImage: typeof prefetchRewardImage;
 }
 
 export interface TriggerNearMilestoneRewardPrefetchResult {
@@ -124,8 +124,8 @@ export interface TriggerNearMilestoneRewardPrefetchResult {
 
 const defaultTriggerNearMilestoneRewardPrefetchDependencies: TriggerNearMilestoneRewardPrefetchDependencies =
   {
-    doesRewardImageExistOnDisk,
-    prefetchRewardImageWithFilesystemCache,
+    doesRewardImageExist,
+    prefetchRewardImage,
   };
 
 export async function triggerNearMilestoneRewardPrefetch(
@@ -148,19 +148,19 @@ export async function triggerNearMilestoneRewardPrefetch(
   }
 
   const cacheOptions = request.cacheOptions ?? {};
-  const rewardImageExistsOnDisk = await dependencies.doesRewardImageExistOnDisk(
+  const rewardImageExists = await dependencies.doesRewardImageExist(
     target.dinosaurName,
     cacheOptions,
   );
 
-  if (rewardImageExistsOnDisk) {
+  if (rewardImageExists) {
     return {
       status: "skipped-already-cached",
       target,
     };
   }
 
-  const prefetchStatus = await dependencies.prefetchRewardImageWithFilesystemCache(
+  const prefetchStatus = await dependencies.prefetchRewardImage(
     { dinosaurName: target.dinosaurName },
     request.generateImage,
     cacheOptions,

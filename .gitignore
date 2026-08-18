@@ -15,6 +15,7 @@
 /.npm-cache/
 /.playwright-browsers/
 /.sqlite/
+/.reward-images/
 
 # next.js
 /.next/

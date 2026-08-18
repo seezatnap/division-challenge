@@ -1,64 +1,43 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
-import ts from "typescript";
+import { loadTypeScriptModule } from "../scripts/lib/load-typescript-module.mjs";
 
-const testDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(testDir, "..");
+// Point this test file at its own database file so it never touches the
+// developer's local data (the modules read the URL lazily on first query).
+const databaseDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-player-profiles-db-"));
+const databasePath = path.join(databaseDirectory, "profiles.sqlite3");
+process.env.TURSO_DATABASE_URL = `file:${databasePath}`;
 
-function toDataUrl(source) {
-  return `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-}
+const sqliteProfilesModulePromise = loadTypeScriptModule(
+  "src/features/persistence/lib/sqlite-player-profiles.ts",
+);
+const databaseModulePromise = loadTypeScriptModule("src/features/persistence/lib/database.ts");
 
-async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
-  const absolutePath = path.join(repoRoot, relativePath);
-  const source = await readFile(absolutePath, "utf8");
-
-  let compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      target: ts.ScriptTarget.ES2022,
-    },
-    fileName: absolutePath,
-  }).outputText;
-
-  for (const [specifier, replacement] of Object.entries(replacements)) {
-    compiled = compiled.replaceAll(`from "${specifier}"`, `from "${replacement}"`);
-    compiled = compiled.replaceAll(`from '${specifier}'`, `from "${replacement}"`);
-  }
-
-  return toDataUrl(compiled);
-}
-
-async function loadSqlitePlayerProfilesModule() {
-  const localProfilesModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/persistence/lib/local-player-profiles.ts",
-  );
-  const sqliteProfilesModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/persistence/lib/sqlite-player-profiles.ts",
-    {
-      "./local-player-profiles": localProfilesModuleUrl,
-    },
-  );
-
-  return import(sqliteProfilesModuleUrl);
-}
-
-const sqliteProfilesModulePromise = loadSqlitePlayerProfilesModule();
-
-test("sqlite player profile storage uses repo-root .sqlite directory", async () => {
+test("player profile storage defaults to the repo-root .sqlite file and honours TURSO_DATABASE_URL", async () => {
   const { getPlayerProfilesDatabaseLocation } = await sqliteProfilesModulePromise;
-  const location = getPlayerProfilesDatabaseLocation();
+  const { resolveDatabaseConfig } = await databaseModulePromise;
 
-  assert.ok(location.sqliteDirectory.endsWith(`${path.sep}.sqlite`));
+  const location = getPlayerProfilesDatabaseLocation();
+  assert.equal(location.driver, "local-file");
+  assert.equal(location.databasePath, databasePath);
+
+  const defaultConfig = resolveDatabaseConfig({});
+  assert.ok(defaultConfig.sqliteDirectory.endsWith(`${path.sep}.sqlite`));
   assert.ok(
-    location.databasePath.endsWith(
+    defaultConfig.databasePath.endsWith(
       `${path.sep}.sqlite${path.sep}division-challenge.sqlite3`,
     ),
   );
+
+  const tursoConfig = resolveDatabaseConfig({
+    TURSO_DATABASE_URL: "libsql://dino-division.turso.io",
+    TURSO_AUTH_TOKEN: "token",
+  });
+  assert.equal(tursoConfig.driver, "turso");
 });
 
 test("writePlayerProfileSnapshotToSqlite and readPlayerProfileSnapshotFromSqlite round-trip snapshots", async () => {

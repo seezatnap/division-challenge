@@ -4,7 +4,7 @@ export const persistenceModule: FeatureModuleDescriptor = {
   id: "persistence",
   title: "Player Profiles",
   summary:
-    "Shared sqlite-backed player profiles with browser localStorage compatibility helpers.",
+    "Shared database (Turso/libsql) player profiles, R2 object storage, and browser localStorage compatibility helpers.",
   rootPath: "src/features/persistence",
 };
 
