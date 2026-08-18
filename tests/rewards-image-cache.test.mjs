@@ -402,3 +402,51 @@ test("persistRewardImageToFilesystemCache removes stale sibling formats for the 
   const entries = (await readdir(cacheDirectory)).sort();
   assert.deepEqual(entries, [`${slug}.jpg`, `${slug}.jpg.metadata.json`]);
 });
+
+test("resolveRewardImageWithFilesystemCache forwards the dossier block and model override to the generator", async () => {
+  const { resolveRewardImageWithFilesystemCache, prefetchRewardImageWithFilesystemCache } =
+    await rewardImageCacheModule;
+
+  const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+  const seenRequests = [];
+
+  await resolveRewardImageWithFilesystemCache(
+    {
+      dinosaurName: " Compsognathus ",
+      dossierPromptBlock: "Field dossier for Compsognathus: Length: 1.0 m.",
+      modelOverride: "gpt-image-2-hd",
+    },
+    async (request) => {
+      seenRequests.push(request);
+      return createGeneratedImage("Compsognathus");
+    },
+    { outputDirectory: cacheDirectory },
+  );
+
+  assert.deepEqual(seenRequests, [
+    {
+      dinosaurName: "Compsognathus",
+      dossierPromptBlock: "Field dossier for Compsognathus: Length: 1.0 m.",
+      modelOverride: "gpt-image-2-hd",
+    },
+  ]);
+
+  const prefetchDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
+  let prefetchResolve;
+  const prefetchSeen = new Promise((resolve) => {
+    prefetchResolve = resolve;
+  });
+  const status = await prefetchRewardImageWithFilesystemCache(
+    { dinosaurName: "Gallimimus", dossierPromptBlock: "Field dossier for Gallimimus." },
+    async (request) => {
+      prefetchResolve(request);
+      return createGeneratedImage("Gallimimus");
+    },
+    { outputDirectory: prefetchDirectory },
+  );
+  assert.equal(status, "started");
+  assert.deepEqual(await prefetchSeen, {
+    dinosaurName: "Gallimimus",
+    dossierPromptBlock: "Field dossier for Gallimimus.",
+  });
+});

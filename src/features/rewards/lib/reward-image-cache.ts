@@ -874,10 +874,11 @@ export async function persistRewardImageToFilesystemCache(
 }
 
 function startInFlightRewardImageGeneration(
-  dinosaurName: string,
+  request: RewardImageGenerationRequest,
   generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>,
   options: FilesystemRewardImageCacheOptions,
 ): Promise<GeneratedRewardImage> {
+  const dinosaurName = normalizeDinosaurName(request.dinosaurName);
   const inFlightGenerationKey = toInFlightRewardImageGenerationKey(dinosaurName, options);
   const generationPromise = (async () => {
     await safelyWriteRewardImageGenerationStatusToDatabase({
@@ -888,7 +889,9 @@ function startInFlightRewardImageGeneration(
     });
 
     try {
-      const generatedImage = await generateImage({ dinosaurName });
+      // Forward the whole request so the dossier block and any model override
+      // reach the generator, not just the name.
+      const generatedImage = await generateImage({ ...request, dinosaurName });
       await persistRewardImageToFilesystemCache(generatedImage, options);
       return generatedImage;
     } catch (error) {
@@ -941,7 +944,7 @@ export async function prefetchRewardImageWithFilesystemCache(
     return "already-in-flight";
   }
 
-  startInFlightRewardImageGeneration(normalizedDinosaurName, generateImage, options);
+  startInFlightRewardImageGeneration(request, generateImage, options);
   return "started";
 }
 
@@ -963,7 +966,7 @@ export async function resolveRewardImageWithFilesystemCache(
     return inFlightGeneration;
   }
 
-  return startInFlightRewardImageGeneration(normalizedDinosaurName, generateImage, options);
+  return startInFlightRewardImageGeneration(request, generateImage, options);
 }
 
 function toDatabaseRecordFromRow(
