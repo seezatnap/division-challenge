@@ -112,3 +112,119 @@ test("solver rejects non-positive factors", async () => {
   assert.throws(() => solveLongMultiplication(createProblem({ multiplicand: 0 })), RangeError);
   assert.throws(() => solveLongMultiplication(createProblem({ multiplier: -3 })), RangeError);
 });
+
+test("solver appends a decimal-point step whose answer is the combined decimal places", async () => {
+  const { solveLongMultiplication } = await solverModule;
+
+  // 8.84 x 8.6 = 76.024
+  const solution = solveLongMultiplication(
+    createProblem({
+      multiplicand: 884,
+      multiplier: 86,
+      multiplicandDecimalPlaces: 2,
+      multiplierDecimalPlaces: 1,
+    }),
+  );
+
+  assert.equal(solution.product, 76024);
+  assert.equal(solution.multiplicandDecimalPlaces, 2);
+  assert.equal(solution.multiplierDecimalPlaces, 1);
+  assert.equal(solution.productDecimalPlaces, 3);
+  assert.deepEqual(
+    solution.steps.map((step) => step.kind),
+    ["partial-product", "partial-product", "product-sum", "decimal-point"],
+  );
+  assert.deepEqual(
+    solution.steps.map((step) => step.expectedValue),
+    ["5304", "7072", "76024", "3"],
+  );
+  assert.equal(solution.steps[3].sequenceIndex, 3);
+  assert.equal(solution.steps[3].id, "multiplication-test-problem:step:3:decimal-point");
+});
+
+test("solver places the decimal-point step right after a lone partial product", async () => {
+  const { solveLongMultiplication } = await solverModule;
+
+  // 4.8 x .7 = 3.36
+  const solution = solveLongMultiplication(
+    createProblem({
+      multiplicand: 48,
+      multiplier: 7,
+      multiplicandDecimalPlaces: 1,
+      multiplierDecimalPlaces: 1,
+    }),
+  );
+
+  assert.deepEqual(
+    solution.steps.map((step) => step.kind),
+    ["partial-product", "decimal-point"],
+  );
+  assert.equal(solution.steps[1].expectedValue, "2");
+});
+
+test("solver reports zero decimal places and no decimal step for whole numbers", async () => {
+  const { solveLongMultiplication, getMultiplicationDecimalPlaces } = await solverModule;
+
+  const solution = solveLongMultiplication(createProblem());
+  assert.equal(solution.productDecimalPlaces, 0);
+  assert.ok(!solution.steps.some((step) => step.kind === "decimal-point"));
+
+  assert.deepEqual(getMultiplicationDecimalPlaces({}), {
+    multiplicandDecimalPlaces: 0,
+    multiplierDecimalPlaces: 0,
+    productDecimalPlaces: 0,
+  });
+});
+
+test("solver rejects decimal problems that would need padding zeros", async () => {
+  const { solveLongMultiplication } = await solverModule;
+
+  // .1 x .1 = .01 needs a zero that is not in the product digits "1".
+  assert.throws(
+    () =>
+      solveLongMultiplication(
+        createProblem({
+          multiplicand: 1,
+          multiplier: 1,
+          multiplicandDecimalPlaces: 1,
+          multiplierDecimalPlaces: 1,
+        }),
+      ),
+    RangeError,
+  );
+
+  // .2 x .5 = .10 is fine: the point sits right before the leading 1.
+  const edgeSolution = solveLongMultiplication(
+    createProblem({
+      multiplicand: 2,
+      multiplier: 5,
+      multiplicandDecimalPlaces: 1,
+      multiplierDecimalPlaces: 1,
+    }),
+  );
+  assert.equal(edgeSolution.steps.at(-1).expectedValue, "2");
+
+  assert.throws(
+    () =>
+      solveLongMultiplication(
+        createProblem({ multiplicand: 48, multiplier: 7, multiplicandDecimalPlaces: 3 }),
+      ),
+    RangeError,
+  );
+  assert.throws(
+    () => solveLongMultiplication(createProblem({ multiplierDecimalPlaces: -1 })),
+    RangeError,
+  );
+});
+
+test("formatDigitsWithDecimalPoint inserts the point, adding a leading zero only when the point comes first", async () => {
+  const { formatDigitsWithDecimalPoint } = await solverModule;
+
+  assert.equal(formatDigitsWithDecimalPoint("884", 0), "884");
+  assert.equal(formatDigitsWithDecimalPoint("884", 2), "8.84");
+  assert.equal(formatDigitsWithDecimalPoint("884", 3), "0.884");
+  assert.equal(formatDigitsWithDecimalPoint("7", 1), "0.7");
+  assert.equal(formatDigitsWithDecimalPoint("76024", 3), "76.024");
+  assert.throws(() => formatDigitsWithDecimalPoint("884", 4), RangeError);
+  assert.throws(() => formatDigitsWithDecimalPoint("8.84", 1), Error);
+});

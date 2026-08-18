@@ -95,6 +95,16 @@ const FEEDBACK_TEMPLATE_BY_MESSAGE_KEY: Record<string, DinoFeedbackTemplate> = {
     text: "Tiny fossil slip in the addition. Re-add the partial product rows.",
     note: "Add each column from the right and carry into the next place.",
   },
+  "dino.feedback.correct.decimal-point": {
+    statusLabel: "Decimal Point Locked",
+    text: "Pinpoint precision! The decimal point landed exactly where it belongs.",
+    note: "The final product is locked in. Queue the next challenge.",
+  },
+  "dino.feedback.retry.decimal-point": {
+    statusLabel: "Retry The Decimal Point",
+    text: "The raptor nudged that point off course. Count the decimal places again.",
+    note: "Add up the decimal places in both factors; the product needs that many digits after the point.",
+  },
   "dino.feedback.complete.problem": {
     statusLabel: "Console Sequence Complete",
     text: "Trail computation complete. Run log marked VERIFIED.",

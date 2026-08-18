@@ -2184,7 +2184,9 @@ export default function Home() {
               <LiveMultiplicationWorkspacePanel
                 key={gameSession.activeProblem.id}
                 multiplicand={gameSession.activeProblem.multiplicand}
+                multiplicandDecimalPlaces={gameSession.activeProblem.multiplicandDecimalPlaces}
                 multiplier={gameSession.activeProblem.multiplier}
+                multiplierDecimalPlaces={gameSession.activeProblem.multiplierDecimalPlaces}
                 onStepValidation={handleWorkspaceStepValidation}
                 steps={gameSession.steps as readonly LongMultiplicationStep[]}
               />

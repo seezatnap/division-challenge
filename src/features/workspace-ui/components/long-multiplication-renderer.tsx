@@ -24,6 +24,7 @@ import {
   playWorkspaceSoundEffect,
   type LiveWorkspaceTypingState,
   type MultiplicationActiveStepFocus,
+  type MultiplicationDecimalPointSlot,
   type MultiplicationWorkRow,
 } from "@/features/workspace-ui/lib";
 
@@ -35,6 +36,10 @@ const NON_DIGIT_KEY_PATTERN = /^\D$/;
 export interface LongMultiplicationRendererProps {
   multiplicand: number;
   multiplier: number;
+  /** Decimal places in the multiplicand; defaults to a whole number. */
+  multiplicandDecimalPlaces?: number;
+  /** Decimal places in the multiplier; defaults to a whole number. */
+  multiplierDecimalPlaces?: number;
   steps: readonly LongMultiplicationStep[];
   onStepValidation?: (validation: LongDivisionStepValidationResult) => void;
   onActiveStepFocusChange?: (focus: MultiplicationActiveStepFocus) => void;
@@ -148,9 +153,25 @@ function MultiplicationEntryCell({
   );
 }
 
+function toDecimalSlotFlagKey(stepId: string, decimalPlaces: number): string {
+  return `${stepId}:decimal-slot:${decimalPlaces}`;
+}
+
+function describeDecimalSlot(decimalPlaces: number, productDigitCount: number): string {
+  if (decimalPlaces === productDigitCount) {
+    return "Place the decimal point before the first digit";
+  }
+
+  return `Place the decimal point with ${decimalPlaces} ${
+    decimalPlaces === 1 ? "digit" : "digits"
+  } after it`;
+}
+
 export function LongMultiplicationRenderer({
   multiplicand,
   multiplier,
+  multiplicandDecimalPlaces = 0,
+  multiplierDecimalPlaces = 0,
   steps,
   onStepValidation,
   onActiveStepFocusChange,
@@ -209,10 +230,19 @@ export function LongMultiplicationRenderer({
       buildMultiplicationRenderModel({
         multiplicand,
         multiplier,
+        multiplicandDecimalPlaces,
+        multiplierDecimalPlaces,
         steps,
         revealedStepCount: liveTypingState.revealedStepCount,
       }),
-    [multiplicand, multiplier, steps, liveTypingState.revealedStepCount],
+    [
+      multiplicand,
+      multiplier,
+      multiplicandDecimalPlaces,
+      multiplierDecimalPlaces,
+      steps,
+      liveTypingState.revealedStepCount,
+    ],
   );
   const stepById = useMemo(() => {
     const nextStepById = new Map<string, LongMultiplicationStep>();
@@ -412,6 +442,86 @@ export function LongMultiplicationRenderer({
     event.preventDefault();
   }, []);
 
+  const decimalPoint = renderModel.decimalPoint;
+  const isDecimalStepRetryLocked = decimalPoint
+    ? Boolean(retryLockedStepIds[decimalPoint.stepId])
+    : false;
+
+  const handleDecimalSlotClick = useCallback(
+    (slot: MultiplicationDecimalPointSlot) => {
+      if (!decimalPoint || !decimalPoint.isActive || isDecimalStepRetryLocked) {
+        return;
+      }
+
+      if (slot.decimalPlaces !== decimalPoint.expectedDecimalPlaces) {
+        // Mirror the digit flow: a wrong tap shakes the tapped slot, plays the
+        // error cue, and briefly locks the whole step before another try.
+        const slotFlagKey = toDecimalSlotFlagKey(decimalPoint.stepId, slot.decimalPlaces);
+        playWorkspaceSoundEffect("digit-error");
+        scheduleAnimationFlag("errorPulseStepIds", slotFlagKey, ENTRY_ERROR_PULSE_DURATION_MS);
+        scheduleAnimationFlag("retryLockedStepIds", slotFlagKey, ENTRY_RETRY_LOCK_DURATION_MS);
+        scheduleAnimationFlag(
+          "retryLockedStepIds",
+          decimalPoint.stepId,
+          ENTRY_RETRY_LOCK_DURATION_MS,
+        );
+        return;
+      }
+
+      playWorkspaceSoundEffect("digit-correct");
+      applySuffixTransition(decimalPoint.stepId, String(slot.decimalPlaces));
+    },
+    [applySuffixTransition, decimalPoint, isDecimalStepRetryLocked, scheduleAnimationFlag],
+  );
+
+  const renderLeadingZero = (
+    position: { leadingZeroColumn: number | null } | null,
+    trackName: "multiplicand" | "multiplier" | "product",
+  ) => {
+    if (!position || position.leadingZeroColumn === null) {
+      return null;
+    }
+
+    return (
+      <span
+        className="mult-static-digit mult-leading-zero"
+        data-mult-leading-zero={trackName}
+        style={{ gridRowStart: 1, gridColumnStart: position.leadingZeroColumn }}
+      >
+        0
+      </span>
+    );
+  };
+
+  const renderStaticDecimalPoint = (
+    position: { column: number; leadingZeroColumn: number | null } | null,
+    trackName: "multiplicand" | "multiplier",
+  ) => {
+    if (!position) {
+      return null;
+    }
+
+    const shouldGlow = activeStepFocus.stepKind === "decimal-point";
+
+    return (
+      <>
+        {renderLeadingZero(position, trackName)}
+        <span
+          aria-hidden="true"
+          className={`mult-decimal-point mult-factor-decimal-point${
+            shouldGlow ? " context-value-glow" : ""
+          }`}
+          data-mult-decimal-point={trackName}
+          data-step-focus={shouldGlow ? "active" : "idle"}
+          data-step-focus-kind={shouldGlow ? activeStepFocus.stepKind : "none"}
+          style={{ gridRowStart: 1, gridColumnStart: position.column }}
+        >
+          <span className="mult-decimal-point-dot" />
+        </span>
+      </>
+    );
+  };
+
   const activeRow = renderModel.workRows.find((row) => row.isActive) ?? null;
   const activeRowSuffix = activeRow
     ? liveTypingState.draftEntryValues[activeRow.stepId] ?? ""
@@ -507,6 +617,7 @@ export function LongMultiplicationRenderer({
                   </span>
                 );
               })}
+              {renderStaticDecimalPoint(renderModel.multiplicandDecimalPoint, "multiplicand")}
             </span>
           </p>
           <p className="mult-statement-row mult-statement-rule" data-mult-row="multiplier">
@@ -537,6 +648,7 @@ export function LongMultiplicationRenderer({
                   </span>
                 );
               })}
+              {renderStaticDecimalPoint(renderModel.multiplierDecimalPoint, "multiplier")}
             </span>
           </p>
         </div>
@@ -590,12 +702,22 @@ export function LongMultiplicationRenderer({
               );
               const isRowRetryLocked = Boolean(retryLockedStepIds[row.stepId]);
               const isRowErrorPulse = Boolean(errorPulseStepIds[row.stepId]);
+              const rowDecimalPoint =
+                decimalPoint && decimalPoint.rowStepId === row.stepId ? decimalPoint : null;
+              const decimalPointState = !rowDecimalPoint
+                ? "none"
+                : rowDecimalPoint.isFilled
+                  ? "placed"
+                  : rowDecimalPoint.isActive
+                    ? "choosing"
+                    : "pending";
 
               return (
                 <li
                   className="mult-work-row"
                   data-step-kind={row.kind}
                   data-mult-shift={row.shiftZeroCount}
+                  data-decimal-point={decimalPointState}
                   key={row.stepId}
                 >
                   <span aria-hidden="true" className="mult-row-op">
@@ -655,6 +777,70 @@ export function LongMultiplicationRenderer({
                         value="0"
                       />
                     ))}
+                    {rowDecimalPoint?.isActive
+                      ? rowDecimalPoint.slots.map((slot) => {
+                          const slotFlagKey = toDecimalSlotFlagKey(
+                            rowDecimalPoint.stepId,
+                            slot.decimalPlaces,
+                          );
+                          const isSlotErrorPulse = Boolean(errorPulseStepIds[slotFlagKey]);
+                          const isSlotRetryLocked = Boolean(retryLockedStepIds[slotFlagKey]);
+                          const slotClassName = [
+                            "mult-decimal-slot",
+                            isSlotErrorPulse ? "inline-entry-error-pulse" : "",
+                            isSlotRetryLocked ? "inline-entry-retry-lock" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ");
+
+                          return (
+                            <button
+                              aria-label={describeDecimalSlot(
+                                slot.decimalPlaces,
+                                rowDecimalPoint.productDigitCount,
+                              )}
+                              className={slotClassName}
+                              data-decimal-places={String(slot.decimalPlaces)}
+                              data-decimal-slot-error={
+                                isSlotErrorPulse ? "pulse" : isSlotRetryLocked ? "locked" : "none"
+                              }
+                              data-entry-step-id={rowDecimalPoint.stepId}
+                              data-entry-step-kind="decimal-point"
+                              data-entry-target-id={rowDecimalPoint.targetId ?? ""}
+                              disabled={isDecimalStepRetryLocked}
+                              key={`${rowDecimalPoint.stepId}:slot:${slot.decimalPlaces}`}
+                              onClick={() => handleDecimalSlotClick(slot)}
+                              style={{ gridRowStart: 1, gridColumnStart: slot.column }}
+                              type="button"
+                            >
+                              <span aria-hidden="true" className="mult-decimal-point-dot" />
+                            </button>
+                          );
+                        })
+                      : null}
+                    {rowDecimalPoint?.placedPosition
+                      ? renderLeadingZero(rowDecimalPoint.placedPosition, "product")
+                      : null}
+                    {rowDecimalPoint?.placedPosition ? (
+                      <span
+                        aria-label={`Decimal point placed: ${renderModel.productDisplayText}`}
+                        className="mult-decimal-point mult-product-decimal-point"
+                        data-entry-animation={
+                          lockingStepIds[rowDecimalPoint.stepId] ? "lock-in" : "none"
+                        }
+                        data-entry-step-id={rowDecimalPoint.stepId}
+                        data-entry-step-kind="decimal-point"
+                        data-entry-state="locked"
+                        data-mult-decimal-point="product"
+                        role="img"
+                        style={{
+                          gridRowStart: 1,
+                          gridColumnStart: rowDecimalPoint.placedPosition.column,
+                        }}
+                      >
+                        <span className="mult-decimal-point-dot" />
+                      </span>
+                    ) : null}
                   </span>
                 </li>
               );

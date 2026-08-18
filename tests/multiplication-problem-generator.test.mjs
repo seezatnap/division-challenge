@@ -117,3 +117,76 @@ test("lifetime-aware generation maps solved counts to tier levels", async () => 
   });
   assert.equal(apexProblem.difficultyLevel, 5);
 });
+
+test("HARD tier always puts a decimal point in both factors", async () => {
+  const { generateMultiplicationProblem, getMultiplicationDifficultyTier } = await generatorModule;
+  const random = createSeededRandom(2026_08_18);
+  const hardTier = getMultiplicationDifficultyTier(5);
+
+  assert.ok(hardTier.minMultiplicandDecimalPlaces >= 1);
+  assert.ok(hardTier.minMultiplierDecimalPlaces >= 1);
+
+  for (let sampleIndex = 0; sampleIndex < 120; sampleIndex += 1) {
+    const problem = generateMultiplicationProblem({ difficultyLevel: 5, random });
+
+    assert.ok(problem.multiplicandDecimalPlaces >= 1, "multiplicand carries a decimal point");
+    assert.ok(problem.multiplierDecimalPlaces >= 1, "multiplier carries a decimal point");
+    assert.ok(
+      problem.multiplicandDecimalPlaces <= digitCount(problem.multiplicand),
+      "multiplicand decimal places never exceed its digits",
+    );
+    assert.ok(
+      problem.multiplierDecimalPlaces <= digitCount(problem.multiplier),
+      "multiplier decimal places never exceed its digits",
+    );
+  }
+});
+
+test("HARD tier only emits products whose decimal point lands beside a real digit", async () => {
+  const { generateMultiplicationProblem, isDecimalPointPlaceable } = await generatorModule;
+  const random = createSeededRandom(31337);
+  let sawPointBeforeFirstFactorDigit = false;
+
+  for (let sampleIndex = 0; sampleIndex < 200; sampleIndex += 1) {
+    const problem = generateMultiplicationProblem({ difficultyLevel: 5, random });
+    const productDigits = digitCount(problem.multiplicand * problem.multiplier);
+    const totalDecimalPlaces =
+      problem.multiplicandDecimalPlaces + problem.multiplierDecimalPlaces;
+
+    // .1 x .1 = .01 would need a padding zero, so the total may never exceed
+    // the product's digit count.
+    assert.ok(
+      totalDecimalPlaces <= productDigits,
+      `${problem.multiplicand}x${problem.multiplier} with ${totalDecimalPlaces} places needs padding`,
+    );
+    assert.equal(isDecimalPointPlaceable(productDigits, totalDecimalPlaces), true);
+
+    if (
+      problem.multiplicandDecimalPlaces === digitCount(problem.multiplicand) ||
+      problem.multiplierDecimalPlaces === digitCount(problem.multiplier)
+    ) {
+      sawPointBeforeFirstFactorDigit = true;
+    }
+  }
+
+  assert.ok(
+    sawPointBeforeFirstFactorDigit,
+    "factors are allowed to carry the point before their first digit (e.g. .884)",
+  );
+  assert.equal(isDecimalPointPlaceable(1, 2), false);
+  assert.equal(isDecimalPointPlaceable(2, 2), true);
+});
+
+test("lower tiers stay whole numbers", async () => {
+  const { generateMultiplicationProblem } = await generatorModule;
+  const random = createSeededRandom(4242);
+
+  for (const difficultyLevel of [1, 2, 3, 4]) {
+    for (let sampleIndex = 0; sampleIndex < 20; sampleIndex += 1) {
+      const problem = generateMultiplicationProblem({ difficultyLevel, random });
+
+      assert.equal(problem.multiplicandDecimalPlaces, 0);
+      assert.equal(problem.multiplierDecimalPlaces, 0);
+    }
+  }
+});

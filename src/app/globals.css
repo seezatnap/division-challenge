@@ -974,6 +974,13 @@ body {
   min-height: 1.52rem;
 }
 
+/* Every track child is explicitly placed in row 1 so decimal points can
+   share a column with a digit (they overlap) instead of auto-placement
+   pushing digits down into a second row. */
+.mult-digit-track > * {
+  grid-row: 1;
+}
+
 .mult-static-digit {
   display: inline-flex;
   justify-content: center;
@@ -1162,6 +1169,240 @@ body {
 
 .context-value-glow[data-step-focus-kind="product-sum"] {
   --context-glow-duration: 1.6s;
+}
+
+.context-value-glow[data-step-focus-kind="decimal-point"] {
+  --context-glow-duration: 1.35s;
+}
+
+/* Decimal notation. Points sit in the gap between two digit cells: each point
+   is a grid item pinned to row 1 and anchored to the digit on its right, so it
+   never moves the digits. `--mult-decimal-point-offset` is where the dot
+   centre lands relative to that digit's cell edge; half a column gap to the
+   left centres it in the gap. The dot is a filled circle resting on the digit
+   baseline (IBM Plex Mono at line-height 1, centred in the 1.52rem row). */
+.mult-notation {
+  --mult-decimal-point-width: 0.7rem;
+  --mult-decimal-slot-width: 1.05rem;
+  --mult-decimal-dot-size: 0.225rem;
+  --mult-decimal-baseline-offset: 0.36rem;
+  --mult-decimal-point-offset: calc(var(--mult-cell-gap) / -2);
+}
+
+/* Leading zero shown when a value's decimal point comes before its first
+   digit (0.7 rather than .7). Dimmed like the auto-filled place-value zeros. */
+.mult-leading-zero {
+  color: color-mix(in srgb, var(--jp-panel-text) 62%, transparent);
+}
+
+.mult-work-row .mult-leading-zero {
+  animation: mult-carry-pop-in 220ms ease-out;
+}
+
+.mult-decimal-point-dot {
+  display: block;
+  width: var(--mult-decimal-dot-size);
+  height: var(--mult-decimal-dot-size);
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0.2rem rgba(0, 0, 0, 0.25);
+}
+
+.mult-decimal-point {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  justify-self: start;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: var(--mult-decimal-point-width);
+  min-height: 1.52rem;
+  margin-inline-start: calc(
+    var(--mult-decimal-point-offset) - (var(--mult-decimal-point-width) / 2)
+  );
+  padding-bottom: var(--mult-decimal-baseline-offset);
+  color: var(--jp-panel-text);
+  pointer-events: none;
+}
+
+/* Once placed, the product point settles into the same plain style as the
+   factor points; only the arrival animation carries a brief amber flash. */
+.mult-product-decimal-point {
+  animation: mult-decimal-point-place 360ms cubic-bezier(0.22, 0.78, 0.31, 1) 1;
+}
+
+.mult-product-decimal-point .mult-decimal-point-dot {
+  animation: mult-decimal-point-settle 700ms ease-out 1;
+}
+
+@keyframes mult-decimal-point-settle {
+  0% {
+    background: var(--jp-amber-bright);
+    box-shadow:
+      0 0 0.3rem rgba(244, 212, 141, 0.7),
+      0 0 0.6rem rgba(211, 160, 58, 0.5);
+  }
+
+  100% {
+    background: currentColor;
+    box-shadow: 0 0 0.2rem rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* Glowing factor points during the decimal step: colour + glow only, so the
+   dot keeps its baseline position. */
+.mult-factor-decimal-point.context-value-glow {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 0;
+  text-shadow: none;
+  color: var(--jp-amber-bright);
+}
+
+.mult-factor-decimal-point.context-value-glow .mult-decimal-point-dot {
+  box-shadow:
+    0 0 0.3rem rgba(244, 212, 141, 0.7),
+    0 0 0.6rem rgba(211, 160, 58, 0.5);
+}
+
+@keyframes mult-decimal-point-place {
+  0% {
+    transform: translateY(-0.5rem) scale(1.9);
+    opacity: 0;
+  }
+
+  60% {
+    transform: translateY(0.05rem) scale(1.15);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Clickable candidate positions for the product's decimal point. */
+.mult-decimal-slot {
+  --mult-decimal-slot-glow-duration: 1.35s;
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  justify-self: start;
+  align-self: center;
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  width: var(--mult-decimal-slot-width);
+  height: 1.52rem;
+  margin-inline-start: calc(
+    var(--mult-decimal-point-offset) - (var(--mult-decimal-slot-width) / 2)
+  );
+  padding: 0 0 calc(var(--mult-decimal-baseline-offset) - 1px);
+  border: 1px dotted rgba(244, 212, 141, 0.7);
+  border-radius: 0.35rem;
+  background: rgba(0, 0, 0, 0.16);
+  color: var(--jp-amber-bright);
+  font: inherit;
+  cursor: pointer;
+  z-index: 1;
+  box-shadow:
+    0 0 0 1px rgba(244, 212, 141, 0.42),
+    0 0 0.7rem rgba(211, 160, 58, 0.45);
+  animation: mult-decimal-slot-pulse var(--mult-decimal-slot-glow-duration) ease-in-out infinite;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.mult-decimal-slot .mult-decimal-point-dot {
+  box-shadow:
+    0 0 0.3rem rgba(244, 212, 141, 0.7),
+    0 0 0.6rem rgba(211, 160, 58, 0.5);
+}
+
+.mult-decimal-slot::after {
+  content: "";
+  position: absolute;
+  inset: -0.18rem;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mult-decimal-slot:hover:not(:disabled),
+.mult-decimal-slot:focus-visible {
+  border-style: solid;
+  border-color: rgba(244, 212, 141, 0.95);
+  background: rgba(211, 160, 58, 0.24);
+  transform: scale(1.08);
+  animation-play-state: paused;
+}
+
+.mult-decimal-slot:focus-visible {
+  outline: 2px solid rgba(244, 212, 141, 0.92);
+  outline-offset: 2px;
+}
+
+.mult-decimal-slot:disabled {
+  cursor: not-allowed;
+}
+
+.mult-decimal-slot.inline-entry-error-pulse,
+.mult-decimal-slot.inline-entry-retry-lock {
+  border-style: solid;
+  border-color: rgba(213, 57, 57, 0.84);
+  background: rgba(213, 57, 57, 0.2);
+  color: rgba(255, 196, 196, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(213, 57, 57, 0.52),
+    0 0 1rem rgba(213, 57, 57, 0.3);
+  animation: none;
+}
+
+.mult-decimal-slot.inline-entry-error-pulse {
+  animation: inline-entry-error-shake 360ms cubic-bezier(0.22, 0.78, 0.31, 1) 1;
+}
+
+.mult-decimal-slot.inline-entry-error-pulse .mult-decimal-point-dot,
+.mult-decimal-slot.inline-entry-retry-lock .mult-decimal-point-dot {
+  box-shadow: none;
+}
+
+@keyframes mult-decimal-slot-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+    box-shadow:
+      0 0 0 1px rgba(244, 212, 141, 0.42),
+      0 0 0.55rem rgba(211, 160, 58, 0.4);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+    box-shadow:
+      0 0 0 1px rgba(244, 212, 141, 0.9),
+      0 0 1.05rem rgba(211, 160, 58, 0.82);
+  }
+}
+
+/* While the point is being chosen, dim the product digits slightly so the
+   pulsing slots read as the active target. */
+.mult-work-row[data-decimal-point="choosing"] .inline-entry-work-row.inline-entry-locked {
+  color: color-mix(in srgb, var(--jp-panel-text) 82%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mult-decimal-slot,
+  .mult-product-decimal-point {
+    animation: none;
+  }
 }
 
 @keyframes inline-entry-lock-in {

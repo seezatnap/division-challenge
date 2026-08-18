@@ -27,8 +27,14 @@ export interface DivisionProblem {
 
 export interface MultiplicationProblem {
   id: string;
+  /** Digit string of the top factor as an integer, e.g. 8.84 is stored as 884. */
   multiplicand: number;
+  /** Digit string of the bottom factor as an integer, e.g. 8.6 is stored as 86. */
   multiplier: number;
+  /** Decimal places in the top factor (0 or omitted for whole numbers). */
+  multiplicandDecimalPlaces?: number;
+  /** Decimal places in the bottom factor (0 or omitted for whole numbers). */
+  multiplierDecimalPlaces?: number;
   difficultyLevel: number;
 }
 
@@ -38,7 +44,7 @@ export type LongDivisionStepKind =
   | "subtraction-result"
   | "bring-down";
 
-export type LongMultiplicationStepKind = "partial-product" | "product-sum";
+export type LongMultiplicationStepKind = "partial-product" | "product-sum" | "decimal-point";
 
 export type WorkspaceStepKind = LongDivisionStepKind | LongMultiplicationStepKind;
 
@@ -52,6 +58,7 @@ export const LONG_DIVISION_STEP_ORDER = [
 export const LONG_MULTIPLICATION_STEP_ORDER = [
   "partial-product",
   "product-sum",
+  "decimal-point",
 ] as const satisfies readonly LongMultiplicationStepKind[];
 
 export interface WorkspaceStep {

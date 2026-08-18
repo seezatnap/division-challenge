@@ -17,12 +17,88 @@ export interface LongMultiplicationSolution {
   readonly problemId: MultiplicationProblem["id"];
   readonly multiplicand: number;
   readonly multiplier: number;
+  /** Product of the factor digit strings, ignoring any decimal points. */
   readonly product: number;
+  readonly multiplicandDecimalPlaces: number;
+  readonly multiplierDecimalPlaces: number;
+  /** Decimal places in the product: the two factor counts added together. */
+  readonly productDecimalPlaces: number;
   readonly partialProducts: readonly LongMultiplicationPartialProduct[];
   readonly steps: readonly LongMultiplicationStep[];
 }
 
+export interface MultiplicationDecimalPlaces {
+  readonly multiplicandDecimalPlaces: number;
+  readonly multiplierDecimalPlaces: number;
+  readonly productDecimalPlaces: number;
+}
+
 const DECIMAL_BASE = 10;
+
+function normalizeDecimalPlaces(value: number | undefined, argumentName: string): number {
+  if (typeof value === "undefined") {
+    return 0;
+  }
+
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError(`${argumentName} must be a non-negative integer.`);
+  }
+
+  return value;
+}
+
+/**
+ * Resolves the decimal-place counts for a problem. Whole-number problems
+ * (the default) report zero everywhere and produce no decimal-point step.
+ */
+export function getMultiplicationDecimalPlaces(
+  problem: Pick<MultiplicationProblem, "multiplicandDecimalPlaces" | "multiplierDecimalPlaces">,
+): MultiplicationDecimalPlaces {
+  const multiplicandDecimalPlaces = normalizeDecimalPlaces(
+    problem.multiplicandDecimalPlaces,
+    "problem.multiplicandDecimalPlaces",
+  );
+  const multiplierDecimalPlaces = normalizeDecimalPlaces(
+    problem.multiplierDecimalPlaces,
+    "problem.multiplierDecimalPlaces",
+  );
+
+  return {
+    multiplicandDecimalPlaces,
+    multiplierDecimalPlaces,
+    productDecimalPlaces: multiplicandDecimalPlaces + multiplierDecimalPlaces,
+  };
+}
+
+/**
+ * Inserts a decimal point into a digit string, e.g. ("884", 2) -> "8.84".
+ * A count equal to the digit length puts the point in front and adds the
+ * conventional leading zero ("0.884"); zero returns the digits unchanged. The
+ * digits themselves are never padded.
+ */
+export function formatDigitsWithDecimalPoint(digits: string, decimalPlaces: number): string {
+  if (!/^\d+$/.test(digits)) {
+    throw new Error("digits must be a non-empty string of numeric characters.");
+  }
+
+  if (!Number.isInteger(decimalPlaces) || decimalPlaces < 0) {
+    throw new RangeError("decimalPlaces must be a non-negative integer.");
+  }
+
+  if (decimalPlaces === 0) {
+    return digits;
+  }
+
+  if (decimalPlaces > digits.length) {
+    throw new RangeError(
+      `decimalPlaces (${decimalPlaces}) must not exceed the digit count (${digits.length}).`,
+    );
+  }
+
+  const splitIndex = digits.length - decimalPlaces;
+  const integerPart = splitIndex === 0 ? "0" : digits.slice(0, splitIndex);
+  return `${integerPart}.${digits.slice(splitIndex)}`;
+}
 
 function assertNonEmptyString(value: string, argumentName: string): void {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -81,6 +157,22 @@ export function solveLongMultiplication(
   assertPositiveInteger(problem.multiplicand, "problem.multiplicand");
   assertPositiveInteger(problem.multiplier, "problem.multiplier");
 
+  const decimalPlaces = getMultiplicationDecimalPlaces(problem);
+  const multiplicandDigitCount = String(problem.multiplicand).length;
+  const multiplierDigitCount = String(problem.multiplier).length;
+
+  if (decimalPlaces.multiplicandDecimalPlaces > multiplicandDigitCount) {
+    throw new RangeError(
+      "problem.multiplicandDecimalPlaces must not exceed the multiplicand digit count.",
+    );
+  }
+
+  if (decimalPlaces.multiplierDecimalPlaces > multiplierDigitCount) {
+    throw new RangeError(
+      "problem.multiplierDecimalPlaces must not exceed the multiplier digit count.",
+    );
+  }
+
   const multiplierDigits = toMultiplierDigitsRightToLeft(problem.multiplier);
   const partialProducts: LongMultiplicationPartialProduct[] = [];
   const steps: LongMultiplicationStep[] = [];
@@ -103,6 +195,23 @@ export function solveLongMultiplication(
 
   if (multiplierDigits.length > 1) {
     steps.push(createStep(problem.id, sequenceIndex, "product-sum", product));
+    sequenceIndex += 1;
+  }
+
+  if (decimalPlaces.productDecimalPlaces > 0) {
+    // The point must land beside a digit that is really in the product, so a
+    // problem such as .1 x .1 (= .01, needing a padding zero) is rejected.
+    if (decimalPlaces.productDecimalPlaces > String(product).length) {
+      throw new RangeError(
+        "The combined decimal places must not exceed the product digit count.",
+      );
+    }
+
+    // The player answers this step by choosing how many product digits sit to
+    // the right of the decimal point.
+    steps.push(
+      createStep(problem.id, sequenceIndex, "decimal-point", decimalPlaces.productDecimalPlaces),
+    );
   }
 
   return {
@@ -110,6 +219,7 @@ export function solveLongMultiplication(
     multiplicand: problem.multiplicand,
     multiplier: problem.multiplier,
     product,
+    ...decimalPlaces,
     partialProducts,
     steps,
   };

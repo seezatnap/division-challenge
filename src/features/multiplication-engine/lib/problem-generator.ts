@@ -6,6 +6,16 @@ export interface MultiplicationDifficultyTier {
   readonly maxMultiplicandDigits: number;
   readonly minMultiplierDigits: number;
   readonly maxMultiplierDigits: number;
+  /**
+   * Decimal places allowed in the multiplicand. Omitted means whole numbers
+   * only. A value equal to the digit count puts the point before the first
+   * digit (e.g. .884).
+   */
+  readonly minMultiplicandDecimalPlaces?: number;
+  readonly maxMultiplicandDecimalPlaces?: number;
+  /** Decimal places allowed in the multiplier; omitted means whole numbers only. */
+  readonly minMultiplierDecimalPlaces?: number;
+  readonly maxMultiplierDecimalPlaces?: number;
 }
 
 export interface MultiplicationProblemGenerationOptions {
@@ -59,11 +69,16 @@ export const MULTIPLICATION_DIFFICULTY_TIERS = [
     maxMultiplierDigits: 2,
   },
   {
+    // HARD: decimal multiplication. Both factors always carry a decimal point.
     level: 5,
     minMultiplicandDigits: 3,
     maxMultiplicandDigits: 3,
     minMultiplierDigits: 2,
     maxMultiplierDigits: 2,
+    minMultiplicandDecimalPlaces: 1,
+    maxMultiplicandDecimalPlaces: 3,
+    minMultiplierDecimalPlaces: 1,
+    maxMultiplierDecimalPlaces: 2,
   },
 ] as const satisfies readonly MultiplicationDifficultyTier[];
 
@@ -112,6 +127,32 @@ function randomInteger(min: number, max: number, random: () => number): number {
 
 function randomNonZeroDigit(random: () => number): number {
   return randomInteger(2, 9, random);
+}
+
+function randomDecimalPlaces(
+  digits: number,
+  minDecimalPlaces: number | undefined,
+  maxDecimalPlaces: number | undefined,
+  random: () => number,
+): number {
+  // Never ask for more decimal places than the factor has digits.
+  const min = Math.min(digits, Math.max(0, minDecimalPlaces ?? 0));
+  const max = Math.min(digits, Math.max(min, maxDecimalPlaces ?? 0));
+
+  return randomInteger(min, max, random);
+}
+
+/**
+ * A decimal product is only valid when its decimal point lands beside a digit
+ * that actually appears in the product. `.1 x .1 = .01` would need a padding
+ * zero, so it is rejected; `.2 x .5 = .10` is fine because the point sits
+ * right before the leading `1`.
+ */
+export function isDecimalPointPlaceable(
+  productDigitCount: number,
+  totalDecimalPlaces: number,
+): boolean {
+  return totalDecimalPlaces >= 0 && totalDecimalPlaces <= productDigitCount;
 }
 
 function randomFactorWithDigits(digits: number, random: () => number): number {
@@ -189,8 +230,30 @@ export function generateMultiplicationProblem(
 
     const multiplicand = randomFactorWithDigits(multiplicandDigits, random);
     const multiplier = randomFactorWithDigits(multiplierDigits, random);
+    const multiplicandDecimalPlaces = randomDecimalPlaces(
+      multiplicandDigits,
+      difficultyTier.minMultiplicandDecimalPlaces,
+      difficultyTier.maxMultiplicandDecimalPlaces,
+      random,
+    );
+    const multiplierDecimalPlaces = randomDecimalPlaces(
+      multiplierDigits,
+      difficultyTier.minMultiplierDecimalPlaces,
+      difficultyTier.maxMultiplierDecimalPlaces,
+      random,
+    );
+    const product = multiplicand * multiplier;
 
-    if (!Number.isSafeInteger(multiplicand * multiplier)) {
+    if (!Number.isSafeInteger(product)) {
+      continue;
+    }
+
+    if (
+      !isDecimalPointPlaceable(
+        String(product).length,
+        multiplicandDecimalPlaces + multiplierDecimalPlaces,
+      )
+    ) {
       continue;
     }
 
@@ -198,6 +261,8 @@ export function generateMultiplicationProblem(
       id: createProblemId(difficultyTier.level, random),
       multiplicand,
       multiplier,
+      multiplicandDecimalPlaces,
+      multiplierDecimalPlaces,
       difficultyLevel: difficultyTier.level,
     };
   }

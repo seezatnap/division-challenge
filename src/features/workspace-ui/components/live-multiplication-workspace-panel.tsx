@@ -16,6 +16,8 @@ import { LongMultiplicationRenderer } from "./long-multiplication-renderer";
 export interface LiveMultiplicationWorkspacePanelProps {
   readonly multiplicand: number;
   readonly multiplier: number;
+  readonly multiplicandDecimalPlaces?: number;
+  readonly multiplierDecimalPlaces?: number;
   readonly steps: readonly LongMultiplicationStep[];
   readonly onStepValidation?: (validation: LongDivisionStepValidationResult) => void;
 }
@@ -27,6 +29,8 @@ interface CoachMessageEntry {
 export function LiveMultiplicationWorkspacePanel({
   multiplicand,
   multiplier,
+  multiplicandDecimalPlaces = 0,
+  multiplierDecimalPlaces = 0,
   steps,
   onStepValidation,
 }: LiveMultiplicationWorkspacePanelProps) {
@@ -60,7 +64,9 @@ export function LiveMultiplicationWorkspacePanel({
     <div className="game-grid">
       <LongMultiplicationRenderer
         multiplicand={multiplicand}
+        multiplicandDecimalPlaces={multiplicandDecimalPlaces}
         multiplier={multiplier}
+        multiplierDecimalPlaces={multiplierDecimalPlaces}
         onActiveStepFocusChange={handleActiveStepFocusChange}
         onStepValidation={handleStepValidation}
         steps={steps}

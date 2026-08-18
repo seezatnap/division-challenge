@@ -38,6 +38,7 @@ const STEP_CORRECT_HINT_KEYS = {
   "bring-down": "dino.feedback.correct.bring-down",
   "partial-product": "dino.feedback.correct.partial-product",
   "product-sum": "dino.feedback.correct.product-sum",
+  "decimal-point": "dino.feedback.correct.decimal-point",
 } as const satisfies Record<WorkspaceStepKind, string>;
 
 const STEP_RETRY_HINT_KEYS = {
@@ -47,6 +48,7 @@ const STEP_RETRY_HINT_KEYS = {
   "bring-down": "dino.feedback.retry.bring-down",
   "partial-product": "dino.feedback.retry.partial-product",
   "product-sum": "dino.feedback.retry.product-sum",
+  "decimal-point": "dino.feedback.retry.decimal-point",
 } as const satisfies Record<WorkspaceStepKind, string>;
 
 function assertStepList(steps: readonly WorkspaceStep[]): void {
