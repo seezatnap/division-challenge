@@ -33,9 +33,9 @@ async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
   return toDataUrl(compiled);
 }
 
-async function loadImageStatusRoute(getGeminiRewardImageGenerationStatusImpl) {
+async function loadImageStatusRoute(getRewardImageGenerationStatusImpl) {
   const callbackName = `__routeRewardImageStatus_${Math.random().toString(16).slice(2)}`;
-  globalThis[callbackName] = getGeminiRewardImageGenerationStatusImpl;
+  globalThis[callbackName] = getRewardImageGenerationStatusImpl;
 
   const nextServerModuleUrl = toDataUrl(`
     export const NextResponse = {
@@ -49,12 +49,12 @@ async function loadImageStatusRoute(getGeminiRewardImageGenerationStatusImpl) {
   `);
 
   const serviceModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/gemini-image-service.ts",
+    "src/features/rewards/lib/reward-image-service.ts",
   );
   const serviceModule = await import(serviceModuleUrl);
 
   const imageCacheModuleUrl = toDataUrl(`
-    export async function getGeminiRewardImageGenerationStatus(dinosaurName) {
+    export async function getRewardImageGenerationStatus(dinosaurName) {
       return await globalThis.${callbackName}(dinosaurName);
     }
   `);
@@ -63,8 +63,8 @@ async function loadImageStatusRoute(getGeminiRewardImageGenerationStatusImpl) {
     "src/app/api/rewards/image-status/route.ts",
     {
       "next/server": nextServerModuleUrl,
-      "@/features/rewards/lib/gemini-image-cache": imageCacheModuleUrl,
-      "@/features/rewards/lib/gemini-image-service": serviceModuleUrl,
+      "@/features/rewards/lib/reward-image-cache": imageCacheModuleUrl,
+      "@/features/rewards/lib/reward-image-service": serviceModuleUrl,
     },
   );
   const routeModule = await import(routeModuleUrl);
@@ -132,11 +132,11 @@ test("GET /api/rewards/image-status returns image readiness snapshot", async () 
   }
 });
 
-test("GET /api/rewards/image-status maps known GeminiImageGenerationError failures", async () => {
+test("GET /api/rewards/image-status maps known RewardImageGenerationError failures", async () => {
   const { routeModule, serviceModule, cleanup } = await loadImageStatusRoute(async () => {
-    throw new serviceModule.GeminiImageGenerationError(
-      "GEMINI_REQUEST_FAILED",
-      "Gemini image generation request failed.",
+    throw new serviceModule.RewardImageGenerationError(
+      "IMAGE_REQUEST_FAILED",
+      "OpenAI image generation request failed.",
       502,
     );
   });
@@ -150,8 +150,8 @@ test("GET /api/rewards/image-status maps known GeminiImageGenerationError failur
     assert.equal(response.status, 502);
     assert.deepEqual(body, {
       error: {
-        code: "GEMINI_REQUEST_FAILED",
-        message: "Gemini image generation request failed.",
+        code: "IMAGE_REQUEST_FAILED",
+        message: "OpenAI image generation request failed.",
       },
     });
   } finally {

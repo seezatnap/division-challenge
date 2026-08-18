@@ -6,7 +6,7 @@ import {
   getMilestoneSolvedCountForRewardNumber,
   getRewardNumberForSolvedCount,
 } from "./dinosaurs";
-import { toRewardImageCacheSlug } from "./gemini-image-cache";
+import { toRewardImageCacheSlug } from "./reward-image-cache";
 
 function assertNonNegativeInteger(value: number, argumentName: string): void {
   if (!Number.isInteger(value) || value < 0) {

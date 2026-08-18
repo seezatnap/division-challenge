@@ -52,13 +52,13 @@ const rewardMilestoneModule = (async () => {
     "src/features/rewards/lib/dinosaurs.ts",
   );
   const imageCacheModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/gemini-image-cache.ts",
+    "src/features/rewards/lib/reward-image-cache.ts",
   );
   const milestoneModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/milestones.ts",
     {
       "./dinosaurs": dinosaursModuleUrl,
-      "./gemini-image-cache": imageCacheModuleUrl,
+      "./reward-image-cache": imageCacheModuleUrl,
     },
   );
 

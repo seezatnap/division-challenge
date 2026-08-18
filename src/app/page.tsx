@@ -45,7 +45,6 @@ import {
   getDinosaurForRewardNumber,
   getMilestoneSolvedCountForRewardNumber,
 } from "@/features/rewards/lib/dinosaurs";
-import { NANO_BANANA_PRO_IMAGE_MODEL } from "@/features/rewards/lib/gemini";
 import {
   buildHybridDinosaurDossier,
   formatMetersAsMetersAndFeet,
@@ -1709,7 +1708,6 @@ export default function Home() {
   const requestAmberImageGeneration = useCallback(async () => {
     const generationResult = await requestGeneratedImage({
       assetName: AMBER_REWARD_ASSET_NAME,
-      modelOverride: NANO_BANANA_PRO_IMAGE_MODEL,
     });
     if (!generationResult) {
       return;

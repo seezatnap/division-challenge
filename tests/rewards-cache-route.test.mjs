@@ -68,19 +68,19 @@ async function loadRewardsCacheRoute({
   `);
 
   const imageCacheModuleUrl = toDataUrl(`
-    export async function listGeminiRewardImageCacheDatabaseRecords() {
+    export async function listRewardImageCacheDatabaseRecords() {
       return await globalThis.${listCallbackName}();
     }
 
-    export async function getGeminiRewardImageCacheDatabaseRecord(dinosaurName) {
+    export async function getRewardImageCacheDatabaseRecord(dinosaurName) {
       return await globalThis.${getCallbackName}(dinosaurName);
     }
 
-    export async function deleteGeminiRewardImageCacheEntry(dinosaurName) {
+    export async function deleteRewardImageCacheEntry(dinosaurName) {
       return await globalThis.${deleteCallbackName}(dinosaurName);
     }
 
-    export function getGeminiRewardCacheDatabaseLocation() {
+    export function getRewardCacheDatabaseLocation() {
       return globalThis.${locationCallbackName}();
     }
   `);
@@ -89,7 +89,7 @@ async function loadRewardsCacheRoute({
     "src/app/api/rewards/cache/route.ts",
     {
       "next/server": nextServerModuleUrl,
-      "@/features/rewards/lib/gemini-image-cache": imageCacheModuleUrl,
+      "@/features/rewards/lib/reward-image-cache": imageCacheModuleUrl,
     },
   );
   const routeModule = await import(routeModuleUrl);

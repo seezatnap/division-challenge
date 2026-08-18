@@ -38,13 +38,13 @@ async function loadRewardPrefetchModule() {
     "src/features/rewards/lib/dinosaurs.ts",
   );
   const imageCacheModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/gemini-image-cache.ts",
+    "src/features/rewards/lib/reward-image-cache.ts",
   );
   const prefetchModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/prefetch.ts",
     {
       "./dinosaurs": dinosaursModuleUrl,
-      "./gemini-image-cache": imageCacheModuleUrl,
+      "./reward-image-cache": imageCacheModuleUrl,
     },
   );
 
@@ -105,7 +105,7 @@ test("triggerNearMilestoneRewardPrefetch skips all work when not near a mileston
         cacheCheckCount += 1;
         return false;
       },
-      prefetchGeminiRewardImageWithFilesystemCache: async () => {
+      prefetchRewardImageWithFilesystemCache: async () => {
         prefetchCallCount += 1;
         return "started";
       },
@@ -135,7 +135,7 @@ test("triggerNearMilestoneRewardPrefetch checks cache first and skips generation
         assert.equal(dinosaurName, "Tyrannosaurus Rex");
         return true;
       },
-      prefetchGeminiRewardImageWithFilesystemCache: async () => {
+      prefetchRewardImageWithFilesystemCache: async () => {
         prefetchCallCount += 1;
         return "started";
       },
@@ -165,7 +165,7 @@ test("triggerNearMilestoneRewardPrefetch starts background generation only when 
         assert.equal(dinosaurName, "Tyrannosaurus Rex");
         return false;
       },
-      prefetchGeminiRewardImageWithFilesystemCache: async (request) => {
+      prefetchRewardImageWithFilesystemCache: async (request) => {
         prefetchCallCount += 1;
         assert.deepEqual(request, { dinosaurName: "Tyrannosaurus Rex" });
         return "started";
@@ -190,7 +190,7 @@ test("triggerNearMilestoneRewardPrefetch reports already-in-flight status when d
     },
     {
       doesRewardImageExistOnDisk: async () => false,
-      prefetchGeminiRewardImageWithFilesystemCache: async () => "already-in-flight",
+      prefetchRewardImageWithFilesystemCache: async () => "already-in-flight",
     },
   );
 
@@ -212,7 +212,7 @@ test("triggerNearMilestoneRewardPrefetch reports skipped-already-cached when cac
     },
     {
       doesRewardImageExistOnDisk: async () => false,
-      prefetchGeminiRewardImageWithFilesystemCache: async () => "already-cached",
+      prefetchRewardImageWithFilesystemCache: async () => "already-cached",
     },
   );
 

@@ -34,9 +34,9 @@ async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
 }
 
 async function loadGenerateImageRoute(
-  generateGeminiRewardImageImpl,
+  generateRewardImageImpl,
   ensureRewardDossierArtifactsImpl = async () => undefined,
-  getGeminiRewardImageGenerationStatusImpl = async (dinosaurName) => ({
+  getRewardImageGenerationStatusImpl = async (dinosaurName) => ({
     dinosaurName,
     status: "ready",
     imagePath: `/rewards/${String(dinosaurName)
@@ -48,9 +48,9 @@ async function loadGenerateImageRoute(
   const callbackName = `__routeGenerateImage_${Math.random().toString(16).slice(2)}`;
   const dossierCallbackName = `__routeEnsureDossiers_${Math.random().toString(16).slice(2)}`;
   const statusCallbackName = `__routeGetImageStatus_${Math.random().toString(16).slice(2)}`;
-  globalThis[callbackName] = generateGeminiRewardImageImpl;
+  globalThis[callbackName] = generateRewardImageImpl;
   globalThis[dossierCallbackName] = ensureRewardDossierArtifactsImpl;
-  globalThis[statusCallbackName] = getGeminiRewardImageGenerationStatusImpl;
+  globalThis[statusCallbackName] = getRewardImageGenerationStatusImpl;
 
   const nextServerModuleUrl = toDataUrl(`
     export const NextResponse = {
@@ -64,12 +64,12 @@ async function loadGenerateImageRoute(
   `);
 
   const serviceModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/gemini-image-service.ts",
+    "src/features/rewards/lib/reward-image-service.ts",
   );
   const serviceModule = await import(serviceModuleUrl);
 
   const runtimeModuleUrl = toDataUrl(`
-    export async function generateGeminiRewardImage(payload) {
+    export async function generateRewardImage(payload) {
       return await globalThis.${callbackName}(payload);
     }
   `);
@@ -79,7 +79,7 @@ async function loadGenerateImageRoute(
     }
   `);
   const imageCacheModuleUrl = toDataUrl(`
-    export async function getGeminiRewardImageGenerationStatus(dinosaurName) {
+    export async function getRewardImageGenerationStatus(dinosaurName) {
       return await globalThis.${statusCallbackName}(dinosaurName);
     }
   `);
@@ -89,9 +89,9 @@ async function loadGenerateImageRoute(
     {
       "next/server": nextServerModuleUrl,
       "@/features/rewards/lib/dossier-artifacts": dossierArtifactModuleUrl,
-      "@/features/rewards/lib/gemini-image-cache": imageCacheModuleUrl,
-      "@/features/rewards/lib/gemini-image-runtime": runtimeModuleUrl,
-      "@/features/rewards/lib/gemini-image-service": serviceModuleUrl,
+      "@/features/rewards/lib/reward-image-cache": imageCacheModuleUrl,
+      "@/features/rewards/lib/reward-image-runtime": runtimeModuleUrl,
+      "@/features/rewards/lib/reward-image-service": serviceModuleUrl,
     },
   );
   const routeModule = await import(routeModuleUrl);
@@ -109,7 +109,7 @@ async function loadGenerateImageRoute(
 
 test("POST /api/rewards/generate-image returns INVALID_REQUEST for malformed JSON", async () => {
   const { routeModule, cleanup } = await loadGenerateImageRoute(async () => {
-    assert.fail("generateGeminiRewardImage should not be called for malformed JSON");
+    assert.fail("generateRewardImage should not be called for malformed JSON");
   });
 
   try {
@@ -136,15 +136,15 @@ test("POST /api/rewards/generate-image returns INVALID_REQUEST for malformed JSO
   }
 });
 
-test("POST /api/rewards/generate-image maps known GeminiImageGenerationError responses", async () => {
+test("POST /api/rewards/generate-image maps known RewardImageGenerationError responses", async () => {
   let seenPayload;
 
   const { routeModule, serviceModule, cleanup } = await loadGenerateImageRoute(async (payload) => {
     seenPayload = payload;
 
-    throw new serviceModule.GeminiImageGenerationError(
-      "GEMINI_REQUEST_FAILED",
-      "Gemini image generation request failed.",
+    throw new serviceModule.RewardImageGenerationError(
+      "IMAGE_REQUEST_FAILED",
+      "OpenAI image generation request failed.",
       502,
     );
   });
@@ -165,8 +165,8 @@ test("POST /api/rewards/generate-image maps known GeminiImageGenerationError res
     assert.deepEqual(seenPayload, { dinosaurName: "Triceratops" });
     assert.deepEqual(body, {
       error: {
-        code: "GEMINI_REQUEST_FAILED",
-        message: "Gemini image generation request failed.",
+        code: "IMAGE_REQUEST_FAILED",
+        message: "OpenAI image generation request failed.",
       },
     });
   } finally {
@@ -178,7 +178,7 @@ test("POST /api/rewards/generate-image wraps successful image output in a data e
   const generatedImage = {
     dinosaurName: "Brachiosaurus",
     prompt: "cinematic portrait of Brachiosaurus",
-    model: "gemini-2.0-flash-exp",
+    model: "gpt-image-2",
     mimeType: "image/png",
     imageBase64: "YWJjZA==",
   };

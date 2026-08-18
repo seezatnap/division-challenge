@@ -4,7 +4,7 @@ export const rewardsModule: FeatureModuleDescriptor = {
   id: "rewards",
   title: "Rewards",
   summary:
-    "Milestone tracking, Gemini generation orchestration, prefetch flow, and earned reward reveal UX.",
+    "Milestone tracking, OpenAI generation orchestration, prefetch flow, and earned reward reveal UX.",
   rootPath: "src/features/rewards",
 };
 

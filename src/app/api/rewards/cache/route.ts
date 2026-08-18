@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 import {
-  deleteGeminiRewardImageCacheEntry,
-  getGeminiRewardCacheDatabaseLocation,
-  getGeminiRewardImageCacheDatabaseRecord,
-  listGeminiRewardImageCacheDatabaseRecords,
-} from "@/features/rewards/lib/gemini-image-cache";
+  deleteRewardImageCacheEntry,
+  getRewardCacheDatabaseLocation,
+  getRewardImageCacheDatabaseRecord,
+  listRewardImageCacheDatabaseRecords,
+} from "@/features/rewards/lib/reward-image-cache";
 
 export const runtime = "nodejs";
 
@@ -37,10 +37,10 @@ function parseDinosaurNameFromRequest(request: Request): string | null {
 export async function GET(request: Request): Promise<Response> {
   try {
     const dinosaurName = parseDinosaurNameFromRequest(request);
-    const databaseLocation = getGeminiRewardCacheDatabaseLocation();
+    const databaseLocation = getRewardCacheDatabaseLocation();
 
     if (dinosaurName) {
-      const record = await getGeminiRewardImageCacheDatabaseRecord(dinosaurName);
+      const record = await getRewardImageCacheDatabaseRecord(dinosaurName);
       return NextResponse.json(
         {
           data: {
@@ -52,7 +52,7 @@ export async function GET(request: Request): Promise<Response> {
       );
     }
 
-    const records = await listGeminiRewardImageCacheDatabaseRecords();
+    const records = await listRewardImageCacheDatabaseRecords();
     return NextResponse.json(
       {
         data: {
@@ -80,12 +80,12 @@ export async function DELETE(request: Request): Promise<Response> {
   }
 
   try {
-    const deletionResult = await deleteGeminiRewardImageCacheEntry(dinosaurName);
+    const deletionResult = await deleteRewardImageCacheEntry(dinosaurName);
     return NextResponse.json(
       {
         data: {
           ...deletionResult,
-          database: getGeminiRewardCacheDatabaseLocation(),
+          database: getRewardCacheDatabaseLocation(),
         },
       },
       { status: 200 },

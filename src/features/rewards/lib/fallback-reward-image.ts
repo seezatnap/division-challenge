@@ -1,4 +1,4 @@
-import type { GeminiGeneratedImage } from "./gemini-image-service";
+import type { GeneratedRewardImage } from "./reward-image-service";
 
 const FALLBACK_REWARD_IMAGE_MODEL = "local-fallback-svg";
 const FALLBACK_REWARD_IMAGE_MIME_TYPE = "image/svg+xml";
@@ -39,7 +39,7 @@ function toFallbackRewardSvgMarkup(dinosaurName: string): string {
   ].join("\n");
 }
 
-export function createFallbackRewardImage(dinosaurName: string): GeminiGeneratedImage {
+export function createFallbackRewardImage(dinosaurName: string): GeneratedRewardImage {
   const normalizedDinosaurName = dinosaurName.trim();
   if (normalizedDinosaurName.length === 0) {
     throw new Error("dinosaurName must be a non-empty string.");

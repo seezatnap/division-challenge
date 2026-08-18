@@ -686,9 +686,9 @@ test("visual workflow: solving a full problem advances to the next question and 
 
     const statusNotices = await page.locator('p[role="status"]').allTextContents();
     assert.equal(
-      statusNotices.some((notice) => notice.includes("Gemini configuration is missing or invalid")),
+      statusNotices.some((notice) => notice.includes("OpenAI configuration is missing or invalid")),
       false,
-      "Expected reward generation to avoid Gemini configuration error notices via runtime fallback.",
+      "Expected reward generation to avoid OpenAI configuration error notices via runtime fallback.",
     );
   } finally {
     await context.close();

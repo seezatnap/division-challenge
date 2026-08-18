@@ -12,12 +12,16 @@ Detailed setup, environment, storage, fallback, and test workflow docs live in
 ```bash
 npm ci
 cat <<'EOF' > .env.local
-GEMINI_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_api_key_here
 EOF
 npm run dev
 ```
 
-`GEMINI_API_KEY` is required for Gemini reward image generation.
+`OPENAI_API_KEY` is required for reward generation (dossiers, exact-appearance
+briefs, and images all come from OpenAI). Optional overrides:
+`OPENAI_TEXT_MODEL` (default `gpt-5.6-luna`), `OPENAI_IMAGE_MODEL` (default
+`gpt-image-2`), `OPENAI_IMAGE_SIZE` (default `1536x1024`),
+`OPENAI_IMAGE_QUALITY` (default `medium`), `OPENAI_BASE_URL`.
 
 ## Validation
 
@@ -31,7 +35,7 @@ npm run build
 Targeted checks for this feature set:
 
 ```bash
-node --test tests/rewards-gemini-config.test.mjs
+node --test tests/rewards-openai-config.test.mjs
 node --test tests/persistence-file-system-save-load.test.mjs
 node --test tests/player-journey-smoke.test.mjs
 ```

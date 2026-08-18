@@ -4,16 +4,16 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 import type {
-  GeminiGeneratedImage,
-  GeminiImageGenerationRequest,
-} from "./gemini-image-service";
+  GeneratedRewardImage,
+  RewardImageGenerationRequest,
+} from "./reward-image-service";
 
 const DEFAULT_REWARD_IMAGE_DIRECTORY = path.join(process.cwd(), "public", "rewards");
 const CACHE_METADATA_SUFFIX = ".metadata.json";
 const DEFAULT_CACHE_MODEL = "filesystem-cache";
 const SQLITE_DIRECTORY_NAME = ".sqlite";
 const DEFAULT_SQLITE_DATABASE_FILE = "division-challenge.sqlite3";
-const inFlightRewardImageGenerations = new Map<string, Promise<GeminiGeneratedImage>>();
+const inFlightRewardImageGenerations = new Map<string, Promise<GeneratedRewardImage>>();
 
 const SUPPORTED_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "svg"] as const;
 type SupportedImageExtension = (typeof SUPPORTED_IMAGE_EXTENSIONS)[number];
@@ -43,7 +43,7 @@ interface RewardImageCacheMetadata {
   mimeType: string;
 }
 
-export interface FilesystemGeminiImageCacheOptions {
+export interface FilesystemRewardImageCacheOptions {
   outputDirectory?: string;
 }
 
@@ -53,27 +53,27 @@ export interface CachedRewardImageFile {
   modifiedTimeMs: number;
 }
 
-export type GeminiRewardImageGenerationStatus = "ready" | "generating" | "missing";
+export type RewardImageGenerationStatus = "ready" | "generating" | "missing";
 
-export interface GeminiRewardImageGenerationStatusSnapshot {
+export interface RewardImageGenerationStatusSnapshot {
   dinosaurName: string;
-  status: GeminiRewardImageGenerationStatus;
+  status: RewardImageGenerationStatus;
   imagePath: string | null;
 }
 
-export type GeminiRewardImagePrefetchStatus =
+export type RewardImagePrefetchStatus =
   | "already-cached"
   | "already-in-flight"
   | "started";
 
-export interface GeminiRewardCacheDatabaseLocationSnapshot {
+export interface RewardCacheDatabaseLocationSnapshot {
   projectRoot: string;
   sqliteDirectory: string;
   databaseFile: string;
   databasePath: string;
 }
 
-export interface GeminiRewardImageCacheDatabaseRecord {
+export interface RewardImageCacheDatabaseRecord {
   slug: string;
   dinosaurName: string;
   prompt: string;
@@ -83,11 +83,11 @@ export interface GeminiRewardImageCacheDatabaseRecord {
   absoluteImagePath: string;
   imagePath: string | null;
   updatedAtMs: number;
-  status: GeminiRewardImageGenerationStatus;
+  status: RewardImageGenerationStatus;
   statusUpdatedAtMs: number;
 }
 
-export interface DeleteGeminiRewardImageCacheEntryResult {
+export interface DeleteRewardImageCacheEntryResult {
   dinosaurName: string;
   deletedDatabaseRecord: boolean;
 }
@@ -125,14 +125,14 @@ function normalizeDinosaurName(dinosaurName: string): string {
   return normalizedName;
 }
 
-function resolveOutputDirectory(options: FilesystemGeminiImageCacheOptions): string {
+function resolveOutputDirectory(options: FilesystemRewardImageCacheOptions): string {
   const configuredOutputDirectory = getTrimmedNonEmptyString(options.outputDirectory);
   return configuredOutputDirectory ?? DEFAULT_REWARD_IMAGE_DIRECTORY;
 }
 
 function toInFlightRewardImageGenerationKey(
   dinosaurName: string,
-  options: FilesystemGeminiImageCacheOptions,
+  options: FilesystemRewardImageCacheOptions,
 ): string {
   const slug = toRewardImageCacheSlug(dinosaurName);
   const outputDirectory = path.resolve(resolveOutputDirectory(options));
@@ -168,7 +168,7 @@ function resolveSqliteDatabaseFileName(): string {
   );
 }
 
-export function getGeminiRewardCacheDatabaseLocation(): GeminiRewardCacheDatabaseLocationSnapshot {
+export function getRewardCacheDatabaseLocation(): RewardCacheDatabaseLocationSnapshot {
   const projectRoot = resolveGitProjectRootDirectory();
   const sqliteDirectory = path.join(projectRoot, SQLITE_DIRECTORY_NAME);
   const databaseFile = resolveSqliteDatabaseFileName();
@@ -435,7 +435,7 @@ async function getRewardCacheDatabase(): Promise<Sqlite3Database> {
   }
 
   rewardCacheDatabasePromise = (async () => {
-    const databaseLocation = getGeminiRewardCacheDatabaseLocation();
+    const databaseLocation = getRewardCacheDatabaseLocation();
     mkdirSync(databaseLocation.sqliteDirectory, { recursive: true });
 
     const driver = resolveSqlite3Driver();
@@ -570,7 +570,7 @@ async function upsertRewardImageCacheMetadataInDatabase(input: {
   );
 }
 
-function normalizeGenerationStatus(value: unknown): GeminiRewardImageGenerationStatus | null {
+function normalizeGenerationStatus(value: unknown): RewardImageGenerationStatus | null {
   if (value === "ready" || value === "generating" || value === "missing") {
     return value;
   }
@@ -580,7 +580,7 @@ function normalizeGenerationStatus(value: unknown): GeminiRewardImageGenerationS
 
 async function writeRewardImageGenerationStatusToDatabase(input: {
   dinosaurName: string;
-  status: GeminiRewardImageGenerationStatus;
+  status: RewardImageGenerationStatus;
   imagePath: string | null;
   updatedAtMs: number;
 }): Promise<void> {
@@ -615,7 +615,7 @@ async function writeRewardImageGenerationStatusToDatabase(input: {
 
 async function safelyWriteRewardImageGenerationStatusToDatabase(input: {
   dinosaurName: string;
-  status: GeminiRewardImageGenerationStatus;
+  status: RewardImageGenerationStatus;
   imagePath: string | null;
   updatedAtMs: number;
 }): Promise<void> {
@@ -670,7 +670,7 @@ export function toRewardImageCacheSlug(dinosaurName: string): string {
 
 export async function findCachedRewardImageFile(
   dinosaurName: string,
-  options: FilesystemGeminiImageCacheOptions = {},
+  options: FilesystemRewardImageCacheOptions = {},
 ): Promise<CachedRewardImageFile | null> {
   const slug = toRewardImageCacheSlug(dinosaurName);
   const outputDirectory = resolveOutputDirectory(options);
@@ -704,16 +704,16 @@ export async function findCachedRewardImageFile(
 
 export async function doesRewardImageExistOnDisk(
   dinosaurName: string,
-  options: FilesystemGeminiImageCacheOptions = {},
+  options: FilesystemRewardImageCacheOptions = {},
 ): Promise<boolean> {
   const cachedFile = await findCachedRewardImageFile(dinosaurName, options);
   return cachedFile !== null;
 }
 
-export async function readCachedGeminiRewardImage(
+export async function readCachedRewardImage(
   dinosaurName: string,
-  options: FilesystemGeminiImageCacheOptions = {},
-): Promise<GeminiGeneratedImage | null> {
+  options: FilesystemRewardImageCacheOptions = {},
+): Promise<GeneratedRewardImage | null> {
   const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
   const cachedFile = await findCachedRewardImageFile(normalizedDinosaurName, options);
 
@@ -755,10 +755,10 @@ export async function readCachedGeminiRewardImage(
   };
 }
 
-export async function getGeminiRewardImageGenerationStatus(
+export async function getRewardImageGenerationStatus(
   dinosaurName: string,
-  options: FilesystemGeminiImageCacheOptions = {},
-): Promise<GeminiRewardImageGenerationStatusSnapshot> {
+  options: FilesystemRewardImageCacheOptions = {},
+): Promise<RewardImageGenerationStatusSnapshot> {
   const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
   const cachedFile = await findCachedRewardImageFile(normalizedDinosaurName, options);
 
@@ -812,9 +812,9 @@ export async function getGeminiRewardImageGenerationStatus(
   };
 }
 
-export async function persistGeminiRewardImageToFilesystemCache(
-  image: GeminiGeneratedImage,
-  options: FilesystemGeminiImageCacheOptions = {},
+export async function persistRewardImageToFilesystemCache(
+  image: GeneratedRewardImage,
+  options: FilesystemRewardImageCacheOptions = {},
 ): Promise<string> {
   const normalizedDinosaurName = normalizeDinosaurName(image.dinosaurName);
   const outputDirectory = resolveOutputDirectory(options);
@@ -875,9 +875,9 @@ export async function persistGeminiRewardImageToFilesystemCache(
 
 function startInFlightRewardImageGeneration(
   dinosaurName: string,
-  generateImage: (request: GeminiImageGenerationRequest) => Promise<GeminiGeneratedImage>,
-  options: FilesystemGeminiImageCacheOptions,
-): Promise<GeminiGeneratedImage> {
+  generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>,
+  options: FilesystemRewardImageCacheOptions,
+): Promise<GeneratedRewardImage> {
   const inFlightGenerationKey = toInFlightRewardImageGenerationKey(dinosaurName, options);
   const generationPromise = (async () => {
     await safelyWriteRewardImageGenerationStatusToDatabase({
@@ -889,7 +889,7 @@ function startInFlightRewardImageGeneration(
 
     try {
       const generatedImage = await generateImage({ dinosaurName });
-      await persistGeminiRewardImageToFilesystemCache(generatedImage, options);
+      await persistRewardImageToFilesystemCache(generatedImage, options);
       return generatedImage;
     } catch (error) {
       await safelyWriteRewardImageGenerationStatusToDatabase({
@@ -917,17 +917,17 @@ function startInFlightRewardImageGeneration(
 
 function getInFlightRewardImageGeneration(
   dinosaurName: string,
-  options: FilesystemGeminiImageCacheOptions,
-): Promise<GeminiGeneratedImage> | undefined {
+  options: FilesystemRewardImageCacheOptions,
+): Promise<GeneratedRewardImage> | undefined {
   const inFlightGenerationKey = toInFlightRewardImageGenerationKey(dinosaurName, options);
   return inFlightRewardImageGenerations.get(inFlightGenerationKey);
 }
 
-export async function prefetchGeminiRewardImageWithFilesystemCache(
-  request: GeminiImageGenerationRequest,
-  generateImage: (request: GeminiImageGenerationRequest) => Promise<GeminiGeneratedImage>,
-  options: FilesystemGeminiImageCacheOptions = {},
-): Promise<GeminiRewardImagePrefetchStatus> {
+export async function prefetchRewardImageWithFilesystemCache(
+  request: RewardImageGenerationRequest,
+  generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>,
+  options: FilesystemRewardImageCacheOptions = {},
+): Promise<RewardImagePrefetchStatus> {
   const normalizedDinosaurName = normalizeDinosaurName(request.dinosaurName);
   const rewardImageExistsOnDisk = await doesRewardImageExistOnDisk(normalizedDinosaurName, options);
 
@@ -945,13 +945,13 @@ export async function prefetchGeminiRewardImageWithFilesystemCache(
   return "started";
 }
 
-export async function resolveGeminiRewardImageWithFilesystemCache(
-  request: GeminiImageGenerationRequest,
-  generateImage: (request: GeminiImageGenerationRequest) => Promise<GeminiGeneratedImage>,
-  options: FilesystemGeminiImageCacheOptions = {},
-): Promise<GeminiGeneratedImage> {
+export async function resolveRewardImageWithFilesystemCache(
+  request: RewardImageGenerationRequest,
+  generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>,
+  options: FilesystemRewardImageCacheOptions = {},
+): Promise<GeneratedRewardImage> {
   const normalizedDinosaurName = normalizeDinosaurName(request.dinosaurName);
-  const cachedImage = await readCachedGeminiRewardImage(normalizedDinosaurName, options);
+  const cachedImage = await readCachedRewardImage(normalizedDinosaurName, options);
 
   if (cachedImage) {
     return cachedImage;
@@ -968,7 +968,7 @@ export async function resolveGeminiRewardImageWithFilesystemCache(
 
 function toDatabaseRecordFromRow(
   row: RewardImageCacheDatabaseRecordRow,
-): GeminiRewardImageCacheDatabaseRecord | null {
+): RewardImageCacheDatabaseRecord | null {
   const dinosaurName = getTrimmedNonEmptyString(row.dinosaur_name);
   if (!dinosaurName) {
     return null;
@@ -1003,8 +1003,8 @@ function toDatabaseRecordFromRow(
   };
 }
 
-export async function listGeminiRewardImageCacheDatabaseRecords(): Promise<
-  readonly GeminiRewardImageCacheDatabaseRecord[]
+export async function listRewardImageCacheDatabaseRecords(): Promise<
+  readonly RewardImageCacheDatabaseRecord[]
 > {
   try {
     const database = await getRewardCacheDatabase();
@@ -1030,7 +1030,7 @@ export async function listGeminiRewardImageCacheDatabaseRecords(): Promise<
       `,
     );
 
-    const records: GeminiRewardImageCacheDatabaseRecord[] = [];
+    const records: RewardImageCacheDatabaseRecord[] = [];
     for (const row of rows) {
       const record = toDatabaseRecordFromRow(row);
       if (record) {
@@ -1044,9 +1044,9 @@ export async function listGeminiRewardImageCacheDatabaseRecords(): Promise<
   }
 }
 
-export async function getGeminiRewardImageCacheDatabaseRecord(
+export async function getRewardImageCacheDatabaseRecord(
   dinosaurName: string,
-): Promise<GeminiRewardImageCacheDatabaseRecord | null> {
+): Promise<RewardImageCacheDatabaseRecord | null> {
   const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
 
   try {
@@ -1081,10 +1081,10 @@ export async function getGeminiRewardImageCacheDatabaseRecord(
   }
 }
 
-export async function deleteGeminiRewardImageCacheEntry(
+export async function deleteRewardImageCacheEntry(
   dinosaurName: string,
-  options: FilesystemGeminiImageCacheOptions = {},
-): Promise<DeleteGeminiRewardImageCacheEntryResult> {
+  options: FilesystemRewardImageCacheOptions = {},
+): Promise<DeleteRewardImageCacheEntryResult> {
   const normalizedDinosaurName = normalizeDinosaurName(dinosaurName);
   const outputDirectory = resolveOutputDirectory(options);
   const slug = toRewardImageCacheSlug(normalizedDinosaurName);

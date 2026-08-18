@@ -11,7 +11,7 @@ import {
   toRewardDossierArtifactSlug,
   type RewardDinosaurDossier,
 } from "./dino-dossiers";
-import { generateGeminiRewardDossier } from "./gemini-dossier-service";
+import { generateOpenAiRewardDossier } from "./openai-dossier-service";
 
 const DOSSIER_ARTIFACTS_ROOT = path.join(process.cwd(), "public", "artifacts", "dossiers");
 const PRIMARY_DOSSIER_DIRECTORY = path.join(DOSSIER_ARTIFACTS_ROOT, "primary");
@@ -25,7 +25,12 @@ const HYBRID_DOSSIER_MANIFEST_PATH = path.join(
   "hybrid-dinosaur-dossiers.json",
 );
 
-type DossierGenerationSource = "gemini" | "deterministic-fallback";
+/**
+ * "openai" is the live generator. "gemini" artifacts were written by the
+ * previous provider and remain valid, so they are still reused rather than
+ * regenerated.
+ */
+type DossierGenerationSource = "openai" | "gemini" | "deterministic-fallback";
 
 interface RewardDossierArtifact {
   readonly kind: RewardDinosaurDossier["kind"];
@@ -182,11 +187,14 @@ function toGenerationSource(payload: unknown): DossierGenerationSource | null {
   }
 
   const source = payload.generator.source;
-  return source === "gemini" || source === "deterministic-fallback" ? source : null;
+  return source === "openai" || source === "gemini" || source === "deterministic-fallback"
+    ? source
+    : null;
 }
 
 function shouldReuseExistingArtifact(payload: unknown): boolean {
-  return toGenerationSource(payload) === "gemini";
+  const source = toGenerationSource(payload);
+  return source === "openai" || source === "gemini";
 }
 
 async function readJsonFileIfExists(absolutePath: string): Promise<unknown | null> {
@@ -275,12 +283,12 @@ async function generateDossierForAsset(assetName: string): Promise<{
   generator: RewardDossierArtifactFile["generator"];
 }> {
   try {
-    const generatedDossier = await generateGeminiRewardDossier(assetName);
+    const generatedDossier = await generateOpenAiRewardDossier(assetName);
 
     return {
       dossier: generatedDossier.dossier,
       generator: {
-        source: "gemini",
+        source: "openai",
         model: generatedDossier.model,
         prompt: generatedDossier.prompt,
       },

@@ -39,27 +39,27 @@ async function loadRewardPipelineModules() {
     "src/features/rewards/lib/dinosaurs.ts",
   );
   const imageCacheModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/gemini-image-cache.ts",
+    "src/features/rewards/lib/reward-image-cache.ts",
   );
   const milestonesModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/milestones.ts",
     {
       "./dinosaurs": dinosaursModuleUrl,
-      "./gemini-image-cache": imageCacheModuleUrl,
+      "./reward-image-cache": imageCacheModuleUrl,
     },
   );
   const prefetchModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/prefetch.ts",
     {
       "./dinosaurs": dinosaursModuleUrl,
-      "./gemini-image-cache": imageCacheModuleUrl,
+      "./reward-image-cache": imageCacheModuleUrl,
     },
   );
   const revealModuleUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/earned-reward-reveal.ts",
   );
 
-  const [dinosaurs, geminiImageCache, milestones, prefetch, earnedRewardReveal] =
+  const [dinosaurs, rewardImageCache, milestones, prefetch, earnedRewardReveal] =
     await Promise.all([
       import(dinosaursModuleUrl),
       import(imageCacheModuleUrl),
@@ -70,18 +70,18 @@ async function loadRewardPipelineModules() {
 
   return {
     dinosaurs,
-    geminiImageCache,
+    rewardImageCache,
     milestones,
     prefetch,
     earnedRewardReveal,
   };
 }
 
-function createGeminiImage(dinosaurName, overrides = {}) {
+function createGeneratedImage(dinosaurName, overrides = {}) {
   return {
     dinosaurName,
     prompt: `cinematic portrait of ${dinosaurName}`,
-    model: "gemini-2.0-flash-exp",
+    model: "gpt-image-2",
     mimeType: "image/png",
     imageBase64: Buffer.from(`${dinosaurName}-reward-bytes`).toString("base64"),
     ...overrides,
@@ -118,7 +118,7 @@ test("reward milestones trigger at 5-solve boundaries with deterministic dinosau
 });
 
 test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight calls", async () => {
-  const { prefetch, geminiImageCache } = await rewardPipelineModules;
+  const { prefetch, rewardImageCache } = await rewardPipelineModules;
 
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-pipeline-"));
   let generatorInvocationCount = 0;
@@ -135,7 +135,7 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
     generatorInvocationCount += 1;
     markGenerationStarted();
     await generationGate;
-    return createGeminiImage(dinosaurName);
+    return createGeneratedImage(dinosaurName);
   };
 
   const skippedResult = await prefetch.triggerNearMilestoneRewardPrefetch({
@@ -162,7 +162,7 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
   assert.equal(dedupedResult.status, "prefetch-already-in-flight");
   assert.equal(dedupedResult.target.dinosaurName, "Tyrannosaurus Rex");
 
-  const generatingStatus = await geminiImageCache.getGeminiRewardImageGenerationStatus(
+  const generatingStatus = await rewardImageCache.getRewardImageGenerationStatus(
     "Tyrannosaurus Rex",
     { outputDirectory: cacheDirectory },
   );
@@ -173,7 +173,7 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
   });
 
   releaseGenerationGate();
-  await geminiImageCache.resolveGeminiRewardImageWithFilesystemCache(
+  await rewardImageCache.resolveRewardImageWithFilesystemCache(
     { dinosaurName: "Tyrannosaurus Rex" },
     async () => {
       assert.fail("existing in-flight prefetch should satisfy resolve without another generator call");
@@ -181,7 +181,7 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
     { outputDirectory: cacheDirectory },
   );
 
-  const readyStatus = await geminiImageCache.getGeminiRewardImageGenerationStatus(
+  const readyStatus = await rewardImageCache.getRewardImageGenerationStatus(
     "Tyrannosaurus Rex",
     { outputDirectory: cacheDirectory },
   );
@@ -196,7 +196,7 @@ test("near-milestone prefetch checks cache, triggers once, and dedupes in-flight
 });
 
 test("earned reward reveal polling waits for in-flight prefetched generation and reveals the deterministic reward image", async () => {
-  const { milestones, prefetch, geminiImageCache, earnedRewardReveal } = await rewardPipelineModules;
+  const { milestones, prefetch, rewardImageCache, earnedRewardReveal } = await rewardPipelineModules;
 
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-pipeline-"));
   let releaseGenerationGate = () => {};
@@ -211,7 +211,7 @@ test("earned reward reveal polling waits for in-flight prefetched generation and
   const generateImage = async ({ dinosaurName }) => {
     markGenerationStarted();
     await generationGate;
-    return createGeminiImage(dinosaurName);
+    return createGeneratedImage(dinosaurName);
   };
 
   const prefetchResult = await prefetch.triggerNearMilestoneRewardPrefetch({
@@ -237,14 +237,14 @@ test("earned reward reveal polling waits for in-flight prefetched generation and
     pollIntervalMs: 5,
     maxPollAttempts: 3,
     pollStatus: (dinosaurName) =>
-      geminiImageCache.getGeminiRewardImageGenerationStatus(dinosaurName, {
+      rewardImageCache.getRewardImageGenerationStatus(dinosaurName, {
         outputDirectory: cacheDirectory,
       }),
     wait: async () => {
       waitInvocationCount += 1;
       if (waitInvocationCount === 1) {
         releaseGenerationGate();
-        await geminiImageCache.resolveGeminiRewardImageWithFilesystemCache(
+        await rewardImageCache.resolveRewardImageWithFilesystemCache(
           { dinosaurName: earnedReward.dinosaurName },
           async () => {
             assert.fail("polling flow should reuse in-flight prefetch instead of generating a duplicate image");

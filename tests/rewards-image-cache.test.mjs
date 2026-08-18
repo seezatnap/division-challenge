@@ -25,33 +25,33 @@ async function loadTypeScriptModule(relativePath) {
   return import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
 }
 
-function createGeminiImage(dinosaurName, overrides = {}) {
+function createGeneratedImage(dinosaurName, overrides = {}) {
   return {
     dinosaurName,
     prompt: `cinematic portrait of ${dinosaurName}`,
-    model: "gemini-2.0-flash-exp",
+    model: "gpt-image-2",
     mimeType: "image/png",
     imageBase64: Buffer.from(`${dinosaurName}-bytes`).toString("base64"),
     ...overrides,
   };
 }
 
-const geminiImageCacheModule = loadTypeScriptModule(
-  "src/features/rewards/lib/gemini-image-cache.ts",
+const rewardImageCacheModule = loadTypeScriptModule(
+  "src/features/rewards/lib/reward-image-cache.ts",
 );
 
-test("resolveGeminiRewardImageWithFilesystemCache persists new images and marks disk existence", async () => {
+test("resolveRewardImageWithFilesystemCache persists new images and marks disk existence", async () => {
   const {
     doesRewardImageExistOnDisk,
-    readCachedGeminiRewardImage,
-    resolveGeminiRewardImageWithFilesystemCache,
-  } = await geminiImageCacheModule;
+    readCachedRewardImage,
+    resolveRewardImageWithFilesystemCache,
+  } = await rewardImageCacheModule;
 
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
-  const generatedImage = createGeminiImage("Triceratops");
+  const generatedImage = createGeneratedImage("Triceratops");
   let generatorInvocationCount = 0;
 
-  const result = await resolveGeminiRewardImageWithFilesystemCache(
+  const result = await resolveRewardImageWithFilesystemCache(
     { dinosaurName: " Triceratops " },
     async (request) => {
       generatorInvocationCount += 1;
@@ -68,19 +68,19 @@ test("resolveGeminiRewardImageWithFilesystemCache persists new images and marks 
     true,
   );
 
-  const cachedImage = await readCachedGeminiRewardImage("Triceratops", {
+  const cachedImage = await readCachedRewardImage("Triceratops", {
     outputDirectory: cacheDirectory,
   });
   assert.deepEqual(cachedImage, generatedImage);
 });
 
-test("resolveGeminiRewardImageWithFilesystemCache skips duplicate generation when cached asset exists", async () => {
-  const { resolveGeminiRewardImageWithFilesystemCache } = await geminiImageCacheModule;
+test("resolveRewardImageWithFilesystemCache skips duplicate generation when cached asset exists", async () => {
+  const { resolveRewardImageWithFilesystemCache } = await rewardImageCacheModule;
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
-  const generatedImage = createGeminiImage("Velociraptor");
+  const generatedImage = createGeneratedImage("Velociraptor");
   let generatorInvocationCount = 0;
 
-  const firstResult = await resolveGeminiRewardImageWithFilesystemCache(
+  const firstResult = await resolveRewardImageWithFilesystemCache(
     { dinosaurName: "Velociraptor" },
     async () => {
       generatorInvocationCount += 1;
@@ -91,11 +91,11 @@ test("resolveGeminiRewardImageWithFilesystemCache skips duplicate generation whe
 
   assert.equal(generatorInvocationCount, 1);
 
-  const secondResult = await resolveGeminiRewardImageWithFilesystemCache(
+  const secondResult = await resolveRewardImageWithFilesystemCache(
     { dinosaurName: "  Velociraptor " },
     async () => {
       generatorInvocationCount += 1;
-      return createGeminiImage("Velociraptor", {
+      return createGeneratedImage("Velociraptor", {
         imageBase64: Buffer.from("new-bytes").toString("base64"),
       });
     },
@@ -107,10 +107,10 @@ test("resolveGeminiRewardImageWithFilesystemCache skips duplicate generation whe
   assert.deepEqual(secondResult, generatedImage);
 });
 
-test("resolveGeminiRewardImageWithFilesystemCache dedupes parallel in-flight generation requests", async () => {
-  const { resolveGeminiRewardImageWithFilesystemCache } = await geminiImageCacheModule;
+test("resolveRewardImageWithFilesystemCache dedupes parallel in-flight generation requests", async () => {
+  const { resolveRewardImageWithFilesystemCache } = await rewardImageCacheModule;
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
-  const generatedImage = createGeminiImage("Stegosaurus");
+  const generatedImage = createGeneratedImage("Stegosaurus");
   let generatorInvocationCount = 0;
   let resolveGenerationGate = () => {};
   let resolveGenerationStarted = () => {};
@@ -122,7 +122,7 @@ test("resolveGeminiRewardImageWithFilesystemCache dedupes parallel in-flight gen
     resolveGenerationStarted = resolve;
   });
 
-  const firstRequest = resolveGeminiRewardImageWithFilesystemCache(
+  const firstRequest = resolveRewardImageWithFilesystemCache(
     { dinosaurName: "Stegosaurus" },
     async (request) => {
       generatorInvocationCount += 1;
@@ -136,11 +136,11 @@ test("resolveGeminiRewardImageWithFilesystemCache dedupes parallel in-flight gen
 
   await generationStarted;
 
-  const secondRequest = resolveGeminiRewardImageWithFilesystemCache(
+  const secondRequest = resolveRewardImageWithFilesystemCache(
     { dinosaurName: " Stegosaurus " },
     async () => {
       assert.fail("parallel request should share the in-flight generator promise");
-      return createGeminiImage("Stegosaurus");
+      return createGeneratedImage("Stegosaurus");
     },
     { outputDirectory: cacheDirectory },
   );
@@ -153,26 +153,26 @@ test("resolveGeminiRewardImageWithFilesystemCache dedupes parallel in-flight gen
   assert.deepEqual(secondResult, generatedImage);
 });
 
-test("prefetchGeminiRewardImageWithFilesystemCache checks cache first and skips duplicate generation", async () => {
+test("prefetchRewardImageWithFilesystemCache checks cache first and skips duplicate generation", async () => {
   const {
-    prefetchGeminiRewardImageWithFilesystemCache,
-    resolveGeminiRewardImageWithFilesystemCache,
-  } = await geminiImageCacheModule;
+    prefetchRewardImageWithFilesystemCache,
+    resolveRewardImageWithFilesystemCache,
+  } = await rewardImageCacheModule;
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
-  const generatedImage = createGeminiImage("Pteranodon");
+  const generatedImage = createGeneratedImage("Pteranodon");
   let generatorInvocationCount = 0;
 
-  await resolveGeminiRewardImageWithFilesystemCache(
+  await resolveRewardImageWithFilesystemCache(
     { dinosaurName: "Pteranodon" },
     async () => generatedImage,
     { outputDirectory: cacheDirectory },
   );
 
-  const prefetchStatus = await prefetchGeminiRewardImageWithFilesystemCache(
+  const prefetchStatus = await prefetchRewardImageWithFilesystemCache(
     { dinosaurName: " Pteranodon " },
     async () => {
       generatorInvocationCount += 1;
-      return createGeminiImage("Pteranodon", {
+      return createGeneratedImage("Pteranodon", {
         imageBase64: Buffer.from("unexpected-prefetch-bytes").toString("base64"),
       });
     },
@@ -183,13 +183,13 @@ test("prefetchGeminiRewardImageWithFilesystemCache checks cache first and skips 
   assert.equal(generatorInvocationCount, 0);
 });
 
-test("prefetchGeminiRewardImageWithFilesystemCache starts background generation once and dedupes in-flight calls", async () => {
+test("prefetchRewardImageWithFilesystemCache starts background generation once and dedupes in-flight calls", async () => {
   const {
-    prefetchGeminiRewardImageWithFilesystemCache,
-    resolveGeminiRewardImageWithFilesystemCache,
-  } = await geminiImageCacheModule;
+    prefetchRewardImageWithFilesystemCache,
+    resolveRewardImageWithFilesystemCache,
+  } = await rewardImageCacheModule;
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
-  const generatedImage = createGeminiImage("Carnotaurus");
+  const generatedImage = createGeneratedImage("Carnotaurus");
   let generatorInvocationCount = 0;
   let resolveGenerationGate = () => {};
   let resolveGenerationStarted = () => {};
@@ -201,7 +201,7 @@ test("prefetchGeminiRewardImageWithFilesystemCache starts background generation 
     resolveGenerationStarted = resolve;
   });
 
-  const firstPrefetchStatus = await prefetchGeminiRewardImageWithFilesystemCache(
+  const firstPrefetchStatus = await prefetchRewardImageWithFilesystemCache(
     { dinosaurName: "Carnotaurus" },
     async (request) => {
       generatorInvocationCount += 1;
@@ -215,21 +215,21 @@ test("prefetchGeminiRewardImageWithFilesystemCache starts background generation 
 
   await generationStarted;
 
-  const secondPrefetchStatus = await prefetchGeminiRewardImageWithFilesystemCache(
+  const secondPrefetchStatus = await prefetchRewardImageWithFilesystemCache(
     { dinosaurName: " Carnotaurus " },
     async () => {
       assert.fail("parallel prefetch should reuse the in-flight generation");
-      return createGeminiImage("Carnotaurus");
+      return createGeneratedImage("Carnotaurus");
     },
     { outputDirectory: cacheDirectory },
   );
 
   resolveGenerationGate();
-  const resolvedImage = await resolveGeminiRewardImageWithFilesystemCache(
+  const resolvedImage = await resolveRewardImageWithFilesystemCache(
     { dinosaurName: "Carnotaurus" },
     async () => {
       assert.fail("resolved image should come from the prefetch generation");
-      return createGeminiImage("Carnotaurus");
+      return createGeneratedImage("Carnotaurus");
     },
     { outputDirectory: cacheDirectory },
   );
@@ -240,11 +240,11 @@ test("prefetchGeminiRewardImageWithFilesystemCache starts background generation 
   assert.deepEqual(resolvedImage, generatedImage);
 });
 
-test("readCachedGeminiRewardImage loads pre-existing filesystem assets even when metadata is absent", async () => {
+test("readCachedRewardImage loads pre-existing filesystem assets even when metadata is absent", async () => {
   const {
-    readCachedGeminiRewardImage,
+    readCachedRewardImage,
     toRewardImageCacheSlug,
-  } = await geminiImageCacheModule;
+  } = await rewardImageCacheModule;
 
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
   const dinosaurName = "Tyrannosaurus Rex";
@@ -253,7 +253,7 @@ test("readCachedGeminiRewardImage loads pre-existing filesystem assets even when
   const legacyImagePath = path.join(cacheDirectory, `${slug}.jpeg`);
   await writeFile(legacyImagePath, expectedBytes);
 
-  const cachedImage = await readCachedGeminiRewardImage(dinosaurName, {
+  const cachedImage = await readCachedRewardImage(dinosaurName, {
     outputDirectory: cacheDirectory,
   });
 
@@ -267,11 +267,11 @@ test("readCachedGeminiRewardImage loads pre-existing filesystem assets even when
   assert.deepEqual(cacheDirectoryEntries, [`${slug}.jpeg`]);
 });
 
-test("getGeminiRewardImageGenerationStatus reports missing when no cached image or in-flight generation exists", async () => {
-  const { getGeminiRewardImageGenerationStatus } = await geminiImageCacheModule;
+test("getRewardImageGenerationStatus reports missing when no cached image or in-flight generation exists", async () => {
+  const { getRewardImageGenerationStatus } = await rewardImageCacheModule;
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
 
-  const status = await getGeminiRewardImageGenerationStatus("Allosaurus", {
+  const status = await getRewardImageGenerationStatus("Allosaurus", {
     outputDirectory: cacheDirectory,
   });
 
@@ -282,14 +282,14 @@ test("getGeminiRewardImageGenerationStatus reports missing when no cached image 
   });
 });
 
-test("getGeminiRewardImageGenerationStatus reports generating during in-flight prefetch and ready once image is persisted", async () => {
+test("getRewardImageGenerationStatus reports generating during in-flight prefetch and ready once image is persisted", async () => {
   const {
-    getGeminiRewardImageGenerationStatus,
-    prefetchGeminiRewardImageWithFilesystemCache,
-    resolveGeminiRewardImageWithFilesystemCache,
-  } = await geminiImageCacheModule;
+    getRewardImageGenerationStatus,
+    prefetchRewardImageWithFilesystemCache,
+    resolveRewardImageWithFilesystemCache,
+  } = await rewardImageCacheModule;
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
-  const generatedImage = createGeminiImage("Stigimoloch");
+  const generatedImage = createGeneratedImage("Stigimoloch");
   let resolveGenerationGate = () => {};
   let resolveGenerationStarted = () => {};
 
@@ -300,7 +300,7 @@ test("getGeminiRewardImageGenerationStatus reports generating during in-flight p
     resolveGenerationStarted = resolve;
   });
 
-  const prefetchStatus = await prefetchGeminiRewardImageWithFilesystemCache(
+  const prefetchStatus = await prefetchRewardImageWithFilesystemCache(
     { dinosaurName: "Stigimoloch" },
     async () => {
       resolveGenerationStarted();
@@ -313,7 +313,7 @@ test("getGeminiRewardImageGenerationStatus reports generating during in-flight p
   assert.equal(prefetchStatus, "started");
   await generationStarted;
 
-  const generatingStatus = await getGeminiRewardImageGenerationStatus("Stigimoloch", {
+  const generatingStatus = await getRewardImageGenerationStatus("Stigimoloch", {
     outputDirectory: cacheDirectory,
   });
 
@@ -324,16 +324,16 @@ test("getGeminiRewardImageGenerationStatus reports generating during in-flight p
   });
 
   resolveGenerationGate();
-  await resolveGeminiRewardImageWithFilesystemCache(
+  await resolveRewardImageWithFilesystemCache(
     { dinosaurName: "Stigimoloch" },
     async () => {
       assert.fail("resolved image should reuse the prefetch in-flight generation");
-      return createGeminiImage("Stigimoloch");
+      return createGeneratedImage("Stigimoloch");
     },
     { outputDirectory: cacheDirectory },
   );
 
-  const readyStatus = await getGeminiRewardImageGenerationStatus("Stigimoloch", {
+  const readyStatus = await getRewardImageGenerationStatus("Stigimoloch", {
     outputDirectory: cacheDirectory,
   });
 
@@ -346,8 +346,8 @@ test("getGeminiRewardImageGenerationStatus reports generating during in-flight p
   );
 });
 
-test("getGeminiRewardImageGenerationStatus prefers the newest cached extension when multiple files exist", async () => {
-  const { getGeminiRewardImageGenerationStatus, toRewardImageCacheSlug } = await geminiImageCacheModule;
+test("getRewardImageGenerationStatus prefers the newest cached extension when multiple files exist", async () => {
+  const { getRewardImageGenerationStatus, toRewardImageCacheSlug } = await rewardImageCacheModule;
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
   const dinosaurName = "Tyrannosaurus Rex";
   const slug = toRewardImageCacheSlug(dinosaurName);
@@ -361,7 +361,7 @@ test("getGeminiRewardImageGenerationStatus prefers the newest cached extension w
   await utimes(pngPath, oldTime, oldTime);
   await utimes(jpgPath, now, now);
 
-  const status = await getGeminiRewardImageGenerationStatus(dinosaurName, {
+  const status = await getRewardImageGenerationStatus(dinosaurName, {
     outputDirectory: cacheDirectory,
   });
 
@@ -374,24 +374,24 @@ test("getGeminiRewardImageGenerationStatus prefers the newest cached extension w
   );
 });
 
-test("persistGeminiRewardImageToFilesystemCache removes stale sibling formats for the same dinosaur", async () => {
+test("persistRewardImageToFilesystemCache removes stale sibling formats for the same dinosaur", async () => {
   const {
-    persistGeminiRewardImageToFilesystemCache,
+    persistRewardImageToFilesystemCache,
     toRewardImageCacheSlug,
-  } = await geminiImageCacheModule;
+  } = await rewardImageCacheModule;
   const cacheDirectory = await mkdtemp(path.join(os.tmpdir(), "dino-reward-cache-"));
   const dinosaurName = "Spinosaurus";
 
-  await persistGeminiRewardImageToFilesystemCache(
-    createGeminiImage(dinosaurName, {
+  await persistRewardImageToFilesystemCache(
+    createGeneratedImage(dinosaurName, {
       mimeType: "image/png",
       imageBase64: Buffer.from("png-bytes").toString("base64"),
     }),
     { outputDirectory: cacheDirectory },
   );
 
-  await persistGeminiRewardImageToFilesystemCache(
-    createGeminiImage(dinosaurName, {
+  await persistRewardImageToFilesystemCache(
+    createGeneratedImage(dinosaurName, {
       mimeType: "image/jpeg",
       imageBase64: Buffer.from("jpg-bytes").toString("base64"),
     }),

@@ -12,20 +12,33 @@ Install and start:
 ```bash
 npm ci
 cat <<'EOF' > .env.local
-GEMINI_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_api_key_here
 EOF
 npm run dev
 ```
 
 App URL: `http://localhost:3000`
 
-## 2. Gemini configuration (`GEMINI_API_KEY`)
+## 2. OpenAI configuration (`OPENAI_API_KEY`)
 
-- Environment variable name: `GEMINI_API_KEY`
-- Config source: `process.env` via `src/features/rewards/lib/gemini.ts`
-- Model constant: `gemini-2.0-flash-exp`
+All reward generation uses OpenAI only (no Google APIs):
 
-If `GEMINI_API_KEY` is missing or blank, reward generation fails. The API route responds with a configuration error when Gemini requests are attempted.
+- `OPENAI_API_KEY` (required) — config source: `process.env` via `src/features/rewards/lib/openai.ts`
+- `OPENAI_TEXT_MODEL` (default `gpt-5.6-luna`) — writes the field dossier and, right before
+  each render, an exact-appearance brief of the dinosaur (or a designed description of a
+  hypothetical hybrid) so the image model draws the correct animal
+- `OPENAI_IMAGE_MODEL` (default `gpt-image-2`), `OPENAI_IMAGE_SIZE` (default `1536x1024`),
+  `OPENAI_IMAGE_QUALITY` (default `medium`)
+- `OPENAI_BASE_URL` (default `https://api.openai.com/v1`)
+
+Generation pipeline per reward asset: dossier (cached under `public/artifacts/dossiers`) →
+visual description (Luna) → image (gpt-image-2) → filesystem/sqlite cache. If the description
+call fails the render proceeds from the dossier alone; if the image call fails a local SVG
+fallback is stored instead. Note that OpenAI gates the GPT Image models behind API
+Organization Verification in the developer console.
+
+If `OPENAI_API_KEY` is missing or blank, the image route stores the local fallback image and the
+dossier falls back to the deterministic catalog entry.
 
 Reward generation endpoint:
 
@@ -121,10 +134,10 @@ npm run test
 npm run build
 ```
 
-Targeted commands for setup/Gemini/persistence flow changes:
+Targeted commands for setup/OpenAI/persistence flow changes:
 
 ```bash
-node --test tests/rewards-gemini-config.test.mjs
+node --test tests/rewards-openai-config.test.mjs tests/rewards-image-runtime.test.mjs
 node --test tests/persistence-file-system-save-load.test.mjs
 node --test tests/player-journey-smoke.test.mjs
 ```

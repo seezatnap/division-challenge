@@ -6,10 +6,10 @@ import {
 } from "./dinosaurs";
 import {
   doesRewardImageExistOnDisk,
-  prefetchGeminiRewardImageWithFilesystemCache,
-  type FilesystemGeminiImageCacheOptions,
-} from "./gemini-image-cache";
-import type { GeminiGeneratedImage, GeminiImageGenerationRequest } from "./gemini-image-service";
+  prefetchRewardImageWithFilesystemCache,
+  type FilesystemRewardImageCacheOptions,
+} from "./reward-image-cache";
+import type { GeneratedRewardImage, RewardImageGenerationRequest } from "./reward-image-service";
 
 export const NEAR_MILESTONE_PREFETCH_PROBLEM_NUMBERS = [3, 4] as const;
 
@@ -106,15 +106,15 @@ export type NearMilestoneRewardPrefetchStatus =
 
 export interface TriggerNearMilestoneRewardPrefetchRequest {
   totalProblemsSolved: number;
-  generateImage: (request: GeminiImageGenerationRequest) => Promise<GeminiGeneratedImage>;
+  generateImage: (request: RewardImageGenerationRequest) => Promise<GeneratedRewardImage>;
   unlockInterval?: number;
   prefetchProblemNumbers?: readonly number[];
-  cacheOptions?: FilesystemGeminiImageCacheOptions;
+  cacheOptions?: FilesystemRewardImageCacheOptions;
 }
 
 export interface TriggerNearMilestoneRewardPrefetchDependencies {
   doesRewardImageExistOnDisk: typeof doesRewardImageExistOnDisk;
-  prefetchGeminiRewardImageWithFilesystemCache: typeof prefetchGeminiRewardImageWithFilesystemCache;
+  prefetchRewardImageWithFilesystemCache: typeof prefetchRewardImageWithFilesystemCache;
 }
 
 export interface TriggerNearMilestoneRewardPrefetchResult {
@@ -125,7 +125,7 @@ export interface TriggerNearMilestoneRewardPrefetchResult {
 const defaultTriggerNearMilestoneRewardPrefetchDependencies: TriggerNearMilestoneRewardPrefetchDependencies =
   {
     doesRewardImageExistOnDisk,
-    prefetchGeminiRewardImageWithFilesystemCache,
+    prefetchRewardImageWithFilesystemCache,
   };
 
 export async function triggerNearMilestoneRewardPrefetch(
@@ -160,7 +160,7 @@ export async function triggerNearMilestoneRewardPrefetch(
     };
   }
 
-  const prefetchStatus = await dependencies.prefetchGeminiRewardImageWithFilesystemCache(
+  const prefetchStatus = await dependencies.prefetchRewardImageWithFilesystemCache(
     { dinosaurName: target.dinosaurName },
     request.generateImage,
     cacheOptions,
