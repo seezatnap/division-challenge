@@ -11,9 +11,7 @@ Install and start:
 
 ```bash
 npm ci
-cat <<'EOF' > .env.local
-OPENAI_API_KEY=your_api_key_here
-EOF
+cp .env.example .env.local   # then set OPENAI_API_KEY
 npm run dev
 ```
 
