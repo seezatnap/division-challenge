@@ -233,3 +233,79 @@ test("fetchEarnedRewardImageStatus surfaces API error messages", async () => {
     /dinosaurName query parameter must be a non-empty string/,
   );
 });
+
+test("fetchRewardImageStatuses asks for every name in one request", async () => {
+  const { fetchRewardImageStatuses } = await rewardRevealModule;
+  const seenUrls = [];
+
+  const statusByName = await fetchRewardImageStatuses({
+    dinosaurNames: ["Triceratops", "  ", "Hybrid Triceratops + Velociraptor"],
+    fetchFn: async (input) => {
+      seenUrls.push(String(input));
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            data: {
+              records: [
+                {
+                  dinosaurName: "Triceratops",
+                  status: "ready",
+                  imagePath: "/rewards/triceratops.jpg?v=7",
+                },
+                {
+                  dinosaurName: "Hybrid Triceratops + Velociraptor",
+                  status: "generating",
+                  imagePath: null,
+                },
+              ],
+            },
+          };
+        },
+      };
+    },
+  });
+
+  assert.equal(seenUrls.length, 1, "one request should cover every reward");
+  const requestUrl = new URL(seenUrls[0], "http://localhost");
+  assert.deepEqual(requestUrl.searchParams.getAll("dinosaurNames"), [
+    "Triceratops",
+    "Hybrid Triceratops + Velociraptor",
+  ]);
+  assert.equal(statusByName.get("Triceratops").status, "ready");
+  assert.equal(statusByName.get("Triceratops").imagePath, "/rewards/triceratops.jpg?v=7");
+  assert.equal(statusByName.get("Hybrid Triceratops + Velociraptor").status, "generating");
+  assert.equal(statusByName.size, 2);
+});
+
+test("fetchRewardImageStatuses skips the request when there is nothing to ask about", async () => {
+  const { fetchRewardImageStatuses } = await rewardRevealModule;
+
+  const statusByName = await fetchRewardImageStatuses({
+    dinosaurNames: ["  ", ""],
+    fetchFn: async () => {
+      throw new Error("no request should be made");
+    },
+  });
+
+  assert.equal(statusByName.size, 0);
+});
+
+test("fetchRewardImageStatuses surfaces API errors", async () => {
+  const { fetchRewardImageStatuses } = await rewardRevealModule;
+
+  await assert.rejects(
+    fetchRewardImageStatuses({
+      dinosaurNames: ["Triceratops"],
+      fetchFn: async () => ({
+        ok: false,
+        status: 400,
+        async json() {
+          return { error: { message: "dinosaurNames accepts at most 200 names per request." } };
+        },
+      }),
+    }),
+    /at most 200 names/,
+  );
+});

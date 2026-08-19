@@ -536,3 +536,55 @@ test("parseRewardImageFileName accepts <slug>.<ext> file names only", async () =
   assert.equal(rewardImageCache.parseRewardImageFileName("noext"), null);
   assert.equal(rewardImageCache.parseRewardImageFileName("bad.exe"), null);
 });
+
+test("getRewardImageGenerationStatuses answers many rewards in one query without fetching bytes", async () => {
+  const { rewardImageCache, objectStorage } = await modules;
+  const storage = objectStorage.createInMemoryRewardImageStorage();
+  const readyName = uniqueDinosaurName("Allosaurus");
+  const missingName = uniqueDinosaurName("Carnotaurus");
+  const generatingName = uniqueDinosaurName("Baryonyx");
+
+  await rewardImageCache.persistRewardImage(createGeneratedImage(readyName), { storage });
+
+  let releaseGeneration = () => {};
+  const generationGate = new Promise((resolve) => {
+    releaseGeneration = resolve;
+  });
+  await rewardImageCache.prefetchRewardImage(
+    { dinosaurName: generatingName },
+    async () => {
+      await generationGate;
+      return createGeneratedImage(generatingName);
+    },
+    { storage },
+  );
+
+  // Object reads would be the expensive part; assert none happen.
+  const originalGetObject = storage.getObject.bind(storage);
+  let getObjectCallCount = 0;
+  storage.getObject = async (key) => {
+    getObjectCallCount += 1;
+    return originalGetObject(key);
+  };
+
+  const statuses = await rewardImageCache.getRewardImageGenerationStatuses(
+    [readyName, missingName, generatingName, "   "],
+    { storage },
+  );
+
+  assert.equal(getObjectCallCount, 0, "bulk status must not download image bytes");
+  assert.deepEqual(
+    statuses.map((entry) => [entry.dinosaurName, entry.status]),
+    [
+      [readyName, "ready"],
+      [missingName, "missing"],
+      [generatingName, "generating"],
+    ],
+  );
+  assert.match(statuses[0].imagePath, /\.png\?v=\d+$/);
+  assert.equal(statuses[1].imagePath, null);
+  assert.deepEqual(await rewardImageCache.getRewardImageGenerationStatuses([], { storage }), []);
+
+  storage.getObject = originalGetObject;
+  releaseGeneration();
+});

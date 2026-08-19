@@ -33,9 +33,15 @@ async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
   return toDataUrl(compiled);
 }
 
-async function loadImageStatusRoute(getRewardImageGenerationStatusImpl) {
+async function loadImageStatusRoute(
+  getRewardImageGenerationStatusImpl,
+  getRewardImageGenerationStatusesImpl = async (dinosaurNames) =>
+    dinosaurNames.map((dinosaurName) => ({ dinosaurName, status: "missing", imagePath: null })),
+) {
   const callbackName = `__routeRewardImageStatus_${Math.random().toString(16).slice(2)}`;
+  const bulkCallbackName = `__routeRewardImageStatuses_${Math.random().toString(16).slice(2)}`;
   globalThis[callbackName] = getRewardImageGenerationStatusImpl;
+  globalThis[bulkCallbackName] = getRewardImageGenerationStatusesImpl;
 
   const nextServerModuleUrl = toDataUrl(`
     export const NextResponse = {
@@ -57,6 +63,10 @@ async function loadImageStatusRoute(getRewardImageGenerationStatusImpl) {
     export async function getRewardImageGenerationStatus(dinosaurName) {
       return await globalThis.${callbackName}(dinosaurName);
     }
+
+    export async function getRewardImageGenerationStatuses(dinosaurNames) {
+      return await globalThis.${bulkCallbackName}(dinosaurNames);
+    }
   `);
 
   const routeModuleUrl = await transpileTypeScriptToDataUrl(
@@ -74,6 +84,7 @@ async function loadImageStatusRoute(getRewardImageGenerationStatusImpl) {
     serviceModule,
     cleanup: () => {
       delete globalThis[callbackName];
+      delete globalThis[bulkCallbackName];
     },
   };
 }
@@ -154,6 +165,62 @@ test("GET /api/rewards/image-status maps known RewardImageGenerationError failur
         message: "OpenAI image generation request failed.",
       },
     });
+  } finally {
+    cleanup();
+  }
+});
+
+test("GET /api/rewards/image-status returns many statuses from one request", async () => {
+  let seenNames;
+  const { routeModule, cleanup } = await loadImageStatusRoute(
+    async () => {
+      throw new Error("the single-name path must not be used for a bulk request");
+    },
+    async (dinosaurNames) => {
+      seenNames = dinosaurNames;
+      return dinosaurNames.map((dinosaurName, index) => ({
+        dinosaurName,
+        status: index === 0 ? "ready" : "missing",
+        imagePath: index === 0 ? "/rewards/triceratops.jpg?v=1" : null,
+      }));
+    },
+  );
+
+  try {
+    const request = new Request(
+      "https://example.test/api/rewards/image-status?dinosaurNames=Triceratops&dinosaurNames=Hybrid%20A%20%2B%20B",
+    );
+    const response = await routeModule.GET(request);
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(seenNames, ["Triceratops", "Hybrid A + B"]);
+    assert.deepEqual(body.data.records, [
+      { dinosaurName: "Triceratops", status: "ready", imagePath: "/rewards/triceratops.jpg?v=1" },
+      { dinosaurName: "Hybrid A + B", status: "missing", imagePath: null },
+    ]);
+  } finally {
+    cleanup();
+  }
+});
+
+test("GET /api/rewards/image-status rejects an oversized bulk request", async () => {
+  const { routeModule, cleanup } = await loadImageStatusRoute(async () => {
+    throw new Error("should not be called");
+  });
+
+  try {
+    const searchParams = new URLSearchParams();
+    for (let index = 0; index < 201; index += 1) {
+      searchParams.append("dinosaurNames", `Dino ${index}`);
+    }
+
+    const response = await routeModule.GET(
+      new Request(`https://example.test/api/rewards/image-status?${searchParams.toString()}`),
+    );
+
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error.message, /at most 200 names/);
   } finally {
     cleanup();
   }

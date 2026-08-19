@@ -37,6 +37,12 @@ export interface FetchEarnedRewardImageStatusRequest {
   fetchFn?: typeof fetch;
 }
 
+export interface FetchRewardImageStatusesRequest {
+  dinosaurNames: readonly string[];
+  endpoint?: string;
+  fetchFn?: typeof fetch;
+}
+
 type JsonRecord = Record<string, unknown>;
 interface ResolvedStatusEndpoint {
   endpointUrl: URL;
@@ -181,6 +187,77 @@ export async function fetchEarnedRewardImageStatus(
   }
 
   return normalizeEarnedRewardImageStatusSnapshot(parsedBody.data, dinosaurName);
+}
+
+/**
+ * Fetches the status of many rewards in one request, keyed by asset name.
+ * Used on load so a gallery of unlocked rewards costs a single round trip and
+ * never asks the server to generate something that already exists.
+ */
+export async function fetchRewardImageStatuses(
+  request: FetchRewardImageStatusesRequest,
+): Promise<Map<string, EarnedRewardImageStatusSnapshot>> {
+  const dinosaurNames = request.dinosaurNames
+    .map((dinosaurName) => getTrimmedNonEmptyString(dinosaurName))
+    .filter((dinosaurName): dinosaurName is string => dinosaurName !== null);
+
+  const statusByName = new Map<string, EarnedRewardImageStatusSnapshot>();
+  if (dinosaurNames.length === 0) {
+    return statusByName;
+  }
+
+  const endpoint = getTrimmedNonEmptyString(request.endpoint) ?? DEFAULT_REWARD_STATUS_ENDPOINT;
+  const fetchFn = request.fetchFn ?? fetch;
+  if (typeof fetchFn !== "function") {
+    throw new Error("fetchFn must be available to request reward image status.");
+  }
+
+  const resolvedEndpoint = resolveStatusEndpoint(endpoint);
+  for (const dinosaurName of dinosaurNames) {
+    resolvedEndpoint.endpointUrl.searchParams.append("dinosaurNames", dinosaurName);
+  }
+
+  const response = await fetchFn(toStatusRequestUrl(resolvedEndpoint), {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const parsedBody = (await response.json()) as unknown;
+  if (!response.ok) {
+    if (isRecord(parsedBody) && isRecord(parsedBody.error)) {
+      const errorMessage = getTrimmedNonEmptyString(parsedBody.error.message);
+      if (errorMessage) {
+        throw new Error(errorMessage);
+      }
+    }
+
+    throw new Error(`Reward status request failed with status ${response.status}.`);
+  }
+
+  const records =
+    isRecord(parsedBody) && isRecord(parsedBody.data) && Array.isArray(parsedBody.data.records)
+      ? parsedBody.data.records
+      : [];
+
+  for (const record of records) {
+    if (!isRecord(record)) {
+      continue;
+    }
+
+    const dinosaurName = getTrimmedNonEmptyString(record.dinosaurName);
+    if (!dinosaurName) {
+      continue;
+    }
+
+    statusByName.set(
+      dinosaurName,
+      normalizeEarnedRewardImageStatusSnapshot(record, dinosaurName),
+    );
+  }
+
+  return statusByName;
 }
 
 export async function pollEarnedRewardImageUntilReady(

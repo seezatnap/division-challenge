@@ -38,11 +38,18 @@ export async function POST(request: Request): Promise<Response> {
     });
     const imageStatus = await getRewardImageGenerationStatus(generatedImage.dinosaurName);
 
+    // Deliberately omits `imageBase64`: the browser loads the picture from its
+    // imagePath, and inlining it here added ~1-3 MB of unused JSON per reward.
     return NextResponse.json(
       {
         data: {
-          ...generatedImage,
+          dinosaurName: generatedImage.dinosaurName,
+          prompt: generatedImage.prompt,
+          model: generatedImage.model,
+          mimeType: generatedImage.mimeType,
+          ...(generatedImage.source ? { source: generatedImage.source } : {}),
           imagePath: imageStatus.status === "ready" ? imageStatus.imagePath : null,
+          status: imageStatus.status,
         },
       },
       { status: 200 },

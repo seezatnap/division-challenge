@@ -561,6 +561,78 @@ export async function getRewardImageGenerationStatus(
 }
 
 /**
+ * Status for many rewards in a single query. Reads only `reward_image_states`
+ * (joined to the current image row) — it never fetches image bytes, so it stays
+ * cheap no matter how many rewards a player has unlocked.
+ */
+export async function getRewardImageGenerationStatuses(
+  dinosaurNames: readonly string[],
+  options: RewardImageCacheOptions = {},
+): Promise<readonly RewardImageGenerationStatusSnapshot[]> {
+  const storage = resolveStorage(options);
+  const requestedNames = dinosaurNames
+    .map((dinosaurName) => getTrimmedNonEmptyString(dinosaurName))
+    .filter((dinosaurName): dinosaurName is string => dinosaurName !== null);
+
+  if (requestedNames.length === 0) {
+    return [];
+  }
+
+  const slugByName = new Map<string, string>();
+  for (const dinosaurName of requestedNames) {
+    slugByName.set(dinosaurName, toRewardImageCacheSlug(dinosaurName));
+  }
+
+  const uniqueSlugs = [...new Set(slugByName.values())];
+  const recordBySlug = new Map<string, RewardImageCacheDatabaseRecord>();
+
+  try {
+    const placeholders = uniqueSlugs.map(() => "?").join(", ");
+    const result = await executeDatabaseStatement({
+      sql: `
+        SELECT
+          states.slug AS state_slug,
+          states.dinosaur_name AS state_dinosaur_name,
+          states.status AS state_status,
+          states.updated_at_ms AS state_updated_at_ms,
+          ${REWARD_IMAGE_COLUMNS}
+        FROM reward_image_states AS states
+        LEFT JOIN reward_images AS images
+          ON images.id = states.current_image_id
+        WHERE states.slug IN (${placeholders})
+      `,
+      args: uniqueSlugs,
+    });
+
+    for (const row of result.rows) {
+      const record = toDatabaseRecordFromRow(row, storage);
+      if (record) {
+        recordBySlug.set(record.slug, record);
+      }
+    }
+  } catch (error) {
+    console.warn("[rewards] failed to read reward image states in bulk", {
+      count: uniqueSlugs.length,
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return requestedNames.map((dinosaurName) => {
+    const record = recordBySlug.get(slugByName.get(dinosaurName) ?? "");
+
+    if (record?.status === "ready" && record.imagePath) {
+      return { dinosaurName, status: "ready", imagePath: record.imagePath };
+    }
+
+    if (getInFlightRewardImageGeneration(dinosaurName, storage) || record?.status === "generating") {
+      return { dinosaurName, status: "generating", imagePath: null };
+    }
+
+    return { dinosaurName, status: "missing", imagePath: null };
+  });
+}
+
+/**
  * Uploads an image to object storage and records it: a new `reward_images`
  * row (history is append-only) and the slug's state pointing at it.
  */

@@ -38,6 +38,8 @@ import {
 import { EarnedRewardRevealPanel } from "@/features/rewards/components/earned-reward-reveal-panel";
 import {
   fetchEarnedRewardImageStatus,
+  fetchRewardImageStatuses,
+  type EarnedRewardImageStatusSnapshot,
   type EarnedRewardImageStatus,
 } from "@/features/rewards/lib/earned-reward-reveal";
 import {
@@ -1472,15 +1474,20 @@ export default function Home() {
     isSessionStarted,
   ]);
 
-  const syncRewardImageStatus = useCallback(async (assetName: string) => {
+  const syncRewardImageStatus = useCallback(async (
+    assetName: string,
+    prefetchedSnapshot?: EarnedRewardImageStatusSnapshot,
+  ) => {
     const normalizedAssetName = assetName.trim();
     if (normalizedAssetName.length === 0) {
       return;
     }
 
-    const statusSnapshot = await fetchEarnedRewardImageStatus({
-      dinosaurName: normalizedAssetName,
-    });
+    const statusSnapshot =
+      prefetchedSnapshot ??
+      (await fetchEarnedRewardImageStatus({
+        dinosaurName: normalizedAssetName,
+      }));
     const readyImagePath = statusSnapshot.imagePath;
     if (statusSnapshot.status !== "ready" || !readyImagePath) {
       return;
@@ -1526,10 +1533,14 @@ export default function Home() {
     });
   }, []);
 
-  const syncAmberImageStatus = useCallback(async () => {
-    const statusSnapshot = await fetchEarnedRewardImageStatus({
-      dinosaurName: AMBER_REWARD_ASSET_NAME,
-    });
+  const syncAmberImageStatus = useCallback(async (
+    prefetchedSnapshot?: EarnedRewardImageStatusSnapshot,
+  ) => {
+    const statusSnapshot =
+      prefetchedSnapshot ??
+      (await fetchEarnedRewardImageStatus({
+        dinosaurName: AMBER_REWARD_ASSET_NAME,
+      }));
     const readyImagePath = statusSnapshot.imagePath;
     if (statusSnapshot.status !== "ready" || !readyImagePath) {
       return;
@@ -1548,10 +1559,15 @@ export default function Home() {
   }, []);
 
   const syncHybridImageStatus = useCallback(
-    async (hybridReward: UnlockedHybridReward) => {
-      const statusSnapshot = await fetchEarnedRewardImageStatus({
-        dinosaurName: hybridReward.generationAssetName,
-      });
+    async (
+      hybridReward: UnlockedHybridReward,
+      prefetchedSnapshot?: EarnedRewardImageStatusSnapshot,
+    ) => {
+      const statusSnapshot =
+        prefetchedSnapshot ??
+        (await fetchEarnedRewardImageStatus({
+          dinosaurName: hybridReward.generationAssetName,
+        }));
       const readyImagePath = statusSnapshot.imagePath;
       if (statusSnapshot.status !== "ready" || !readyImagePath) {
         return;
@@ -1780,21 +1796,76 @@ export default function Home() {
     [requestGeneratedImage, syncHybridImageStatus],
   );
 
+  // One bulk status request covers every unlocked reward. Anything already
+  // rendered just has its path refreshed; only genuinely missing assets are
+  // sent for generation. Requesting generation for all of them (the previous
+  // behaviour) re-downloaded every image on the server and shipped megabytes of
+  // unused JSON back on each load.
   useEffect(() => {
     if (!isSessionStarted) {
       return;
     }
 
-    for (const unlockedReward of gameSession.unlockedRewards) {
-      void requestRewardImageGeneration(unlockedReward.dinosaurName);
-    }
-    for (const unlockedHybrid of gameSession.unlockedHybrids) {
-      void requestHybridImageGeneration(unlockedHybrid);
+    const needsAmberImage = gameSession.amberBalance > 0 && !gameSession.amberImagePath;
+    const assetNames = [
+      ...gameSession.unlockedRewards.map((unlockedReward) => unlockedReward.dinosaurName),
+      ...gameSession.unlockedHybrids.map((unlockedHybrid) => unlockedHybrid.generationAssetName),
+      ...(needsAmberImage ? [AMBER_REWARD_ASSET_NAME] : []),
+    ];
+
+    if (assetNames.length === 0) {
+      return;
     }
 
-    if (gameSession.amberBalance > 0 && !gameSession.amberImagePath) {
-      void requestAmberImageGeneration();
-    }
+    let didCancel = false;
+
+    void (async () => {
+      let statusByAssetName = new Map<string, EarnedRewardImageStatusSnapshot>();
+      try {
+        statusByAssetName = await fetchRewardImageStatuses({ dinosaurNames: assetNames });
+      } catch {
+        // Fall through with an empty map: missing statuses are treated as
+        // "needs generating", which is the previous behaviour.
+      }
+
+      if (didCancel) {
+        return;
+      }
+
+      const isMissing = (assetName: string): boolean =>
+        (statusByAssetName.get(assetName)?.status ?? "missing") === "missing";
+
+      for (const unlockedReward of gameSession.unlockedRewards) {
+        const snapshot = statusByAssetName.get(unlockedReward.dinosaurName);
+        if (snapshot?.status === "ready") {
+          void syncRewardImageStatus(unlockedReward.dinosaurName, snapshot);
+        } else if (isMissing(unlockedReward.dinosaurName)) {
+          void requestRewardImageGeneration(unlockedReward.dinosaurName);
+        }
+      }
+
+      for (const unlockedHybrid of gameSession.unlockedHybrids) {
+        const snapshot = statusByAssetName.get(unlockedHybrid.generationAssetName);
+        if (snapshot?.status === "ready") {
+          void syncHybridImageStatus(unlockedHybrid, snapshot);
+        } else if (isMissing(unlockedHybrid.generationAssetName)) {
+          void requestHybridImageGeneration(unlockedHybrid);
+        }
+      }
+
+      if (needsAmberImage) {
+        const snapshot = statusByAssetName.get(AMBER_REWARD_ASSET_NAME);
+        if (snapshot?.status === "ready") {
+          void syncAmberImageStatus(snapshot);
+        } else if (isMissing(AMBER_REWARD_ASSET_NAME)) {
+          void requestAmberImageGeneration();
+        }
+      }
+    })();
+
+    return () => {
+      didCancel = true;
+    };
   }, [
     gameSession.amberBalance,
     gameSession.amberImagePath,
@@ -1804,6 +1875,9 @@ export default function Home() {
     requestAmberImageGeneration,
     requestHybridImageGeneration,
     requestRewardImageGeneration,
+    syncAmberImageStatus,
+    syncHybridImageStatus,
+    syncRewardImageStatus,
   ]);
 
   const advanceToNextProblem = useCallback(() => {

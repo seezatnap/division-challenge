@@ -203,12 +203,19 @@ test("POST /api/rewards/generate-image wraps successful image output in a data e
 
     assert.equal(response.status, 200);
     assert.deepEqual(seenPayload, { dinosaurName: "Brachiosaurus" });
+    // The image bytes are deliberately not echoed back: the browser loads the
+    // picture from imagePath, so inlining base64 was megabytes of dead weight.
     assert.deepEqual(body, {
       data: {
-        ...generatedImage,
+        dinosaurName: "Brachiosaurus",
+        prompt: "cinematic portrait of Brachiosaurus",
+        model: "gpt-image-2",
+        mimeType: "image/png",
         imagePath: "/rewards/brachiosaurus.png",
+        status: "ready",
       },
     });
+    assert.equal("imageBase64" in body.data, false);
   } finally {
     cleanup();
   }
