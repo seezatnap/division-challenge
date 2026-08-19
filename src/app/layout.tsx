@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Alegreya_Sans, Cinzel, IBM_Plex_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 import { UiSoundEffects } from "@/features/workspace-ui/components/ui-sound-effects";
+
+const GOOGLE_ANALYTICS_ID = "G-GW0EZ8GPTN";
 
 const jurassicDisplay = Cinzel({
   variable: "--font-jurassic-display",
@@ -53,6 +56,18 @@ export default function RootLayout({
           <div className="jp3-frame-bolt jp3-frame-bolt--br" aria-hidden="true" />
           {children}
         </div>
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ANALYTICS_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){window.dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GOOGLE_ANALYTICS_ID}');
+          `}
+        </Script>
       </body>
     </html>
   );

@@ -36,6 +36,8 @@ function resolveRewardImageRemotePatterns(): NonNullable<
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR?.trim() || ".next",
+  output: "standalone",
+  poweredByHeader: false,
   // libsql ships a native binding for `file:` databases; keep it (and the AWS
   // SDK) out of the server bundle so Node loads them normally.
   serverExternalPackages: ["@libsql/client", "libsql", "@aws-sdk/client-s3"],

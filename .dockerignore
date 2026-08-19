@@ -1,0 +1,15 @@
+node_modules
+.next
+.next-*
+out
+dist
+build
+coverage
+.git
+.env
+.env.*
+!.env.example
+.sqlite
+.reward-images
+public/rewards
+public/artifacts
