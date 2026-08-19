@@ -6,6 +6,9 @@
  * numerator is built as `2^twos * 5^fives * cofactor`, where the cofactor is
  * coprime to 10 — which fixes the amount of work exactly: the fraction takes
  * `twos + fives` single-divisor rounds to reduce, and then stops.
+ *
+ * The mix is deliberately lopsided: at most one 5 and up to four 2s, so most
+ * rounds are halving and dividing by 5 stays a one-off.
  */
 
 import {
@@ -18,6 +21,10 @@ export const FRACTION_DENOMINATOR_EXPONENTS = [2, 3, 4] as const;
 /** Keeps the numerator readable: at most two digits of non-reducible factor. */
 const MAX_COFACTOR = 99;
 
+/** A fraction carries at most one factor of 5 and no more than four 2s. */
+const MAX_FIVES = 1;
+const MAX_TWOS = 4;
+
 export interface FractionDifficultyTier {
   readonly level: number;
   readonly minReductionRounds: number;
@@ -25,15 +32,15 @@ export interface FractionDifficultyTier {
 }
 
 /**
- * Mirrors the difficulty choices the player sees: easy is one or two rounds of
- * reducing, medium three or four, hard five or six.
+ * Mirrors the difficulty choices the player sees: easy is two rounds of
+ * reducing, medium three or four, hard four or five.
  */
 export const FRACTION_DIFFICULTY_TIERS: readonly FractionDifficultyTier[] = [
-  { level: 1, minReductionRounds: 1, maxReductionRounds: 2 },
-  { level: 2, minReductionRounds: 1, maxReductionRounds: 2 },
+  { level: 1, minReductionRounds: 2, maxReductionRounds: 2 },
+  { level: 2, minReductionRounds: 2, maxReductionRounds: 2 },
   { level: 3, minReductionRounds: 3, maxReductionRounds: 4 },
   { level: 4, minReductionRounds: 3, maxReductionRounds: 4 },
-  { level: 5, minReductionRounds: 5, maxReductionRounds: 6 },
+  { level: 5, minReductionRounds: 4, maxReductionRounds: 5 },
 ];
 
 export interface FractionReductionProblem {
@@ -105,10 +112,11 @@ export function getFractionShapesForRounds(reductionRounds: number): readonly Fr
 
   for (const denominatorExponent of FRACTION_DENOMINATOR_EXPONENTS) {
     const denominator = 10 ** denominatorExponent;
+    const maxTwos = Math.min(denominatorExponent, MAX_TWOS, reductionRounds);
 
-    for (let twos = 0; twos <= Math.min(denominatorExponent, reductionRounds); twos += 1) {
+    for (let twos = 0; twos <= maxTwos; twos += 1) {
       const fives = reductionRounds - twos;
-      if (fives > denominatorExponent) {
+      if (fives > Math.min(denominatorExponent, MAX_FIVES)) {
         continue;
       }
 
@@ -161,8 +169,8 @@ export function generateFractionReductionProblem(
     random,
   );
 
-  // Six rounds only fit under 10000; fall back a round at a time rather than
-  // failing when a tier asks for more than a denominator can carry.
+  // Five rounds only fit under 10000 (2^4 * 5); fall back a round at a time
+  // rather than failing when a tier asks for more than a denominator can carry.
   let shapes: readonly FractionShape[] = [];
   let reductionRounds = requestedRounds;
   while (reductionRounds >= 1) {

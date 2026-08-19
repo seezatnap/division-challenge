@@ -44,7 +44,8 @@ node --test tests/player-journey-smoke.test.mjs
 - **Fractions** (replaces the old "Mixed Ops") gives a fraction over 100, 1000 or 10000 and reduces it
   one divisor at a time: choose which of 2/3/5/7/9/11 divides both halves, fill in the two divisions
   (the **?** button opens a long-division scratch pad that fills the answer in for you), repeat until
-  nothing divides both, then answer "None of the above". Easy is 1–2 rounds, medium 3–4, hard 5–6.
+  nothing divides both, then answer "None of the above". A fraction carries at most one factor of 5
+  and up to four 2s, so most rounds are halving. Easy is 2 rounds, medium 3–4, hard 4–5.
   See `docs/developer-runbook.md` §3b.
 
 ## Dinosaur facts

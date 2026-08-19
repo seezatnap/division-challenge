@@ -114,8 +114,9 @@ and has them reduce it one divisor at a time:
 
 - `problem-generator.ts` builds the numerator as `2^a * 5^b * cofactor`, where the cofactor is
   coprime to 10 and the fraction stays proper. That fixes the workload exactly: `a + b` rounds of
-  reducing, then the fraction stops. Difficulty maps to rounds — easy 1–2, medium 3–4, hard 5–6
-  (`FRACTION_DIFFICULTY_TIERS`).
+  reducing, then the fraction stops. The mix is deliberately lopsided — at most one 5 (`MAX_FIVES`)
+  and up to four 2s (`MAX_TWOS`) — so most rounds are halving. Difficulty maps to rounds: easy 2,
+  medium 3–4, hard 4–5 (`FRACTION_DIFFICULTY_TIERS`).
 - `fraction-reduction.ts` holds the rules: the offered choices are 2, 3, 5, 7, 9, 11, and a choice is
   correct only when it divides *both* halves. Because the denominator is a power of ten, only 2 and 5
   ever can — the rest are deliberate distractors. "None of the above" is correct exactly when nothing

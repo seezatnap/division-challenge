@@ -74,27 +74,52 @@ test("dividing produces the reduced fraction and counts the rounds left", async 
 test("difficulty tiers map to the promised amount of work", async () => {
   const { getFractionDifficultyTier } = await engine;
 
-  // easy = 1-2 rounds, medium = 3-4, hard = 5-6.
-  for (const level of [1, 2]) {
-    assert.deepEqual(
-      [getFractionDifficultyTier(level).minReductionRounds, getFractionDifficultyTier(level).maxReductionRounds],
-      [1, 2],
-      `level ${level}`,
-    );
+  // easy = 2 rounds, medium = 3-4, hard = 4-5.
+  const expectedRoundsByLevel = [
+    [[1, 2], [2, 2]],
+    [[3, 4], [3, 4]],
+    [[5, 6, 9], [4, 5]],
+  ];
+
+  for (const [levels, expectedRounds] of expectedRoundsByLevel) {
+    for (const level of levels) {
+      const tier = getFractionDifficultyTier(level);
+      assert.deepEqual(
+        [tier.minReductionRounds, tier.maxReductionRounds],
+        expectedRounds,
+        `level ${level}`,
+      );
+    }
   }
-  for (const level of [3, 4]) {
-    assert.deepEqual(
-      [getFractionDifficultyTier(level).minReductionRounds, getFractionDifficultyTier(level).maxReductionRounds],
-      [3, 4],
-      `level ${level}`,
-    );
-  }
-  for (const level of [5, 6, 9]) {
-    assert.deepEqual(
-      [getFractionDifficultyTier(level).minReductionRounds, getFractionDifficultyTier(level).maxReductionRounds],
-      [5, 6],
-      `level ${level}`,
-    );
+});
+
+test("generated numerators carry at most one 5 and no more than four 2s", async () => {
+  const { generateFractionReductionProblem } = await engine;
+
+  const countSharedFactor = (fraction, factor) => {
+    let { numerator, denominator } = fraction;
+    let count = 0;
+    while (numerator % factor === 0 && denominator % factor === 0) {
+      numerator /= factor;
+      denominator /= factor;
+      count += 1;
+    }
+
+    return count;
+  };
+
+  for (const difficultyLevel of [1, 2, 3, 4, 5, 7]) {
+    for (let iteration = 0; iteration < 80; iteration += 1) {
+      const problem = generateFractionReductionProblem({ difficultyLevel });
+      const fives = countSharedFactor(problem.fraction, 5);
+      const twos = countSharedFactor(problem.fraction, 2);
+      const label = `${problem.fraction.numerator}/${problem.fraction.denominator} (level ${difficultyLevel})`;
+
+      assert.ok(fives <= 1, `${label} shares ${fives} factors of 5`);
+      assert.ok(twos <= 4, `${label} shares ${twos} factors of 2`);
+      // Rounds are exactly the shared 2s plus the shared 5.
+      assert.equal(twos + fives, problem.reductionRounds, label);
+    }
   }
 });
 
