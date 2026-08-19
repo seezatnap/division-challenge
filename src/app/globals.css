@@ -2984,3 +2984,239 @@ body {
     grid-template-columns: minmax(0, 0.54fr) minmax(0, 1fr);
   }
 }
+
+/* ── Fraction reducing workspace ─────────────────────────────────────────── */
+
+.fraction-workspace {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+@media (min-width: 48rem) {
+  .fraction-workspace {
+    grid-template-columns: minmax(0, 1.42fr) minmax(0, 0.95fr);
+    align-items: start;
+  }
+}
+
+.fraction-paper {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.fraction-row-list {
+  display: grid;
+  gap: 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fraction-row {
+  display: grid;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed color-mix(in srgb, var(--jp-panel-text) 22%, transparent);
+}
+
+.fraction-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.fraction-row-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.1rem;
+}
+
+.fraction-row-connector {
+  width: 1.35rem;
+  height: 2px;
+  background: color-mix(in srgb, var(--jp-panel-text) 30%, transparent);
+}
+
+.fraction-value {
+  display: inline-grid;
+  justify-items: center;
+  gap: 0.15rem;
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--jp-panel-text);
+  line-height: 1.1;
+}
+
+.fraction-numerator,
+.fraction-denominator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+}
+
+.fraction-bar {
+  display: block;
+  width: 100%;
+  min-width: 3.25rem;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.fraction-reduction-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.85rem;
+}
+
+.fraction-equals {
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--jp-panel-text);
+  opacity: 0.85;
+}
+
+.fraction-entry-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.inline-entry.fraction-entry {
+  width: auto;
+  min-width: 3.5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.inline-entry.fraction-entry.inline-entry-locked {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--jp-amber-bright) 62%, transparent);
+  background: rgba(211, 160, 58, 0.16);
+}
+
+.fraction-help-button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-text) 42%, transparent);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--jp-panel-text);
+  font-family: var(--font-jurassic-body), system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.fraction-help-button:hover {
+  background: rgba(211, 160, 58, 0.34);
+  color: var(--jp-amber-bright);
+  transform: translateY(-1px);
+}
+
+.fraction-help-button:focus-visible {
+  outline: 2px solid var(--jp-amber-bright);
+  outline-offset: 2px;
+}
+
+.fraction-hint {
+  margin: 0;
+  font-family: var(--font-jurassic-body), system-ui, sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--jp-panel-text);
+  opacity: 0.78;
+}
+
+.fraction-choice-box {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 2px solid var(--jp-panel-border);
+  border-radius: 0.4rem;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.fraction-choice-prompt {
+  margin: 0;
+  font-family: var(--font-jurassic-body), system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--jp-panel-text);
+}
+
+.fraction-choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.fraction-choice-button {
+  min-width: 2.75rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--jp-panel-text) 34%, transparent);
+  border-radius: 0.3rem;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--jp-panel-text);
+  font-family: var(--font-jurassic-mono), "Courier New", monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.fraction-choice-button:hover {
+  background: rgba(211, 160, 58, 0.32);
+  color: var(--jp-amber-bright);
+  transform: translateY(-1px);
+}
+
+.fraction-choice-button:focus-visible {
+  outline: 2px solid var(--jp-amber-bright);
+  outline-offset: 2px;
+}
+
+.fraction-choice-button-none {
+  font-family: var(--font-jurassic-body), system-ui, sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+/* Wrong choice: the same red shake the workspace cells use. */
+.fraction-choice-button.inline-entry-error-pulse {
+  border-color: rgba(213, 57, 57, 0.84);
+  background: rgba(213, 57, 57, 0.2);
+  box-shadow: 0 0 0 1px rgba(213, 57, 57, 0.52), 0 0 1rem rgba(213, 57, 57, 0.3);
+  animation: inline-entry-error-shake 360ms cubic-bezier(0.22, 0.78, 0.31, 1) 1;
+}
+
+.fraction-solved-note {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid var(--jp-amber-bright);
+  background: rgba(211, 160, 58, 0.18);
+  font-family: var(--font-jurassic-body), system-ui, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--jp-panel-text);
+}
+
+/* The scratch-pad modal has to be wide enough for the two-column game grid. */
+.jp-modal.jp-modal-workspace {
+  width: min(64rem, 96vw);
+  display: grid;
+  gap: 0.75rem;
+}

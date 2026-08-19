@@ -1,6 +1,7 @@
 export type FeatureModuleId =
   | "division-engine"
   | "multiplication-engine"
+  | "fraction-engine"
   | "workspace-ui"
   | "rewards"
   | "gallery"
@@ -15,7 +16,7 @@ export interface FeatureModuleDescriptor {
 
 export type IsoDateString = string;
 
-export type GameMode = "division" | "multiplication";
+export type GameMode = "division" | "multiplication" | "fractions";
 
 export interface DivisionProblem {
   id: string;

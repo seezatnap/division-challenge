@@ -41,6 +41,12 @@ interface SanitizedActiveRewardReveal {
   initialImagePath: string | null;
 }
 
+interface SanitizedSolvedCountByMode {
+  division: number;
+  multiplication: number;
+  fractions: number;
+}
+
 interface SanitizedPlayerProfileSnapshot {
   gameSession: {
     totalProblemsSolved: number;
@@ -48,6 +54,9 @@ interface SanitizedPlayerProfileSnapshot {
     currentStreak: number;
     amberBalance: number;
     amberImagePath: string | null;
+    solvedByMode: SanitizedSolvedCountByMode;
+    preferredGameMode: "division" | "multiplication" | "fractions";
+    preferredDifficulty: "easy" | "medium" | "hard";
     unlockedRewards: readonly SanitizedUnlockedReward[];
     unlockedHybrids: readonly SanitizedUnlockedHybridReward[];
   };
@@ -69,6 +78,28 @@ function toTrimmedNonEmptyString(value: unknown): string | null {
 
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : null;
+}
+
+function normalizeSolvedByMode(value: unknown): SanitizedSolvedCountByMode {
+  const record = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+
+  return {
+    division: toNonNegativeInteger(record.division) ?? 0,
+    multiplication: toNonNegativeInteger(record.multiplication) ?? 0,
+    fractions: toNonNegativeInteger(record.fractions) ?? 0,
+  };
+}
+
+function normalizePreferredGameMode(
+  value: unknown,
+): SanitizedPlayerProfileSnapshot["gameSession"]["preferredGameMode"] {
+  return value === "multiplication" || value === "fractions" ? value : "division";
+}
+
+function normalizePreferredDifficulty(
+  value: unknown,
+): SanitizedPlayerProfileSnapshot["gameSession"]["preferredDifficulty"] {
+  return value === "medium" || value === "hard" ? value : "easy";
 }
 
 function normalizeUnlockedRewards(
@@ -237,6 +268,9 @@ function sanitizePlayerProfileSnapshot(
           currentStreak?: unknown;
           amberBalance?: unknown;
           amberImagePath?: unknown;
+          solvedByMode?: unknown;
+          preferredGameMode?: unknown;
+          preferredDifficulty?: unknown;
           unlockedRewards?: unknown;
           unlockedHybrids?: unknown;
         })
@@ -263,6 +297,9 @@ function sanitizePlayerProfileSnapshot(
       currentStreak,
       amberBalance,
       amberImagePath,
+      solvedByMode: normalizeSolvedByMode(parsedGameSession.solvedByMode),
+      preferredGameMode: normalizePreferredGameMode(parsedGameSession.preferredGameMode),
+      preferredDifficulty: normalizePreferredDifficulty(parsedGameSession.preferredDifficulty),
       unlockedRewards,
       unlockedHybrids: normalizeUnlockedHybrids(parsedGameSession.unlockedHybrids),
     },

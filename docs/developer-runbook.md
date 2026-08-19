@@ -104,6 +104,33 @@ attributes, source, model, prompt, timestamps) — deliberately *without* measur
 cannot carry a fact. Rows written by `openai`/`gemini` are reused; a `curated` row means generation
 failed and the fact-sheet text is being shown instead.
 
+## 3b. Game modes
+
+Three sequencer modes share one session loop in `src/app/page.tsx`: **Division**, **Multiplication**
+and **Fractions** (which replaced the old "Mixed Ops" random-picker).
+
+Fraction reducing (`src/features/fraction-engine`) hands the player a fraction over a power of ten
+and has them reduce it one divisor at a time:
+
+- `problem-generator.ts` builds the numerator as `2^a * 5^b * cofactor`, where the cofactor is
+  coprime to 10 and the fraction stays proper. That fixes the workload exactly: `a + b` rounds of
+  reducing, then the fraction stops. Difficulty maps to rounds — easy 1–2, medium 3–4, hard 5–6
+  (`FRACTION_DIFFICULTY_TIERS`).
+- `fraction-reduction.ts` holds the rules: the offered choices are 2, 3, 5, 7, 9, 11, and a choice is
+  correct only when it divides *both* halves. Because the denominator is a power of ten, only 2 and 5
+  ever can — the rest are deliberate distractors. "None of the above" is correct exactly when nothing
+  on the list divides both, and choosing it ends the problem.
+- `reduction-session.ts` is the state machine: pick a divisor → fill in the two divisions → the
+  reduced fraction is appended as a new row and the question repeats. Every row stays on screen so
+  the whole reduction reads as shown work.
+- `FractionReductionPanel` (in workspace-ui) renders it, reusing the workspace's inline-entry cells,
+  amber glow and red error shake. The **?** button beside each blank opens a scratch pad containing a
+  real `LiveDivisionWorkspacePanel` for that exact division; solving it there drops the answer into
+  the blank. Focus follows the active blank (numerator, then denominator).
+
+Fraction problems are not step-driven, so the panel reports completion through `onProblemSolved`
+instead of workspace step validation; scoring, streaks and amber are unchanged.
+
 ## 4. Storage: Turso database + Cloudflare R2 images
 
 All server-side state lives in one libsql database (`src/features/persistence/lib/database.ts`):

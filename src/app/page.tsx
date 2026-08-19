@@ -35,6 +35,10 @@ import {
   type UnlockedReward,
   type WorkspaceStep,
 } from "@/features/contracts";
+import {
+  generateFractionReductionProblem,
+  type FractionReductionProblem,
+} from "@/features/fraction-engine";
 import { EarnedRewardRevealPanel } from "@/features/rewards/components/earned-reward-reveal-panel";
 import {
   fetchEarnedRewardImageStatus,
@@ -54,6 +58,7 @@ import {
   toRewardDossierApiPath,
   type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
+import { FractionReductionPanel } from "@/features/workspace-ui/components/fraction-reduction-panel";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
 import { LiveMultiplicationWorkspacePanel } from "@/features/workspace-ui/components/live-multiplication-workspace-panel";
 import {
@@ -76,10 +81,13 @@ const workspacePreviewProblem: DivisionProblem = {
 
 const workspacePreviewSolution = solveLongDivision(workspacePreviewProblem);
 
-export type GameModeChoice = GameMode | "mixed";
+export type GameModeChoice = GameMode;
 export type DifficultyChoice = "easy" | "medium" | "hard";
 
-type LiveWorkspaceProblem = DivisionProblem | MultiplicationProblem;
+type LiveWorkspaceProblem =
+  | DivisionProblem
+  | MultiplicationProblem
+  | FractionReductionProblem;
 
 function isMultiplicationProblem(
   problem: LiveWorkspaceProblem,
@@ -87,9 +95,16 @@ function isMultiplicationProblem(
   return "multiplicand" in problem;
 }
 
+function isFractionProblem(
+  problem: LiveWorkspaceProblem,
+): problem is FractionReductionProblem {
+  return "fraction" in problem;
+}
+
 interface SolvedCountByMode {
   division: number;
   multiplication: number;
+  fractions: number;
 }
 
 interface LiveGameSessionState {
@@ -206,7 +221,7 @@ function toTrimmedValue(value: unknown): string | null {
 const GAME_MODE_CHOICE_OPTIONS: readonly { value: GameModeChoice; label: string }[] = [
   { value: "division", label: "Division" },
   { value: "multiplication", label: "Multiplication" },
-  { value: "mixed", label: "Mixed Ops" },
+  { value: "fractions", label: "Fractions" },
 ];
 
 const ENGINE_LEVEL_BY_DIFFICULTY: Record<DifficultyChoice, number> = {
@@ -231,7 +246,9 @@ const DIFFICULTY_CHOICE_OPTIONS: readonly {
 ];
 
 function toGameModeChoice(value: unknown): GameModeChoice {
-  return value === "multiplication" || value === "mixed" ? value : "division";
+  // Profiles saved before fraction mode may carry the retired "mixed" choice;
+  // those fall back to division.
+  return value === "multiplication" || value === "fractions" ? value : "division";
 }
 
 function toDifficultyChoice(value: unknown): DifficultyChoice {
@@ -261,6 +278,7 @@ function toSolvedCountByMode(
   return {
     division: toNonNegativeInteger(record.division ?? fallbackDivisionSolvedCount),
     multiplication: toNonNegativeInteger(record.multiplication),
+    fractions: toNonNegativeInteger(record.fractions),
   };
 }
 
@@ -734,11 +752,21 @@ interface NextLiveProblemResolution {
 }
 
 function resolveModeForNextProblem(preferredGameMode: GameModeChoice): GameMode {
-  if (preferredGameMode === "mixed") {
-    return Math.random() < 0.5 ? "division" : "multiplication";
-  }
-
   return preferredGameMode;
+}
+
+function resolveNextFractionProblem(
+  totalProblemsSolved: number,
+  difficultyLevel: number,
+): { problem: FractionReductionProblem; steps: readonly WorkspaceStep[] } {
+  const problem = generateFractionReductionProblem({ difficultyLevel });
+
+  return {
+    // Fraction problems are not step-driven, but the id keeps the same shape as
+    // the other modes so problem-scoped effects and dedupes behave identically.
+    problem: { ...problem, id: `live-problem-${totalProblemsSolved + 1}-${problem.id}` },
+    steps: [],
+  };
 }
 
 
@@ -792,6 +820,11 @@ function resolveNextProblemForPreferences(input: {
 }): NextLiveProblemResolution {
   const mode = resolveModeForNextProblem(input.preferredGameMode);
   const difficultyLevel = ENGINE_LEVEL_BY_DIFFICULTY[input.preferredDifficulty];
+
+  if (mode === "fractions") {
+    const resolution = resolveNextFractionProblem(input.totalProblemsSolved, difficultyLevel);
+    return { mode, ...resolution };
+  }
 
   if (mode === "multiplication") {
     const resolution = resolveNextMultiplicationProblem(
@@ -866,7 +899,7 @@ const initialLiveGameSessionState: LiveGameSessionState = {
   currentStreak: 0,
   totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
   totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
-  solvedByMode: { division: 0, multiplication: 0 },
+  solvedByMode: { division: 0, multiplication: 0, fractions: 0 },
   preferredGameMode: "division",
   preferredDifficulty: "easy",
   amberBalance: 0,
@@ -891,7 +924,7 @@ function createFreshLiveGameSessionState(): LiveGameSessionState {
     currentStreak: 0,
     totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
     totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
-    solvedByMode: { division: 0, multiplication: 0 },
+    solvedByMode: { division: 0, multiplication: 0, fractions: 0 },
     preferredGameMode: "division",
     preferredDifficulty: "easy",
     amberBalance: 0,
@@ -1920,8 +1953,7 @@ export default function Home() {
       return;
     }
 
-    const shouldSwapActiveProblem =
-      nextGameMode === "mixed" || currentState.activeMode !== nextGameMode;
+    const shouldSwapActiveProblem = currentState.activeMode !== nextGameMode;
     const nextSession: LiveGameSessionState = {
       ...currentState,
       preferredGameMode: nextGameMode,
@@ -2097,14 +2129,35 @@ export default function Home() {
     [],
   );
 
+  // Fraction problems are not step-driven, so the panel reports completion
+  // directly rather than through workspace step validation.
+  const handleFractionProblemSolved = useCallback((problemId: string) => {
+    if (completedProblemIdRef.current === problemId) {
+      return;
+    }
+
+    completedProblemIdRef.current = problemId;
+    setIsNextProblemReady(true);
+  }, []);
+
+  const handleFractionIncorrectAttempt = useCallback(() => {
+    hadErrorInCurrentProblemRef.current = true;
+  }, []);
+
   const activeLaneLabel =
-    gameSession.activeMode === "multiplication"
-      ? gameSession.steps[0]
-        ? "partial product"
-        : "ready"
-      : formatActiveInputLane(gameSession.steps[0] ? "quotient" : null);
+    gameSession.activeMode === "fractions"
+      ? "common divisor"
+      : gameSession.activeMode === "multiplication"
+        ? gameSession.steps[0]
+          ? "partial product"
+          : "ready"
+        : formatActiveInputLane(gameSession.steps[0] ? "quotient" : null);
   const activeModeLabel =
-    gameSession.activeMode === "multiplication" ? "Multiplication" : "Division";
+    gameSession.activeMode === "fractions"
+      ? "Fractions"
+      : gameSession.activeMode === "multiplication"
+        ? "Multiplication"
+        : "Division";
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
@@ -2183,9 +2236,11 @@ export default function Home() {
         <header className="jurassic-panel jurassic-hero motif-canopy">
           <p className="eyebrow">Dinosaur Genomic Sequencing Console</p>
           <h1 className="hero-title">
-            {gameSession.activeMode === "multiplication"
-              ? "InGen Multiplication Dashboard"
-              : "InGen Division Dashboard"}
+            {gameSession.activeMode === "fractions"
+              ? "InGen Fraction Dashboard"
+              : gameSession.activeMode === "multiplication"
+                ? "InGen Multiplication Dashboard"
+                : "InGen Division Dashboard"}
           </h1>
         </header>
 
@@ -2255,8 +2310,16 @@ export default function Home() {
               </div>
             </div>
 
-            {gameSession.activeMode === "multiplication" &&
-            isMultiplicationProblem(gameSession.activeProblem) ? (
+            {gameSession.activeMode === "fractions" &&
+            isFractionProblem(gameSession.activeProblem) ? (
+              <FractionReductionPanel
+                key={gameSession.activeProblem.id}
+                onIncorrectAttempt={handleFractionIncorrectAttempt}
+                onProblemSolved={handleFractionProblemSolved}
+                problem={gameSession.activeProblem}
+              />
+            ) : gameSession.activeMode === "multiplication" &&
+              isMultiplicationProblem(gameSession.activeProblem) ? (
               <LiveMultiplicationWorkspacePanel
                 key={gameSession.activeProblem.id}
                 multiplicand={gameSession.activeProblem.multiplicand}

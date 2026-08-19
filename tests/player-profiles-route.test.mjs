@@ -236,6 +236,11 @@ test("PUT /api/player-profiles persists profile snapshots via sqlite writer", as
           currentStreak: 0,
           amberBalance: 55,
           amberImagePath: null,
+          // Per-mode counts and the player's mode/difficulty choice are kept so
+          // they survive loading the profile on another device.
+          solvedByMode: { division: 0, multiplication: 0, fractions: 0 },
+          preferredGameMode: "division",
+          preferredDifficulty: "easy",
           unlockedRewards: [],
           unlockedHybrids: [],
         },
@@ -250,6 +255,86 @@ test("PUT /api/player-profiles persists profile snapshots via sqlite writer", as
     });
     assert.equal(body.data.profile.playerName, "Gus");
     assert.equal(body.data.profile.updatedAtMs, 999);
+  } finally {
+    cleanup();
+  }
+});
+
+test("PUT /api/player-profiles keeps per-mode progress and the chosen mode", async () => {
+  let seenPayload;
+  const { routeModule, cleanup } = await loadPlayerProfilesRoute({
+    writePlayerProfileSnapshotToSqliteImpl: async (payload) => {
+      seenPayload = payload;
+      return {
+        schemaVersion: 1,
+        playerName: payload.playerName,
+        playerNameKey: payload.playerName.toLowerCase(),
+        snapshot: payload.snapshot,
+        updatedAtMs: payload.updatedAtMs ?? 1,
+      };
+    },
+  });
+
+  try {
+    const request = new Request("https://example.test/api/player-profiles", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        playerName: "Gus",
+        snapshot: {
+          gameSession: {
+            solvedByMode: { division: 4, multiplication: 2, fractions: 7, bogus: 9 },
+            preferredGameMode: "fractions",
+            preferredDifficulty: "hard",
+          },
+        },
+      }),
+    });
+
+    await routeModule.PUT(request);
+
+    assert.deepEqual(seenPayload.snapshot.gameSession.solvedByMode, {
+      division: 4,
+      multiplication: 2,
+      fractions: 7,
+    });
+    assert.equal(seenPayload.snapshot.gameSession.preferredGameMode, "fractions");
+    assert.equal(seenPayload.snapshot.gameSession.preferredDifficulty, "hard");
+  } finally {
+    cleanup();
+  }
+});
+
+test("PUT /api/player-profiles falls back for unknown mode and difficulty values", async () => {
+  let seenPayload;
+  const { routeModule, cleanup } = await loadPlayerProfilesRoute({
+    writePlayerProfileSnapshotToSqliteImpl: async (payload) => {
+      seenPayload = payload;
+      return {
+        schemaVersion: 1,
+        playerName: payload.playerName,
+        playerNameKey: payload.playerName.toLowerCase(),
+        snapshot: payload.snapshot,
+        updatedAtMs: 1,
+      };
+    },
+  });
+
+  try {
+    const request = new Request("https://example.test/api/player-profiles", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        playerName: "Gus",
+        // "mixed" is the retired mode; it must degrade rather than persist.
+        snapshot: { gameSession: { preferredGameMode: "mixed", preferredDifficulty: "extreme" } },
+      }),
+    });
+
+    await routeModule.PUT(request);
+
+    assert.equal(seenPayload.snapshot.gameSession.preferredGameMode, "division");
+    assert.equal(seenPayload.snapshot.gameSession.preferredDifficulty, "easy");
   } finally {
     cleanup();
   }

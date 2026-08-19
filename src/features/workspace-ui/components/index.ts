@@ -8,6 +8,7 @@ export const workspaceUiModule: FeatureModuleDescriptor = {
 };
 
 export * from "./bus-stop-long-division-renderer";
+export * from "./fraction-reduction-panel";
 export * from "./live-division-workspace-panel";
 export * from "./long-multiplication-renderer";
 export * from "./live-multiplication-workspace-panel";

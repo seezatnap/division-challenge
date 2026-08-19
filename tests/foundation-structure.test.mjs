@@ -16,6 +16,7 @@ const requiredPaths = [
   "src/features/workspace-ui/index.ts",
   "src/features/rewards/index.ts",
   "src/features/gallery/index.ts",
+  "src/features/fraction-engine/index.ts",
   "src/features/persistence/index.ts",
   "src/features/registry.ts",
 ];
