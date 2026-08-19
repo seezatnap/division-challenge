@@ -49,7 +49,7 @@ import {
   buildHybridDinosaurDossier,
   formatMetersAsMetersAndFeet,
   parseRewardDinosaurDossierArtifact,
-  toHybridRewardDossierArtifactPath,
+  toRewardDossierApiPath,
   type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
@@ -1202,7 +1202,7 @@ export default function Home() {
     void (async () => {
       try {
         const dossierResponse = await fetch(
-          toHybridRewardDossierArtifactPath(selectedHybridReward.generationAssetName),
+          toRewardDossierApiPath(selectedHybridReward.generationAssetName),
           {
             cache: "no-store",
             signal: abortController.signal,
@@ -1213,8 +1213,12 @@ export default function Home() {
           return;
         }
 
-        const dossierPayload = (await dossierResponse.json().catch(() => null)) as unknown;
-        const parsedDossier = parseRewardDinosaurDossierArtifact(dossierPayload);
+        const dossierResponseBody = (await dossierResponse.json().catch(() => null)) as {
+          data?: { dossier?: unknown };
+        } | null;
+        const parsedDossier = parseRewardDinosaurDossierArtifact(
+          dossierResponseBody?.data?.dossier,
+        );
         if (!parsedDossier || didCancel) {
           return;
         }

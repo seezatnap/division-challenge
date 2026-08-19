@@ -1,28 +1,14 @@
+import {
+  formatDietForDisplay,
+  formatTaxonForDisplay,
+  formatTimePeriodForDisplay,
+  getDinosaurFactSheet,
+  type DinosaurFactSheet,
+} from "./dinosaur-facts";
 import { DINOSAUR_ROSTER } from "./dinosaurs";
 
 const HYBRID_ASSET_NAME_PATTERN = /^hybrid\s+(.+?)\s*\+\s*(.+)$/i;
 const AMBER_ASSET_NAME_PATTERN = /^amber\b/i;
-
-const ATTRIBUTE_POOL = [
-  "reinforced skull plating",
-  "high-traction hind claws",
-  "long-range scent tracking",
-  "rapid acceleration bursts",
-  "stabilizing tail counterbalance",
-  "dense osteoderm armor",
-  "precision depth vision",
-  "heat-regulated dorsal sail",
-  "impact-resistant neck vertebrae",
-  "broad-spectrum low-light vision",
-  "efficient oxygen recovery",
-  "silent fern-canopy stalking",
-  "powerful bite leverage",
-  "shock-absorbing foot pads",
-  "wide-turn agility",
-  "camouflage skin mottling",
-  "high-endurance stride cycle",
-  "rapid threat recognition",
-] as const;
 
 const HYBRID_SIGNATURE_ATTRIBUTES = [
   "mosaic gene stability",
@@ -96,10 +82,6 @@ function toStableHashSeed(value: string): number {
   return hash >>> 0;
 }
 
-function clampNumber(value: number, minimumValue: number, maximumValue: number): number {
-  return Math.min(maximumValue, Math.max(minimumValue, value));
-}
-
 function roundToTenths(value: number): number {
   return Math.round(value * 10) / 10;
 }
@@ -146,22 +128,6 @@ function normalizeHybridPair(input: RewardHybridPair): RewardHybridPair {
   };
 }
 
-function pickDistinctAttributes(seed: number, count: number): string[] {
-  const selectedAttributes: string[] = [];
-  let cursor = seed;
-
-  while (selectedAttributes.length < count) {
-    const nextAttribute = ATTRIBUTE_POOL[cursor % ATTRIBUTE_POOL.length];
-    if (!selectedAttributes.includes(nextAttribute)) {
-      selectedAttributes.push(nextAttribute);
-    }
-
-    cursor = (cursor + 37) >>> 0;
-  }
-
-  return selectedAttributes;
-}
-
 function findCanonicalDinosaurName(dinosaurName: string): string {
   const normalizedName = normalizeNameOrThrow(dinosaurName, "dinosaurName");
   const canonicalMatch = DINOSAUR_ROSTER.find(
@@ -171,134 +137,16 @@ function findCanonicalDinosaurName(dinosaurName: string): string {
   return canonicalMatch ?? normalizedName;
 }
 
-function toPrimaryDinosaurDescription(input: {
-  dinosaurName: string;
-  attributes: readonly string[];
-}): string {
-  const [leadTrait = "strong pack instincts", supportTrait = "rapid threat recognition"] =
-    input.attributes;
-
-  return `${input.dinosaurName} is profiled as a high-alert apex-era species with ${leadTrait} and ${supportTrait}, built to dominate dense tropical terrain and react quickly to movement.`;
-}
-
-const DIET_POOL = [
-  "Carnivore (Meat-Eater)",
-  "Herbivore (Plant-Eater)",
-  "Omnivore (All-Eater)",
-  "Piscivore (Fish-Eater)",
-] as const;
-
-const TIME_PERIOD_POOL = [
-  "Late Cretaceous - 68 to 66 million years ago",
-  "Late Jurassic - 155 to 150 million years ago",
-  "Early Cretaceous - 130 to 110 million years ago",
-  "Late Jurassic to Early Cretaceous - 150 million years ago",
-  "Middle Jurassic - 170 to 160 million years ago",
-  "Late Triassic - 230 to 210 million years ago",
-  "Late Cretaceous - 80 to 72 million years ago",
-  "Early Jurassic - 193 to 183 million years ago",
-] as const;
-
-const LOCATION_POOL = [
-  "Western U.S., Canada",
-  "Western U.S., Southern Europe, Northern Africa",
-  "Mongolia, China",
-  "North America, Europe",
-  "South America, Africa",
-  "East Asia, Southeast Asia",
-  "Northern Africa, Europe",
-  "Australia, Antarctica",
-] as const;
-
-const TAXON_POOL = [
-  "Theropoda, Tyrannosauridae",
-  "Sauropodomorpha, Sauropoda, Macronaria",
-  "Theropoda, Dromaeosauridae",
-  "Ornithischia, Ceratopsidae",
-  "Ornithischia, Thyreophora, Stegosauria",
-  "Ornithischia, Ornithopoda, Hadrosauridae",
-  "Theropoda, Spinosauridae",
-  "Theropoda, Abelisauridae",
-  "Sauropodomorpha, Diplodocidae",
-  "Pterosauria, Pteranodontidae",
-] as const;
-
-const NAME_MEANING_POOL = [
-  '"tyrant lizard king"',
-  '"swift thief"',
-  '"three-horned face"',
-  '"arm lizard"',
-  '"double-crested lizard"',
-  '"spine lizard"',
-  '"roofed lizard"',
-  '"near crested lizard"',
-  '"chicken mimic"',
-  '"elegant jaw"',
-  '"winged and toothless"',
-  '"fused lizard"',
-  '"thick-headed lizard"',
-  '"heavy claw"',
-  '"deceptive lizard"',
-  '"high chested arm reptile"',
-] as const;
-
-function buildInfoCardPronunciation(dinosaurName: string): string {
-  const syllables = dinosaurName.replace(/\s+/g, " ").trim().split(/(?=[A-Z])/);
-  if (syllables.length <= 1) {
-    const name = dinosaurName.toLowerCase();
-    const parts: string[] = [];
-    let remaining = name;
-    while (remaining.length > 0) {
-      const chunkLen = Math.min(remaining.length, remaining.length > 4 ? 3 : remaining.length);
-      parts.push(remaining.slice(0, chunkLen).replace(/^./, (c) => c.toUpperCase()));
-      remaining = remaining.slice(chunkLen);
-    }
-    return parts.join(" - ");
-  }
-  return syllables
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
-    .join(" - ");
-}
-
-function buildInfoCardScientificName(dinosaurName: string, seed: number): string {
-  const SPECIES_SUFFIXES = [
-    "horridus", "rex", "africanus", "mongoliensis", "walkeri",
-    "altithorax", "wetherilli", "aegyptiacus", "stenops", "longiceps",
-    "saharicus", "fragilis", "robustus", "gracilis", "antiquus",
-  ];
-  const speciesSuffix = SPECIES_SUFFIXES[seed % SPECIES_SUFFIXES.length];
-  const genus = dinosaurName.split(/\s+/)[0];
-  return `${genus} ${speciesSuffix}`;
-}
-
-function buildPrimaryInfoCard(
-  dinosaurName: string,
-  seed: number,
-  heightMeters: number,
-  lengthMeters: number,
-): RewardDinosaurInfoCard {
-  const diet = DIET_POOL[seed % DIET_POOL.length];
-  const timePeriod = TIME_PERIOD_POOL[(seed >>> 3) % TIME_PERIOD_POOL.length];
-  const location = LOCATION_POOL[(seed >>> 5) % LOCATION_POOL.length];
-  const taxon = TAXON_POOL[(seed >>> 7) % TAXON_POOL.length];
-  const nameMeaning = NAME_MEANING_POOL[(seed >>> 4) % NAME_MEANING_POOL.length];
-  const weightKg = Math.round(clampNumber(
-    lengthMeters * heightMeters * 42 + ((seed >>> 14) % 500),
-    80,
-    60000,
-  ));
-
+function buildInfoCardFromFactSheet(factSheet: DinosaurFactSheet): RewardDinosaurInfoCard {
   return {
-    scientificName: buildInfoCardScientificName(dinosaurName, seed),
-    pronunciation: buildInfoCardPronunciation(dinosaurName),
-    diet,
-    nameMeaning,
-    weightKg,
-    timePeriod,
-    location,
-    taxon,
+    scientificName: factSheet.scientificName,
+    pronunciation: factSheet.pronunciation,
+    diet: formatDietForDisplay(factSheet.diet),
+    nameMeaning: `"${factSheet.nameMeaning}"`,
+    weightKg: factSheet.weightKg,
+    timePeriod: formatTimePeriodForDisplay(factSheet),
+    location: factSheet.location,
+    taxon: formatTaxonForDisplay(factSheet),
   };
 }
 
@@ -311,28 +159,38 @@ export function formatWeightForDisplay(weightKg: number): string {
   return `${weightKg} kg (${lbs} lbs)`;
 }
 
+/**
+ * Builds the dossier for a catalogue animal entirely from its curated fact
+ * sheet. A name with no fact sheet gets a profile that states the data is
+ * missing rather than one filled with plausible-looking invented values;
+ * callers detect that case via `infoCard === null` and zero dimensions.
+ */
 export function buildPrimaryDinosaurDossier(dinosaurName: string): RewardDinosaurDossier {
   const canonicalDinosaurName = findCanonicalDinosaurName(dinosaurName);
-  const seed = toStableHashSeed(canonicalDinosaurName.toLowerCase());
+  const factSheet = getDinosaurFactSheet(canonicalDinosaurName);
 
-  const lengthMeters = roundToTenths(5 + ((seed >>> 2) % 141) / 10);
-  const rawHeightMeters = roundToTenths(1.8 + ((seed >>> 10) % 63) / 10);
-  const maxHeightMeters = roundToTenths(Math.max(2, lengthMeters * 0.64));
-  const heightMeters = roundToTenths(clampNumber(rawHeightMeters, 1.8, maxHeightMeters));
-  const attributes = pickDistinctAttributes(seed, 3);
+  if (!factSheet) {
+    return {
+      kind: "primary",
+      subjectName: canonicalDinosaurName,
+      heightMeters: 0,
+      lengthMeters: 0,
+      attributes: [],
+      description: `${canonicalDinosaurName} is not in the Research Center catalogue yet, so no verified field data is on file.`,
+      sourceDinosaurs: null,
+      infoCard: null,
+    };
+  }
 
   return {
     kind: "primary",
     subjectName: canonicalDinosaurName,
-    heightMeters,
-    lengthMeters,
-    attributes,
-    description: toPrimaryDinosaurDescription({
-      dinosaurName: canonicalDinosaurName,
-      attributes,
-    }),
+    heightMeters: factSheet.heightMeters,
+    lengthMeters: factSheet.lengthMeters,
+    attributes: [...factSheet.traits],
+    description: factSheet.description,
     sourceDinosaurs: null,
-    infoCard: buildPrimaryInfoCard(canonicalDinosaurName, seed, heightMeters, lengthMeters),
+    infoCard: buildInfoCardFromFactSheet(factSheet),
   };
 }
 
@@ -344,7 +202,7 @@ function mergeHybridAttributes(
   const mergedAttributes = [
     ...firstDossier.attributes.slice(0, 2),
     ...secondDossier.attributes.slice(0, 2),
-    HYBRID_SIGNATURE_ATTRIBUTES[seed % HYBRID_SIGNATURE_ATTRIBUTES.length],
+    `engineered trait: ${HYBRID_SIGNATURE_ATTRIBUTES[seed % HYBRID_SIGNATURE_ATTRIBUTES.length]}`,
   ];
 
   const uniqueAttributes = Array.from(new Set(mergedAttributes));
@@ -359,7 +217,7 @@ function toHybridDescription(input: {
   const [leadTrait = "cross-species adaptation", secondaryTrait = "rapid threat recognition"] =
     input.attributes;
 
-  return `This engineered hybrid fuses ${input.firstDinosaurName} and ${input.secondDinosaurName}, blending ${leadTrait} with ${secondaryTrait} to create a controlled but high-volatility predator profile.`;
+  return `This is an imaginary engineered hybrid, not a real animal: it blends ${input.firstDinosaurName} and ${input.secondDinosaurName}, mixing ${leadTrait} with ${secondaryTrait}. Its listed size is the average of its two real parent species.`;
 }
 
 export function buildHybridGenerationAssetName(input: RewardHybridPair): string {
@@ -396,6 +254,12 @@ export function parseHybridGenerationAssetName(assetName: string): RewardHybridP
   });
 }
 
+/**
+ * Hybrids are film-style fiction, so their profile is explicitly framed as an
+ * engineered blend: dimensions are the plain average of the two real parents
+ * (no random jitter), and the info card stays null because there is no real
+ * animal to describe.
+ */
 export function buildHybridDinosaurDossier(input: RewardHybridPair): RewardDinosaurDossier {
   const normalizedPair = normalizeHybridPair(input);
   const firstDossier = buildPrimaryDinosaurDossier(normalizedPair.firstDinosaurName);
@@ -404,15 +268,25 @@ export function buildHybridDinosaurDossier(input: RewardHybridPair): RewardDinos
     `${normalizedPair.firstDinosaurName.toLowerCase()}::${normalizedPair.secondDinosaurName.toLowerCase()}`,
   );
 
-  const averageLengthMeters = (firstDossier.lengthMeters + secondDossier.lengthMeters) / 2;
-  const averageHeightMeters = (firstDossier.heightMeters + secondDossier.heightMeters) / 2;
-  const lengthMeters = roundToTenths(
-    clampNumber(averageLengthMeters + (((hybridSeed >>> 5) % 21) - 10) / 10, 4.5, 24),
-  );
-  const maxHybridHeightMeters = roundToTenths(Math.max(2.2, lengthMeters * 0.68));
-  const heightMeters = roundToTenths(
-    clampNumber(averageHeightMeters + (((hybridSeed >>> 12) % 17) - 8) / 10, 2, maxHybridHeightMeters),
-  );
+  const averageOfKnownValues = (values: readonly number[]): number => {
+    const knownValues = values.filter((value) => value > 0);
+    if (knownValues.length === 0) {
+      return 0;
+    }
+
+    return roundToTenths(
+      knownValues.reduce((total, value) => total + value, 0) / knownValues.length,
+    );
+  };
+
+  const lengthMeters = averageOfKnownValues([
+    firstDossier.lengthMeters,
+    secondDossier.lengthMeters,
+  ]);
+  const heightMeters = averageOfKnownValues([
+    firstDossier.heightMeters,
+    secondDossier.heightMeters,
+  ]);
   const attributes = mergeHybridAttributes(firstDossier, secondDossier, hybridSeed);
   const subjectName = buildHybridGenerationAssetName(normalizedPair);
 
@@ -445,12 +319,33 @@ export function isAmberRewardAssetName(assetName: string): boolean {
   return AMBER_ASSET_NAME_PATTERN.test(normalizedAssetName);
 }
 
-export function toPrimaryRewardDossierArtifactPath(subjectName: string): string {
-  return `/artifacts/dossiers/primary/${toRewardDossierArtifactSlug(subjectName)}.json`;
+/** Endpoint the client reads a dossier from (prose in the database, facts local). */
+export function toRewardDossierApiPath(assetName: string): string {
+  return `/api/rewards/dossier?assetName=${encodeURIComponent(assetName.trim())}`;
 }
 
-export function toHybridRewardDossierArtifactPath(subjectName: string): string {
-  return `/artifacts/dossiers/hybrid/${toRewardDossierArtifactSlug(subjectName)}.json`;
+/** Serialisable payload shape understood by `parseRewardDinosaurDossierArtifact`. */
+export function toRewardDossierArtifactPayload(dossier: RewardDinosaurDossier): {
+  kind: RewardDossierKind;
+  subjectName: string;
+  sourceDinosaurs: readonly [string, string] | null;
+  dimensions: { heightMeters: number; lengthMeters: number };
+  attributes: readonly string[];
+  description: string;
+  infoCard: RewardDinosaurInfoCard | null;
+} {
+  return {
+    kind: dossier.kind,
+    subjectName: dossier.subjectName,
+    sourceDinosaurs: dossier.sourceDinosaurs,
+    dimensions: {
+      heightMeters: dossier.heightMeters,
+      lengthMeters: dossier.lengthMeters,
+    },
+    attributes: dossier.attributes,
+    description: dossier.description,
+    infoCard: dossier.infoCard,
+  };
 }
 
 export function resolveRewardAssetDossier(assetName: string): RewardDinosaurDossier | null {
@@ -475,19 +370,52 @@ export function formatMetersAsMetersAndFeet(meters: number): string {
   return `${normalizedMeters.toFixed(1)} m (${feet.toFixed(1)} ft)`;
 }
 
+/**
+ * Ground-truth block handed to the image and text models. For catalogue
+ * animals it carries the curated facts verbatim so a render cannot drift into
+ * the wrong body plan (feathered raptors, sail-backed Spinosaurus) and a
+ * generated description cannot contradict the info card.
+ */
 export function formatRewardDossierPromptBlock(dossier: RewardDinosaurDossier): string {
-  const sourceLine = dossier.sourceDinosaurs
-    ? `Source species: ${dossier.sourceDinosaurs[0]} + ${dossier.sourceDinosaurs[1]}.`
-    : "Source species: primary catalog profile.";
+  const factSheet =
+    dossier.kind === "primary" ? getDinosaurFactSheet(dossier.subjectName) : null;
 
-  return [
-    `Field dossier for ${dossier.subjectName}:`,
-    `Height: ${formatMetersAsMetersAndFeet(dossier.heightMeters)}.`,
-    `Length: ${formatMetersAsMetersAndFeet(dossier.lengthMeters)}.`,
-    `Attributes: ${dossier.attributes.join(", ")}.`,
-    sourceLine,
+  const lines = [`Field dossier for ${dossier.subjectName}:`];
+
+  if (factSheet) {
+    lines.push(
+      `Scientific name: ${factSheet.scientificName}.`,
+      `Group: ${formatTaxonForDisplay(factSheet)}.`,
+      `Diet: ${formatDietForDisplay(factSheet.diet)}.`,
+      `Lived: ${formatTimePeriodForDisplay(factSheet)}.`,
+      `Found in: ${factSheet.location}.`,
+    );
+  }
+
+  if (dossier.heightMeters > 0) {
+    lines.push(`Height: ${formatMetersAsMetersAndFeet(dossier.heightMeters)}.`);
+  }
+
+  if (dossier.lengthMeters > 0) {
+    lines.push(`Length: ${formatMetersAsMetersAndFeet(dossier.lengthMeters)}.`);
+  }
+
+  if (factSheet) {
+    lines.push(`Weight: ${formatWeightForDisplay(factSheet.weightKg)}.`);
+  }
+
+  if (dossier.attributes.length > 0) {
+    lines.push(`Attributes: ${dossier.attributes.join(", ")}.`);
+  }
+
+  lines.push(
+    dossier.sourceDinosaurs
+      ? `Source species: ${dossier.sourceDinosaurs[0]} + ${dossier.sourceDinosaurs[1]} (imaginary hybrid).`
+      : "Source species: primary catalog profile.",
     `Description: ${dossier.description}`,
-  ].join(" ");
+  );
+
+  return lines.join(" ");
 }
 
 export function parseRewardDinosaurDossierArtifact(
@@ -565,7 +493,7 @@ export function parseRewardDinosaurDossierArtifact(
     }
   }
 
-  return {
+  const parsedDossier: RewardDinosaurDossier = {
     kind,
     subjectName,
     heightMeters,
@@ -574,6 +502,35 @@ export function parseRewardDinosaurDossierArtifact(
     description,
     sourceDinosaurs,
     infoCard,
+  };
+
+  return withCuratedFacts(parsedDossier);
+}
+
+/**
+ * Facts always win over stored content. A stored dossier (whether written by a
+ * model or migrated from an older build) may only contribute prose: its
+ * measurements, traits and info card are replaced with the curated fact sheet
+ * so a stale or hallucinated value can never reach a player.
+ */
+export function withCuratedFacts(dossier: RewardDinosaurDossier): RewardDinosaurDossier {
+  if (dossier.kind !== "primary") {
+    return { ...dossier, infoCard: null };
+  }
+
+  const factSheet = getDinosaurFactSheet(dossier.subjectName);
+  if (!factSheet) {
+    return { ...dossier, infoCard: null };
+  }
+
+  return {
+    ...dossier,
+    subjectName: findCanonicalDinosaurName(dossier.subjectName),
+    heightMeters: factSheet.heightMeters,
+    lengthMeters: factSheet.lengthMeters,
+    attributes: [...factSheet.traits],
+    sourceDinosaurs: null,
+    infoCard: buildInfoCardFromFactSheet(factSheet),
   };
 }
 

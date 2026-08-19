@@ -1,6 +1,8 @@
 import {
+  formatRewardDossierPromptBlock,
   parseHybridGenerationAssetName,
   resolveRewardAssetDossier,
+  withCuratedFacts,
   type RewardDinosaurDossier,
 } from "./dino-dossiers";
 import {
@@ -17,12 +19,8 @@ const DOSSIER_MAX_OUTPUT_TOKENS = 900;
 const DOSSIER_SCHEMA_NAME = "dinosaur_dossier";
 
 interface OpenAiDossierJsonPayload {
-  subjectName: string;
-  heightMeters: number;
-  lengthMeters: number;
-  attributes: string[];
   description: string;
-  sourceDinosaurs: string[] | null;
+  attributes: string[];
 }
 
 export interface OpenAiGeneratedRewardDossier {
@@ -60,33 +58,27 @@ export const DOSSIER_RESPONSE_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
-    subjectName: { type: "string" },
-    heightMeters: { type: "number" },
-    lengthMeters: { type: "number" },
+    description: { type: "string" },
     attributes: {
       type: "array",
       items: { type: "string" },
     },
-    description: { type: "string" },
-    sourceDinosaurs: {
-      anyOf: [{ type: "array", items: { type: "string" } }, { type: "null" }],
-    },
   },
-  required: [
-    "subjectName",
-    "heightMeters",
-    "lengthMeters",
-    "attributes",
-    "description",
-    "sourceDinosaurs",
-  ],
+  required: ["description", "attributes"],
 } as const;
 
+/**
+ * The model writes prose only. Every measurement, date, diet and clade the game
+ * displays comes from the curated fact sheet, which is supplied in the prompt as
+ * VERIFIED FACTS; the model must not contradict it or add numbers of its own.
+ */
 const DOSSIER_INSTRUCTIONS = [
-  "You are a paleontology reference writer producing a concise, grounded field dossier for a dinosaur-themed learning game.",
-  "Return realistic metric dimensions in meters (typical adult height at the hip or head, and total length), three to six short attribute phrases, and a vivid, family-friendly description of two or three sentences.",
-  "For a real species, follow the fossil record and current scientific consensus.",
-  "For a hybrid, blend the two named parent species plausibly and list them in sourceDinosaurs; for a real species set sourceDinosaurs to null.",
+  "You write short exhibit blurbs for a children's dinosaur learning game.",
+  "You are given a VERIFIED FACTS block. Treat it as the only source of truth.",
+  "Never contradict it, and never introduce measurements, weights, dates, locations or classifications that are not in it — the game displays those separately from its own data.",
+  "Write a vivid, accurate, family-friendly description of two or three sentences that a curious eight-year-old can follow. Prefer concrete, checkable statements over drama.",
+  "If the subject is an imaginary engineered hybrid, say plainly that it is not a real animal.",
+  "Also return three to six short attribute phrases consistent with the facts.",
   "Respond only with JSON matching the provided schema.",
 ].join(" ");
 
@@ -108,14 +100,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function toSafeNumber(value: unknown, fallbackValue: number): number {
-  if (typeof value !== "number" || Number.isNaN(value)) {
-    return fallbackValue;
-  }
-
-  return Math.round(Math.max(0.1, value) * 10) / 10;
-}
-
 export function buildDossierPrompt(assetName: string): string {
   const normalizedAssetName = getTrimmedNonEmptyString(assetName);
 
@@ -123,13 +107,22 @@ export function buildDossierPrompt(assetName: string): string {
     throw new Error("assetName must be a non-empty string.");
   }
 
+  const curatedDossier = resolveRewardAssetDossier(normalizedAssetName);
   const hybridPair = parseHybridGenerationAssetName(normalizedAssetName);
+  const subjectLine = hybridPair
+    ? `Write the blurb for "${normalizedAssetName}", an imaginary engineered hybrid of ${hybridPair.firstDinosaurName} and ${hybridPair.secondDinosaurName}.`
+    : `Write the blurb for "${normalizedAssetName}".`;
 
-  if (hybridPair) {
-    return `Create the dossier for "${normalizedAssetName}", a hybrid derived from ${hybridPair.firstDinosaurName} and ${hybridPair.secondDinosaurName}.`;
+  if (!curatedDossier) {
+    return subjectLine;
   }
 
-  return `Create the dossier for the dinosaur "${normalizedAssetName}".`;
+  return [
+    subjectLine,
+    "",
+    "VERIFIED FACTS (do not contradict, do not add numbers of your own):",
+    formatRewardDossierPromptBlock(curatedDossier),
+  ].join("\n");
 }
 
 export function buildOpenAiDossierRequestBody(model: string, prompt: string): OpenAiDossierRequestBody {
@@ -170,58 +163,31 @@ function normalizeAttributes(
   return attributes;
 }
 
-function normalizeSourceDinosaurs(
-  value: unknown,
-  fallbackSourceDinosaurs: readonly [string, string] | null,
-): readonly [string, string] | null {
-  if (!Array.isArray(value) || value.length !== 2) {
-    return fallbackSourceDinosaurs;
-  }
-
-  const firstDinosaurName = getTrimmedNonEmptyString(value[0]);
-  const secondDinosaurName = getTrimmedNonEmptyString(value[1]);
-
-  if (!firstDinosaurName || !secondDinosaurName) {
-    return fallbackSourceDinosaurs;
-  }
-
-  return [firstDinosaurName, secondDinosaurName];
-}
-
 export function normalizeOpenAiDossierPayload(
   assetName: string,
   payload: unknown,
 ): RewardDinosaurDossier {
-  const fallbackDossier = resolveRewardAssetDossier(assetName);
-  if (!fallbackDossier) {
+  const curatedDossier = resolveRewardAssetDossier(assetName);
+  if (!curatedDossier) {
     throw new Error("No dossier can be generated for this asset.");
   }
 
   if (!isRecord(payload)) {
-    return fallbackDossier;
+    return curatedDossier;
   }
 
-  const subjectName = getTrimmedNonEmptyString(payload.subjectName) ?? fallbackDossier.subjectName;
   const description =
-    getTrimmedNonEmptyString(payload.description) ?? fallbackDossier.description;
-  const heightMeters = toSafeNumber(payload.heightMeters, fallbackDossier.heightMeters);
-  const lengthMeters = toSafeNumber(payload.lengthMeters, fallbackDossier.lengthMeters);
-  const sourceDinosaurs = normalizeSourceDinosaurs(
-    payload.sourceDinosaurs,
-    fallbackDossier.sourceDinosaurs,
-  );
-  const attributes = normalizeAttributes(payload.attributes, fallbackDossier.attributes);
+    getTrimmedNonEmptyString(payload.description) ?? curatedDossier.description;
+  const attributes =
+    curatedDossier.kind === "hybrid"
+      ? normalizeAttributes(payload.attributes, curatedDossier.attributes)
+      : curatedDossier.attributes;
 
-  return {
-    kind: fallbackDossier.kind,
-    subjectName,
-    heightMeters,
-    lengthMeters,
-    attributes,
+  return withCuratedFacts({
+    ...curatedDossier,
     description,
-    sourceDinosaurs,
-    infoCard: fallbackDossier.infoCard,
-  };
+    attributes,
+  });
 }
 
 export async function generateOpenAiRewardDossier(

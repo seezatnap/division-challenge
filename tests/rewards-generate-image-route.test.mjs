@@ -35,7 +35,7 @@ async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
 
 async function loadGenerateImageRoute(
   generateRewardImageImpl,
-  ensureRewardDossierArtifactsImpl = async () => undefined,
+  ensureRewardDossierImpl = async () => undefined,
   getRewardImageGenerationStatusImpl = async (dinosaurName) => ({
     dinosaurName,
     status: "ready",
@@ -49,7 +49,7 @@ async function loadGenerateImageRoute(
   const dossierCallbackName = `__routeEnsureDossiers_${Math.random().toString(16).slice(2)}`;
   const statusCallbackName = `__routeGetImageStatus_${Math.random().toString(16).slice(2)}`;
   globalThis[callbackName] = generateRewardImageImpl;
-  globalThis[dossierCallbackName] = ensureRewardDossierArtifactsImpl;
+  globalThis[dossierCallbackName] = ensureRewardDossierImpl;
   globalThis[statusCallbackName] = getRewardImageGenerationStatusImpl;
 
   const nextServerModuleUrl = toDataUrl(`
@@ -73,8 +73,8 @@ async function loadGenerateImageRoute(
       return await globalThis.${callbackName}(payload);
     }
   `);
-  const dossierArtifactModuleUrl = toDataUrl(`
-    export async function ensureRewardDossierArtifacts(assetName) {
+  const dossierStoreModuleUrl = toDataUrl(`
+    export async function ensureRewardDossier(assetName) {
       return await globalThis.${dossierCallbackName}(assetName);
     }
   `);
@@ -88,7 +88,7 @@ async function loadGenerateImageRoute(
     "src/app/api/rewards/generate-image/route.ts",
     {
       "next/server": nextServerModuleUrl,
-      "@/features/rewards/lib/dossier-artifacts": dossierArtifactModuleUrl,
+      "@/features/rewards/lib/dossier-store": dossierStoreModuleUrl,
       "@/features/rewards/lib/reward-image-cache": imageCacheModuleUrl,
       "@/features/rewards/lib/reward-image-runtime": runtimeModuleUrl,
       "@/features/rewards/lib/reward-image-service": serviceModuleUrl,
@@ -214,7 +214,7 @@ test("POST /api/rewards/generate-image wraps successful image output in a data e
   }
 });
 
-test("POST /api/rewards/generate-image creates dossier artifacts before image generation", async () => {
+test("POST /api/rewards/generate-image creates the dossier before image generation", async () => {
   const callOrder = [];
 
   const { routeModule, cleanup } = await loadGenerateImageRoute(

@@ -7,7 +7,10 @@
  *   • every image is uploaded to object storage (Cloudflare R2) and recorded
  *     in `reward_images` / `reward_image_states` in the app database (Turso);
  *   • player profiles are copied into the app database with their stored
- *     `/rewards/<slug>.<ext>` image paths rewritten to the new image URLs.
+ *     `/rewards/<slug>.<ext>` image paths rewritten to the new image URLs;
+ *   • dossier prose from `public/artifacts/dossiers/**.json` is imported into
+ *     the `reward_dossiers` table (facts are never imported — they come from
+ *     the curated fact sheet at read time).
  *
  * Safe to re-run: identical image bytes are skipped (sha256 match) and profile
  * writes never overwrite newer snapshots.
@@ -21,6 +24,8 @@
  *   --source-db <path>       Legacy sqlite file (default: .sqlite/<SQLITE_DB_FILE>)
  *   --skip-images            Do not migrate images
  *   --skip-profiles          Do not migrate player profiles
+ *   --skip-dossiers          Do not migrate dossier prose
+ *   --dossiers-dir <path>    Legacy dossier directory (default: public/artifacts/dossiers)
  *   --player <name>          Only migrate this player (repeatable)
  *   --force                  Re-upload images even if identical bytes are recorded
  *   --allow-local-target     Proceed even if the target is not Turso / R2
@@ -60,6 +65,8 @@ function parseArgs(argv) {
     sourceDb: null,
     skipImages: false,
     skipProfiles: false,
+    skipDossiers: false,
+    dossiersDir: path.join(repoRoot, "public", "artifacts", "dossiers"),
     players: [],
     force: false,
     allowLocalTarget: false,
@@ -93,6 +100,12 @@ function parseArgs(argv) {
       case "--skip-profiles":
         options.skipProfiles = true;
         break;
+      case "--skip-dossiers":
+        options.skipDossiers = true;
+        break;
+      case "--dossiers-dir":
+        options.dossiersDir = path.resolve(nextValue());
+        break;
       case "--player":
         options.players.push(nextValue());
         break;
@@ -124,6 +137,8 @@ function printUsage() {
       "  --source-db <path>       Legacy sqlite file (default: .sqlite/<SQLITE_DB_FILE>)",
       "  --skip-images            Do not migrate images",
       "  --skip-profiles          Do not migrate player profiles",
+      "  --skip-dossiers          Do not migrate dossier prose",
+      "  --dossiers-dir <path>    Legacy dossier directory (default: public/artifacts/dossiers)",
       "  --player <name>          Only migrate this player (repeatable)",
       "  --force                  Re-upload images even if identical bytes are recorded",
       "  --allow-local-target     Proceed even if the target is not Turso / R2",
@@ -339,11 +354,13 @@ async function run() {
 
   loadRepoEnvFiles();
 
-  const [database, storageModule, cache, profiles] = await Promise.all([
+  const [database, storageModule, cache, profiles, dossierStore, dossiers] = await Promise.all([
     loadTypeScriptModule("src/features/persistence/lib/database.ts"),
     loadTypeScriptModule("src/features/persistence/lib/object-storage.ts"),
     loadTypeScriptModule("src/features/rewards/lib/reward-image-cache.ts"),
     loadTypeScriptModule("src/features/persistence/lib/sqlite-player-profiles.ts"),
+    loadTypeScriptModule("src/features/rewards/lib/dossier-store.ts"),
+    loadTypeScriptModule("src/features/rewards/lib/dino-dossiers.ts"),
   ]);
 
   const targetDatabase = database.getDatabaseLocation();
@@ -405,6 +422,9 @@ async function run() {
     imagesFailed: 0,
     profilesFound: 0,
     profilesWritten: 0,
+    dossiersFound: 0,
+    dossiersImported: 0,
+    dossiersSkipped: 0,
     profilePathsRewritten: 0,
     unresolvedSlugs: new Set(),
   };
@@ -549,10 +569,117 @@ async function run() {
     log("");
   }
 
+  // ── Dossier prose ────────────────────────────────────────────────────────
+  if (!options.skipDossiers) {
+    const dossierFiles = [];
+    for (const kind of ["primary", "hybrid"]) {
+      const kindDirectory = path.join(options.dossiersDir, kind);
+      if (!existsSync(kindDirectory)) {
+        continue;
+      }
+
+      const entries = await readdir(kindDirectory, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile() && entry.name.endsWith(".json")) {
+          dossierFiles.push({ kind, absolutePath: path.join(kindDirectory, entry.name) });
+        }
+      }
+    }
+
+    summary.dossiersFound = dossierFiles.length;
+    log(`-- Dossiers: ${dossierFiles.length} found in ${options.dossiersDir}`);
+
+    for (const dossierFile of dossierFiles.sort((left, right) =>
+      left.absolutePath.localeCompare(right.absolutePath),
+    )) {
+      const payload = await readJsonIfExists(dossierFile.absolutePath);
+      const description = getTrimmedNonEmptyString(payload?.description);
+      const source = getTrimmedNonEmptyString(payload?.generator?.source);
+
+      // Hybrid payloads sometimes carry a model-invented portmanteau name
+      // ("Brachiotops"), which the app never looks up. Rebuild the canonical
+      // "Hybrid A + B" key from the parent species instead.
+      let subjectName = getTrimmedNonEmptyString(payload?.subjectName);
+      if (dossierFile.kind === "hybrid") {
+        const sourceDinosaurs = Array.isArray(payload?.sourceDinosaurs)
+          ? payload.sourceDinosaurs.map((entry) => getTrimmedNonEmptyString(entry)).filter(Boolean)
+          : [];
+        subjectName =
+          sourceDinosaurs.length === 2
+            ? dossiers.buildHybridGenerationAssetName({
+                firstDinosaurName: sourceDinosaurs[0],
+                secondDinosaurName: sourceDinosaurs[1],
+              })
+            : null;
+      }
+
+      const label = subjectName ?? path.basename(dossierFile.absolutePath);
+
+      if (!subjectName || !description) {
+        summary.dossiersSkipped += 1;
+        log(`  - ${label}: unreadable, skipped`);
+        continue;
+      }
+
+      // Only real model prose is worth keeping; the old deterministic fallback
+      // text was template-generated and is replaced by the curated description.
+      if (source !== "openai" && source !== "gemini") {
+        summary.dossiersSkipped += 1;
+        log(`  - ${label}: source "${source ?? "unknown"}" is not model-written, skipped`);
+        continue;
+      }
+
+      if (!options.force) {
+        const existing = await dossierStore.readStoredRewardDossier(subjectName).catch(() => null);
+        if (existing && (existing.source === "openai" || existing.source === "gemini")) {
+          summary.dossiersSkipped += 1;
+          log(`  = ${label}: already stored, skipped`);
+          continue;
+        }
+      }
+
+      const attributes = Array.isArray(payload?.attributes)
+        ? payload.attributes.map((entry) => getTrimmedNonEmptyString(entry)).filter(Boolean)
+        : [];
+      const createdAtMs = Date.parse(payload?.generatedAt ?? "");
+
+      if (options.dryRun) {
+        summary.dossiersImported += 1;
+        log(`  + ${label}: would import ${description.length} characters of ${source} prose`);
+        continue;
+      }
+
+      try {
+        await dossierStore.saveRewardDossier({
+          subjectName,
+          kind: dossierFile.kind === "hybrid" ? "hybrid" : "primary",
+          description,
+          attributes,
+          source,
+          model: getTrimmedNonEmptyString(payload?.generator?.model) ?? "unknown-model",
+          prompt: getTrimmedNonEmptyString(payload?.generator?.prompt) ?? "",
+          ...(Number.isFinite(createdAtMs) ? { createdAtMs } : {}),
+        });
+        summary.dossiersImported += 1;
+        log(`  + ${label}: imported ${source} prose`);
+      } catch (error) {
+        summary.dossiersSkipped += 1;
+        log(`  ! ${label}: FAILED — ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    log("");
+  }
+
   // ── Summary ──────────────────────────────────────────────────────────────
   log("== Summary ==");
   log(`images:   ${summary.imagesFound} found, ${summary.imagesUploaded} ${options.dryRun ? "to upload" : "uploaded"}, ${summary.imagesSkippedDuplicate} already recorded, ${summary.imagesFailed} failed`);
   log(`profiles: ${summary.profilesFound} found, ${summary.profilesWritten} ${options.dryRun ? "to write" : "written"}, ${summary.profilePathsRewritten} image path(s) rewritten`);
+  log(`dossiers: ${summary.dossiersFound} found, ${summary.dossiersImported} ${options.dryRun ? "to import" : "imported"}, ${summary.dossiersSkipped} skipped`);
+  if (summary.dossiersImported > 0) {
+    log("note:     imported prose predates the fact-grounded prompt. Only the description text is kept —");
+    log("          every measurement, date and classification shown comes from the curated fact sheet.");
+  }
   if (summary.unresolvedSlugs.size > 0) {
     log(
       `note:     ${summary.unresolvedSlugs.size} image slug(s) referenced by profiles have no migrated image and keep their legacy path (still served by /rewards/<slug>.<ext> once an image exists): ${[...summary.unresolvedSlugs].sort().join(", ")}`,

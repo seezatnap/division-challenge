@@ -19,7 +19,7 @@ import {
   formatMetersAsMetersAndFeet,
   formatWeightForDisplay,
   parseRewardDinosaurDossierArtifact,
-  toPrimaryRewardDossierArtifactPath,
+  toRewardDossierApiPath,
   type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
 
@@ -103,7 +103,7 @@ export function DinoGalleryPanel({
     void (async () => {
       try {
         const dossierResponse = await fetch(
-          toPrimaryRewardDossierArtifactPath(selectedReward.dinosaurName),
+          toRewardDossierApiPath(selectedReward.dinosaurName),
           {
             cache: "no-store",
             signal: abortController.signal,
@@ -114,8 +114,12 @@ export function DinoGalleryPanel({
           return;
         }
 
-        const dossierPayload = (await dossierResponse.json().catch(() => null)) as unknown;
-        const parsedDossier = parseRewardDinosaurDossierArtifact(dossierPayload);
+        const dossierResponseBody = (await dossierResponse.json().catch(() => null)) as {
+          data?: { dossier?: unknown };
+        } | null;
+        const parsedDossier = parseRewardDinosaurDossierArtifact(
+          dossierResponseBody?.data?.dossier,
+        );
         if (!parsedDossier || didCancel) {
           return;
         }

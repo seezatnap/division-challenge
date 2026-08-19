@@ -38,11 +38,18 @@ node --test tests/persistence-file-system-save-load.test.mjs
 node --test tests/player-journey-smoke.test.mjs
 ```
 
+## Dinosaur facts
+
+- Every fact shown in the Research Center card (scientific name, pronunciation, diet, name meaning, size, weight, period, location, taxon) comes from the hand-checked table in `src/features/rewards/lib/dinosaur-facts.ts` — one entry per roster animal. Nothing factual is generated.
+- Non-dinosaurs (pterosaurs, marine reptiles, Dimetrodon) and the two film hybrids are labelled as such instead of being filed under Dinosauria.
+- The language model only writes the descriptive blurb, and receives the curated facts as ground truth it must not contradict; any factual field it returns is discarded. Dossier prose is stored in the `reward_dossiers` table.
+- To fix or add an animal, edit `dinosaur-facts.ts` and run `node --test tests/rewards-dinosaur-facts.test.mjs`. See `docs/developer-runbook.md` §3.
+
 ## Storage behavior (summary)
 
 - Server-side state (a record of every reward image ever generated, generation status, player profiles) lives in one libsql database: Turso when `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` are set, otherwise a local SQLite file at `<repo-root>/.sqlite/division-challenge.sqlite3` (`SQLITE_DB_FILE` overrides the name).
 - Reward image binaries are uploaded to Cloudflare R2 (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`; optional `R2_PUBLIC_BASE_URL` to serve them straight from R2). Without R2 configured they are kept under `.reward-images/` for local development.
-- `npm run db:migrate:rewards` moves images/profiles from the old `public/rewards/` + local sqlite layout into R2/Turso; see `docs/developer-runbook.md` §3.
+- `npm run db:migrate:rewards` moves images/profiles from the old `public/rewards/` + local sqlite layout into R2/Turso; see `docs/developer-runbook.md` §4.
 - Player profiles (for example, amber balance/progress) are persisted to the shared database via `/api/player-profiles`, so the same player name can load across browsers.
 - Browser `localStorage` is still written as a backup/migration source.
 - Save/load prefers File System Access API when available and uses player-named JSON files (for example, `rex-save.json`).

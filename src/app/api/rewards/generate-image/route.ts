@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ensureRewardDossierArtifacts } from "@/features/rewards/lib/dossier-artifacts";
+import { ensureRewardDossier } from "@/features/rewards/lib/dossier-store";
 import { getRewardImageGenerationStatus } from "@/features/rewards/lib/reward-image-cache";
 import { generateRewardImage } from "@/features/rewards/lib/reward-image-runtime";
 import {
@@ -29,7 +29,7 @@ export async function POST(request: Request): Promise<Response> {
     const payload = await parseJsonRequest(request);
     const parsedRequest = parseRewardImageGenerationRequest(payload);
 
-    const dossierResolution = await ensureRewardDossierArtifacts(parsedRequest.dinosaurName);
+    const dossierResolution = await ensureRewardDossier(parsedRequest.dinosaurName);
     const generatedImage = await generateRewardImage({
       ...parsedRequest,
       ...(dossierResolution?.promptBlock

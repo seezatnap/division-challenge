@@ -39,9 +39,13 @@ export async function transpileTypeScriptToDataUrl(relativePath, replacements = 
 /** Loads the rewards OpenAI/prompt modules with their real dependency graph. */
 export async function loadRewardsOpenAiModuleUrls() {
   const dinosaursUrl = await transpileTypeScriptToDataUrl("src/features/rewards/lib/dinosaurs.ts");
+  const dinosaurFactsUrl = await transpileTypeScriptToDataUrl(
+    "src/features/rewards/lib/dinosaur-facts.ts",
+    { "./dinosaurs": dinosaursUrl },
+  );
   const dossiersUrl = await transpileTypeScriptToDataUrl(
     "src/features/rewards/lib/dino-dossiers.ts",
-    { "./dinosaurs": dinosaursUrl },
+    { "./dinosaurs": dinosaursUrl, "./dinosaur-facts": dinosaurFactsUrl },
   );
   const openAiUrl = await transpileTypeScriptToDataUrl("src/features/rewards/lib/openai.ts");
   const rewardImageServiceUrl = await transpileTypeScriptToDataUrl(

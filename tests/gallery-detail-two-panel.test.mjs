@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 
 import ts from "typescript";
 
+import { loadTypeScriptModule } from "../scripts/lib/load-typescript-module.mjs";
+
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "..");
 
@@ -38,17 +40,7 @@ async function transpileTypeScriptToDataUrl(relativePath, replacements = {}) {
 }
 
 async function loadDinoDossiersModule() {
-  const dinosaursModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/dinosaurs.ts",
-  );
-  const dossiersModuleUrl = await transpileTypeScriptToDataUrl(
-    "src/features/rewards/lib/dino-dossiers.ts",
-    {
-      "./dinosaurs": dinosaursModuleUrl,
-    },
-  );
-
-  return import(dossiersModuleUrl);
+  return loadTypeScriptModule("src/features/rewards/lib/dino-dossiers.ts");
 }
 
 // ── Component structure tests ───────────────────────────────

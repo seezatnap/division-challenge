@@ -18,7 +18,7 @@ npm run dev
 App URL: `http://localhost:3000`
 
 Without `TURSO_*` / `R2_*` the app runs fully locally (SQLite file under `.sqlite/`, images under
-`.reward-images/`) so nothing external is needed for development; see §3.
+`.reward-images/`) so nothing external is needed for development; see §4.
 
 ## 2. OpenAI configuration (`OPENAI_API_KEY`)
 
@@ -32,8 +32,8 @@ All reward generation uses OpenAI only (no Google APIs):
   `OPENAI_IMAGE_QUALITY` (default `medium`)
 - `OPENAI_BASE_URL` (default `https://api.openai.com/v1`)
 
-Generation pipeline per reward asset: dossier (cached under `public/artifacts/dossiers`) →
-visual description (Luna) → image (gpt-image-2) → upload to R2 + database record. If the
+Generation pipeline per reward asset: dossier (curated facts + model prose, stored in the
+database) → visual description (Luna) → image (gpt-image-2) → upload to R2 + database record. If the
 description call fails the render proceeds from the dossier alone; if the image call fails a
 local SVG fallback is stored instead (recorded with `source: "fallback-svg"`). Note that OpenAI gates the GPT Image models behind API
 Organization Verification in the developer console.
@@ -51,6 +51,11 @@ Reward image status endpoint:
 - `GET /api/rewards/image-status?dinosaurName=Velociraptor`
 - Returns `ready`, `generating`, or `missing`
 
+Reward dossier endpoint:
+
+- `GET /api/rewards/dossier?assetName=Brachiosaurus` — curated facts plus any stored model prose.
+  Read-only: browsing the gallery never triggers a model call (see §3).
+
 Reward image record endpoints:
 
 - `GET /api/rewards/cache` (current state of every reward: live image + generation status)
@@ -65,7 +70,41 @@ Player profile endpoint:
 - `GET /api/player-profiles?playerName=Gus` (load profile)
 - `PUT /api/player-profiles` with JSON body `{ "playerName": "Gus", "snapshot": { ... }, "updatedAtMs": 123 }`
 
-## 3. Storage: Turso database + Cloudflare R2 images
+## 3. Where dinosaur facts come from
+
+Everything factual the game displays — the Research Center info card, dossier measurements, the
+description fallback — comes from one hand-checked table: `src/features/rewards/lib/dinosaur-facts.ts`,
+which holds a `DinosaurFactSheet` for all 100 roster entries (scientific name, pronunciation, name
+meaning, diet, length/height/weight, period + age range, location, taxon, group, three traits and a
+two-sentence description).
+
+Rules this pipeline enforces:
+
+- **Nothing factual is generated.** An earlier build filled the info card by hashing the animal's
+  name and sampling pools of plausible-sounding values, which is why Brachiosaurus once displayed as
+  a Late Triassic carnivorous dromaeosaur called "roofed lizard". Those pools are gone, and
+  `tests/rewards-dinosaur-facts.test.mjs` fails if they come back.
+- **A name with no fact sheet gets no facts.** `buildPrimaryDinosaurDossier` returns zero dimensions
+  and a null info card rather than inventing values.
+- **Non-dinosaurs are labelled.** `group` distinguishes `dinosaur`, `pterosaur`, `marine-reptile`,
+  `synapsid`, `crocodylomorph` and `film-creation`; the taxon line carries the clarification
+  ("flying reptile, not a dinosaur"), and the two Jurassic World hybrids show a film credit instead
+  of a geologic age.
+- **The model writes prose only.** `openai-dossier-service.ts` sends the fact sheet as a VERIFIED
+  FACTS block and its JSON schema accepts only `description` and `attributes`. Anything factual in a
+  response is discarded by `withCuratedFacts`, which also re-derives facts when reading stored rows —
+  so old or hallucinated content cannot reach a player.
+- **Hybrids are framed as imaginary**, with dimensions averaged from their two real parents.
+
+To correct or add an animal, edit `dinosaur-facts.ts` only; the info card, dossier, prompt block and
+image prompt all follow from it. Diet may be `"unknown"` where fossils genuinely do not show it.
+
+Dossier prose lives in the `reward_dossiers` table (slug, subject name, kind, description,
+attributes, source, model, prompt, timestamps) — deliberately *without* measurements, so a stored row
+cannot carry a fact. Rows written by `openai`/`gemini` are reused; a `curated` row means generation
+failed and the fact-sheet text is being shown instead.
+
+## 4. Storage: Turso database + Cloudflare R2 images
 
 All server-side state lives in one libsql database (`src/features/persistence/lib/database.ts`):
 
@@ -80,6 +119,7 @@ Tables:
 | --- | --- |
 | `reward_images` | one row for **every** image ever created/uploaded: id, slug, dinosaur name, prompt, model, mime type, extension, R2 object key, byte size, sha256, source (`openai` / `fallback-svg` / `filesystem-migration`), created time |
 | `reward_image_states` | one row per reward slug: generation status (`ready` / `generating` / `missing`) and which `reward_images` row is the current image |
+| `reward_dossiers` | model-written dossier prose per reward (facts are never stored here — see §3) |
 | `player_profiles` | shared player profiles (unchanged schema) |
 
 Reward image binaries live in object storage (`src/features/persistence/lib/object-storage.ts`):
@@ -106,8 +146,11 @@ abandoned so a crashed instance cannot wedge a reward).
 `scripts/migrate-rewards-to-r2-and-turso.mjs` uploads every legacy image, records it (keeping the
 original file time as `created_at_ms`, `source: "filesystem-migration"`, prompt/model from the
 `.metadata.json` sidecar or the legacy `reward_image_cache` row), copies player profiles into the
-target database, and rewrites their stored `/rewards/...` image paths to the new URLs. It is
-idempotent (identical bytes are skipped by sha256; profile writes never clobber newer snapshots).
+target database, rewrites their stored `/rewards/...` image paths to the new URLs, and imports
+dossier prose from `public/artifacts/dossiers/**.json` into `reward_dossiers` (hybrid rows are
+re-keyed to the canonical "Hybrid A + B" name, and only model-written prose is imported — the old
+template text is dropped in favour of the curated description). It is idempotent (identical bytes are
+skipped by sha256; profile writes never clobber newer snapshots; stored dossiers are left alone).
 
 ```bash
 # 1. put TURSO_* and R2_* in .env.local
@@ -117,10 +160,11 @@ npm run db:reward-cache:list                      # verify
 rm -rf public/rewards                             # legacy files would shadow /rewards/<slug>.<ext>
 ```
 
-Options: `--rewards-dir`, `--source-db`, `--skip-images`, `--skip-profiles`, `--player <name>`
-(repeatable), `--force`, `--allow-local-target` (migrate into a local file/dir target).
+Options: `--rewards-dir`, `--source-db`, `--dossiers-dir`, `--skip-images`, `--skip-profiles`,
+`--skip-dossiers`, `--player <name>` (repeatable), `--force`, `--allow-local-target` (migrate into a
+local file/dir target).
 
-## 4. Player save file behavior (File System Access API)
+## 5. Player save file behavior (File System Access API)
 
 Save/load logic is implemented in `src/features/persistence/lib/file-system-save-load.ts`.
 
@@ -146,7 +190,7 @@ Write-safety behavior:
 - Failed writes attempt `abort()` and preserve previous file contents
 - If an existing save for the same player exists, incoming snapshots are merged to retain latest progress/rewards
 
-## 5. Fallback behavior (no File System Access API)
+## 6. Fallback behavior (no File System Access API)
 
 When File System Access API is not available, the app uses JSON import/export fallback:
 
@@ -160,7 +204,7 @@ When File System Access API is not available, the app uses JSON import/export fa
 
 If neither File System Access API nor JSON fallback primitives are available, save/load actions surface an error.
 
-## 6. Test execution workflow
+## 7. Test execution workflow
 
 Run the full validation gate before merging:
 
@@ -177,6 +221,10 @@ Targeted commands for setup/OpenAI/persistence flow changes:
 node --test tests/rewards-openai-config.test.mjs tests/rewards-image-runtime.test.mjs
 node --test tests/persistence-file-system-save-load.test.mjs
 node --test tests/player-journey-smoke.test.mjs
+
+# Fact pipeline (curated data, dossier store, dossier endpoint)
+node --test tests/rewards-dinosaur-facts.test.mjs tests/rewards-dossier-store.test.mjs \
+  tests/rewards-dossier-route.test.mjs
 ```
 
 Notes:
@@ -184,7 +232,7 @@ Notes:
 - Test runner: Node built-in test runner (`node --test`)
 - Tests transpile TypeScript modules on the fly for isolated module-level validation
 
-## 7. Reward cache CLI helpers
+## 8. Reward cache CLI helpers
 
 These use the same modules as the app (via `scripts/lib/load-typescript-module.mjs`) and read
 `.env.local`, so they talk to whatever database/storage the app is configured for.
@@ -194,5 +242,5 @@ npm run db:reward-cache:path                       # database + object storage l
 npm run db:reward-cache:list                       # current state per reward
 npm run db:reward-cache:get -- "Tyrannosaurus Rex" # current record + full image history
 npm run db:reward-cache:delete -- "Tyrannosaurus Rex"
-npm run db:migrate:rewards -- --dry-run            # legacy → R2/Turso migration (see §3)
+npm run db:migrate:rewards -- --dry-run            # legacy → R2/Turso migration (see §4)
 ```

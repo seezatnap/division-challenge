@@ -115,6 +115,32 @@ const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
       `,
     ],
   },
+  {
+    version: 2,
+    statements: [
+      // Model-written dossier prose. Deliberately stores no measurements,
+      // dates or taxonomy: those always come from the curated fact sheet at
+      // read time, so a stored row can never carry a stale or invented fact.
+      `
+        CREATE TABLE IF NOT EXISTS reward_dossiers (
+          slug TEXT PRIMARY KEY,
+          subject_name TEXT NOT NULL,
+          kind TEXT NOT NULL CHECK (kind IN ('primary', 'hybrid')),
+          description TEXT NOT NULL,
+          attributes_json TEXT NOT NULL,
+          source TEXT NOT NULL,
+          model TEXT NOT NULL,
+          prompt TEXT NOT NULL,
+          created_at_ms INTEGER NOT NULL,
+          updated_at_ms INTEGER NOT NULL
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS reward_dossiers_updated_at_idx
+        ON reward_dossiers(updated_at_ms DESC)
+      `,
+    ],
+  },
 ];
 
 function getTrimmedNonEmptyString(value: unknown): string | null {

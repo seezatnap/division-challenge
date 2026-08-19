@@ -11,5 +11,7 @@ export * from "./openai-visual-description-service";
 export * from "./prefetch";
 export * from "./earned-reward-reveal";
 export * from "./dino-dossiers";
+export * from "./dinosaur-facts";
+export * from "./dossier-store";
 export * from "./openai-dossier-service";
 export * from "./reward-image-slug";
