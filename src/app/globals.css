@@ -3214,6 +3214,25 @@ body {
   color: var(--jp-panel-text);
 }
 
+/* Spoken feedback for the choice toolbar and blanks; the shake and glow that
+   carry this information visually are invisible to a screen reader. */
+.fraction-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.fraction-choice-button:focus-visible {
+  outline: 2px solid var(--jp-amber-bright);
+  outline-offset: 2px;
+}
+
 /* The scratch-pad modal has to be wide enough for the two-column game grid. */
 .jp-modal.jp-modal-workspace {
   width: min(64rem, 96vw);

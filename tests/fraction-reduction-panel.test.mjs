@@ -183,3 +183,127 @@ test("the fraction engine is registered as a feature module", async () => {
     "Expected the feature directory to be covered by the structure test",
   );
 });
+
+test("the divisor chooser is a keyboard-navigable toolbar, not a bare button pile", async () => {
+  const source = await readRepoFile(PANEL_PATH);
+
+  // Toolbar rather than radiogroup: arrow keys in a radio group select as they
+  // move, which here would submit a wrong answer just for browsing.
+  assert.ok(source.includes('role="toolbar"'), "Expected a toolbar role on the choice group");
+  assert.ok(
+    source.includes('aria-orientation="horizontal"'),
+    "Expected the toolbar orientation to be declared",
+  );
+  assert.ok(
+    source.includes("aria-labelledby={promptId}"),
+    "Expected the toolbar to be labelled by the question it answers",
+  );
+  assert.ok(!source.includes('role="radiogroup"'), "A radiogroup would select while arrowing");
+
+  // Roving tabindex: exactly one tab stop, arrows move focus within it.
+  assert.ok(
+    source.includes("tabIndex={isRovingFocusTarget ? 0 : -1}"),
+    "Expected a roving tabindex across the choices",
+  );
+  assert.ok(
+    source.includes('data-roving-focus={isRovingFocusTarget ? "true" : "false"}'),
+    "Expected the focus target to be marked for the focus effect",
+  );
+
+  for (const key of ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Home", "End"]) {
+    assert.ok(source.includes(`case "${key}":`), `Expected ${key} to move focus`);
+  }
+  assert.ok(source.includes("moveChoiceFocus"), "Expected a focus-moving helper");
+  assert.ok(
+    source.includes("event.preventDefault();"),
+    "Expected arrow keys to not also scroll the page",
+  );
+});
+
+test("focus arrives at the chooser without stealing it back afterwards", async () => {
+  const source = await readRepoFile(PANEL_PATH);
+
+  assert.ok(source.includes("shouldFocusChoiceRef"), "Expected a guarded focus flag");
+  assert.ok(
+    source.includes("choiceToolbarRef.current?.querySelector"),
+    "Expected the effect to look inside the toolbar for its focus target",
+  );
+  assert.ok(
+    source.includes('[data-roving-focus="true"]'),
+    "Expected the effect to focus the roving target",
+  );
+
+  assert.ok(
+    source.includes("!shouldFocusChoiceRef.current"),
+    "Expected the effect to bail unless focus was explicitly requested",
+  );
+  assert.ok(
+    source.includes("isHelperModalOpen ||"),
+    "Expected the chooser not to pull focus out of the scratch pad",
+  );
+});
+
+test("choice and entry outcomes are announced, not only shaken", async () => {
+  const [source, styles] = await Promise.all([
+    readRepoFile(PANEL_PATH),
+    readRepoFile("src/app/globals.css"),
+  ]);
+
+  assert.ok(source.includes('aria-live="polite"'), "Expected a polite live region");
+  // The live region lives inside the paper panel: the two-column grid must not
+  // gain a third child, or the coach gets pushed below the workspace.
+  const gridChildren = source.slice(
+    source.indexOf('className="fraction-workspace"'),
+    source.indexOf("{helperModal && modalHost"),
+  );
+  assert.equal(
+    (gridChildren.match(/^      <(div|aside|p)\b/gm) ?? []).length,
+    2,
+    "Expected exactly two children of the fraction workspace grid",
+  );
+  assert.ok(source.includes('role="status"'), "Expected the live region to be a status");
+  assert.ok(source.includes("setChoiceAnnouncement"), "Expected outcomes to be announced");
+  assert.ok(
+    source.includes("does not divide both"),
+    "Expected a wrong divisor to be explained in words",
+  );
+  assert.ok(
+    /\.fraction-announcement\s*\{[^}]*clip-path:\s*inset\(50%\)/s.test(styles),
+    "Expected the announcement to be visually hidden but readable by assistive tech",
+  );
+  assert.ok(
+    styles.includes(".fraction-choice-button:focus-visible"),
+    "Expected a visible focus ring on the choices",
+  );
+});
+
+test("a solved fraction gets the same verified coach sign-off as division", async () => {
+  const [source, divisionPanel] = await Promise.all([
+    readRepoFile(PANEL_PATH),
+    readRepoFile("src/features/workspace-ui/components/live-division-workspace-panel.tsx"),
+  ]);
+
+  // Division's completion state: celebration tone, which is what paints the
+  // coach panel amber.
+  assert.ok(
+    divisionPanel.includes("data-feedback-tone={activeCoachMessage.tone}"),
+    "Expected division to drive the coach tone (guards this comparison)",
+  );
+  assert.ok(
+    source.includes('data-feedback-tone={isSolved ? "celebration" : "encouragement"}'),
+    "Expected a solved fraction to switch the coach to the celebration tone",
+  );
+  assert.ok(
+    source.includes('data-feedback-outcome={isSolved ? "complete" : "in-progress"}'),
+    "Expected the completion outcome to be exposed like the other panels",
+  );
+  assert.ok(
+    source.includes("Trail computation complete. Run log marked VERIFIED."),
+    "Expected the same verified sign-off wording",
+  );
+  assert.ok(
+    source.includes('statusLabel: "Console Sequence Complete"'),
+    "Expected the same completion status label",
+  );
+  assert.ok(source.includes('<h3 className="hint-title">'), "Expected the coach heading level to match");
+});

@@ -2254,9 +2254,11 @@ export default function Home() {
               <div>
                 <p className="surface-kicker">Game Workspace</p>
                 <h2 className="surface-title" id="game-surface-heading">
-                  {gameSession.activeMode === "multiplication"
-                    ? "DNA Multiplication Sequencer"
-                    : "DNA Division Sequencer"}
+                  {gameSession.activeMode === "fractions"
+                    ? "DNA Fraction Sequencer"
+                    : gameSession.activeMode === "multiplication"
+                      ? "DNA Multiplication Sequencer"
+                      : "DNA Division Sequencer"}
                 </h2>
               </div>
               <p className="status-chip">

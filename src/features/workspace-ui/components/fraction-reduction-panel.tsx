@@ -11,6 +11,7 @@ import {
   applyFractionReductionEntry,
   createFractionReductionSession,
   FRACTION_DIVISOR_CHOICES,
+  getActiveFractionRow,
   getFractionDivisionTargets,
   getFractionReductionProgress,
   NO_COMMON_DIVISOR_CHOICE,
@@ -25,6 +26,17 @@ import { LiveDivisionWorkspacePanel } from "./live-division-workspace-panel";
 
 /** Matches the workspace's own error-pulse timing so feedback feels identical. */
 const CHOICE_ERROR_PULSE_DURATION_MS = 360;
+
+/**
+ * The sign-off the long-division console shows on a solved problem, reused so a
+ * finished fraction reads the same way (amber "verified" coach panel included).
+ */
+const PROBLEM_COMPLETE_COACH_MESSAGE = {
+  messageKey: "dino.feedback.complete.problem",
+  statusLabel: "Console Sequence Complete",
+  text: "Trail computation complete. Run log marked VERIFIED.",
+  note: "Queue the next sequencer task to keep your session streak online.",
+} as const;
 
 export interface FractionReductionPanelProps {
   readonly problem: FractionReductionProblem;
@@ -180,11 +192,49 @@ export function FractionReductionPanel({
   const [rejectedChoice, setRejectedChoice] = useState<FractionReductionChoice | null>(null);
   const [entryError, setEntryError] = useState<FractionReductionPart | null>(null);
   const [helperModal, setHelperModal] = useState<HelperModalState | null>(null);
+  const [focusedChoiceIndex, setFocusedChoiceIndex] = useState(0);
+  const [choiceAnnouncement, setChoiceAnnouncement] = useState("");
   const hasReportedSolvedRef = useRef(false);
+  const choiceToolbarRef = useRef<HTMLDivElement | null>(null);
+  // Set when focus should move to the divisor toolbar: on arrival at a new
+  // round and on arrow-key navigation, but never on an unrelated re-render, so
+  // focus is not yanked back if the player has tabbed elsewhere.
+  const shouldFocusChoiceRef = useRef(true);
 
   const activeRowIndex = session.rows.length - 1;
   const progress = getFractionReductionProgress(session);
   const modalHost = typeof document !== "undefined" ? document.body : null;
+  const isChoosingDivisor = session.status === "choosing-divisor";
+  const isSolved = session.status === "solved";
+  const isHelperModalOpen = helperModal !== null;
+
+  const divisorChoices = useMemo<readonly FractionReductionChoice[]>(
+    () => [...FRACTION_DIVISOR_CHOICES, NO_COMMON_DIVISOR_CHOICE],
+    [],
+  );
+
+  useEffect(() => {
+    if (!isChoosingDivisor || isHelperModalOpen || !shouldFocusChoiceRef.current) {
+      return;
+    }
+
+    const focusTarget = choiceToolbarRef.current?.querySelector<HTMLButtonElement>(
+      '[data-roving-focus="true"]',
+    );
+    if (focusTarget) {
+      shouldFocusChoiceRef.current = false;
+      focusTarget.focus();
+    }
+  }, [focusedChoiceIndex, isChoosingDivisor, isHelperModalOpen, session.rows.length]);
+
+  const moveChoiceFocus = useCallback(
+    (nextIndex: number) => {
+      const choiceCount = divisorChoices.length;
+      shouldFocusChoiceRef.current = true;
+      setFocusedChoiceIndex(((nextIndex % choiceCount) + choiceCount) % choiceCount);
+    },
+    [divisorChoices.length],
+  );
 
   useEffect(() => {
     if (rejectedChoice === null) {
@@ -242,9 +292,16 @@ export function FractionReductionPanel({
     (choice: FractionReductionChoice) => {
       const result = applyFractionDivisorChoice(session, choice);
 
+      const activeFraction = getActiveFractionRow(session).fraction;
+
       if (result.outcome === "divisor-rejected") {
         playWorkspaceSoundEffect("digit-error");
         setRejectedChoice(choice);
+        setChoiceAnnouncement(
+          choice === NO_COMMON_DIVISOR_CHOICE
+            ? `${activeFraction.numerator} and ${activeFraction.denominator} can still be reduced. Try again.`
+            : `${choice} does not divide both ${activeFraction.numerator} and ${activeFraction.denominator}. Try again.`,
+        );
         onIncorrectAttempt?.();
         return;
       }
@@ -258,6 +315,9 @@ export function FractionReductionPanel({
 
       if (result.outcome === "problem-solved") {
         playWorkspaceSoundEffect("problem-complete");
+        setChoiceAnnouncement(
+          `Correct. ${activeFraction.numerator} over ${activeFraction.denominator} is fully reduced.`,
+        );
         if (!hasReportedSolvedRef.current) {
           hasReportedSolvedRef.current = true;
           onProblemSolved?.(problem.id);
@@ -266,6 +326,9 @@ export function FractionReductionPanel({
       }
 
       playWorkspaceSoundEffect("step-lock-in");
+      setChoiceAnnouncement(
+        `Correct. Divide the numerator and denominator by ${choice}.`,
+      );
     },
     [onIncorrectAttempt, onProblemSolved, problem.id, session],
   );
@@ -277,6 +340,7 @@ export function FractionReductionPanel({
       if (result.outcome === "entry-rejected") {
         playWorkspaceSoundEffect("digit-error");
         setEntryError(part);
+        setChoiceAnnouncement(`That is not the right ${toPartLabel(part)}. Try again.`);
         setDrafts((currentDrafts) => ({ ...currentDrafts, [part]: "" }));
         onIncorrectAttempt?.();
         return;
@@ -286,7 +350,19 @@ export function FractionReductionPanel({
         return;
       }
 
+      if (result.outcome === "row-complete") {
+        // The next round's toolbar is about to appear; start it at the first
+        // choice and send focus there.
+        shouldFocusChoiceRef.current = true;
+        setFocusedChoiceIndex(0);
+      }
+
       playWorkspaceSoundEffect(result.outcome === "row-complete" ? "step-lock-in" : "digit-correct");
+      setChoiceAnnouncement(
+        result.outcome === "row-complete"
+          ? "Both answers correct. Choose the next common divisor."
+          : `${toPartLabel(part)} correct.`,
+      );
       setSession(result.state);
       setDrafts((currentDrafts) =>
         result.outcome === "row-complete" ? EMPTY_DRAFTS : { ...currentDrafts, [part]: "" },
@@ -359,29 +435,65 @@ export function FractionReductionPanel({
     [helperModal, session.rows, submitEntry],
   );
 
+  /**
+   * The divisor question is a toolbar rather than a radio group: arrow keys in
+   * a radio group select as they move, which here would submit a wrong answer
+   * just for browsing the options. A toolbar gives one tab stop, arrow-key
+   * movement without side effects, and Enter/Space to answer.
+   */
   const renderDivisorChooser = useCallback(
     (rowIndex: number) => {
-      const choices: readonly FractionReductionChoice[] = [
-        ...FRACTION_DIVISOR_CHOICES,
-        NO_COMMON_DIVISOR_CHOICE,
-      ];
+      const promptId = `fraction-choice-prompt-${rowIndex}`;
+
+      const handleChoiceKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+        switch (event.key) {
+          case "ArrowRight":
+          case "ArrowDown":
+            event.preventDefault();
+            moveChoiceFocus(focusedChoiceIndex + 1);
+            break;
+          case "ArrowLeft":
+          case "ArrowUp":
+            event.preventDefault();
+            moveChoiceFocus(focusedChoiceIndex - 1);
+            break;
+          case "Home":
+            event.preventDefault();
+            moveChoiceFocus(0);
+            break;
+          case "End":
+            event.preventDefault();
+            moveChoiceFocus(divisorChoices.length - 1);
+            break;
+          default:
+            break;
+        }
+      };
 
       return (
-        <div
-          aria-label="Common divisor choices"
-          className="fraction-choice-box"
-          data-ui-surface="fraction-divisor-choices"
-          role="group"
-        >
-          <p className="fraction-choice-prompt">
+        <div className="fraction-choice-box" data-ui-surface="fraction-divisor-choices">
+          <p className="fraction-choice-prompt" id={promptId}>
             Are the numerator and denominator both divisible by&hellip;
           </p>
-          <div className="fraction-choice-grid">
-            {choices.map((choice) => {
+          <div
+            aria-labelledby={promptId}
+            aria-orientation="horizontal"
+            className="fraction-choice-grid"
+            onKeyDown={handleChoiceKeyDown}
+            ref={choiceToolbarRef}
+            role="toolbar"
+          >
+            {divisorChoices.map((choice, choiceIndex) => {
               const isNoneChoice = choice === NO_COMMON_DIVISOR_CHOICE;
+              const isRovingFocusTarget = choiceIndex === focusedChoiceIndex;
 
               return (
                 <button
+                  aria-label={
+                    isNoneChoice
+                      ? "None of the above — the fraction cannot be reduced further"
+                      : `Divisible by ${choice}`
+                  }
                   className={[
                     "fraction-choice-button",
                     isNoneChoice ? "fraction-choice-button-none" : "",
@@ -390,11 +502,17 @@ export function FractionReductionPanel({
                     .filter((entry) => entry.length > 0)
                     .join(" ")}
                   data-choice-rejected={rejectedChoice === choice ? "true" : "false"}
+                  data-roving-focus={isRovingFocusTarget ? "true" : "false"}
                   data-ui-action={`select-fraction-divisor-${choice}`}
                   key={`row-${rowIndex}-choice-${choice}`}
                   onClick={() => {
+                    setFocusedChoiceIndex(choiceIndex);
                     handleDivisorChoice(choice);
                   }}
+                  onFocus={() => {
+                    setFocusedChoiceIndex(choiceIndex);
+                  }}
+                  tabIndex={isRovingFocusTarget ? 0 : -1}
                   type="button"
                 >
                   {isNoneChoice ? "None of the above" : choice}
@@ -405,10 +523,14 @@ export function FractionReductionPanel({
         </div>
       );
     },
-    [handleDivisorChoice, rejectedChoice],
+    [
+      divisorChoices,
+      focusedChoiceIndex,
+      handleDivisorChoice,
+      moveChoiceFocus,
+      rejectedChoice,
+    ],
   );
-
-  const isHelperModalOpen = helperModal !== null;
 
   const renderReductionLine = useCallback(
     (row: FractionReductionRow, rowIndex: number) => {
@@ -531,25 +653,54 @@ export function FractionReductionPanel({
             lower.
           </p>
         ) : null}
+
+        <p
+          aria-live="polite"
+          className="fraction-announcement"
+          data-ui-component="fraction-announcement"
+          role="status"
+        >
+          {choiceAnnouncement}
+        </p>
       </div>
 
-      <aside className="hint-stack" data-feedback-tone="neutral">
-        <p className="hint-title">Console Coach</p>
+      <aside
+        className="hint-stack"
+        data-feedback-outcome={isSolved ? "complete" : "in-progress"}
+        data-feedback-tone={isSolved ? "celebration" : "encouragement"}
+      >
+        <h3 className="hint-title">Console Coach</h3>
         <p className="hint-status">
-          Round {Math.min(progress.completedRounds + 1, progress.totalRounds)} of{" "}
-          {progress.totalRounds}
+          {isSolved
+            ? PROBLEM_COMPLETE_COACH_MESSAGE.statusLabel
+            : `Round ${Math.min(progress.completedRounds + 1, progress.totalRounds)} of ${progress.totalRounds}`}
         </p>
         <ul className="coach-list">
-          <li className="coach-item">
-            Find a number that divides the top <em>and</em> the bottom.
-          </li>
-          <li className="coach-item">
-            Stuck on the division? Tap <strong>?</strong> to work it out on paper.
-          </li>
-          <li className="coach-item">
-            When nothing divides both any more, choose <strong>None of the above</strong>.
-          </li>
+          {isSolved ? (
+            <li
+              className="coach-item"
+              data-feedback-key={PROBLEM_COMPLETE_COACH_MESSAGE.messageKey}
+              data-feedback-tone="celebration"
+            >
+              {PROBLEM_COMPLETE_COACH_MESSAGE.text}
+            </li>
+          ) : (
+            <>
+              <li className="coach-item">
+                Find a number that divides the top <em>and</em> the bottom.
+              </li>
+              <li className="coach-item">
+                Stuck on the division? Tap <strong>?</strong> to work it out on paper.
+              </li>
+              <li className="coach-item">
+                When nothing divides both any more, choose <strong>None of the above</strong>.
+              </li>
+            </>
+          )}
         </ul>
+        {isSolved ? (
+          <p className="hint-note">{PROBLEM_COMPLETE_COACH_MESSAGE.note}</p>
+        ) : null}
       </aside>
 
       {helperModal && modalHost
