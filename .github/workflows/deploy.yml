@@ -40,6 +40,12 @@ jobs:
         with:
           context: .
           push: true
+          # Public R2 base URL for reward images. next/image resolves its
+          # allow-list at build time, so this must be set here and not only in
+          # the runtime environment. Repository variable, not a secret — it is a
+          # public URL. If unset, images are served through the app instead.
+          build-args: |
+            R2_PUBLIC_BASE_URL=${{ vars.R2_PUBLIC_BASE_URL }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
