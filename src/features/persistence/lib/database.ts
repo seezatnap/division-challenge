@@ -12,6 +12,8 @@ import path from "node:path";
 
 import { createClient, type Client, type InStatement, type ResultSet, type Row } from "@libsql/client";
 
+import { DEFAULT_LEGACY_PLAYER_PASSWORD, hashPassword } from "./password-hashing";
+
 export const TURSO_DATABASE_URL_ENV_VAR = "TURSO_DATABASE_URL";
 export const TURSO_AUTH_TOKEN_ENV_VAR = "TURSO_AUTH_TOKEN";
 export const SQLITE_DB_FILE_ENV_VAR = "SQLITE_DB_FILE";
@@ -55,6 +57,58 @@ export type DatabaseResultSet = ResultSet;
 interface SchemaMigration {
   readonly version: number;
   readonly statements: readonly string[];
+  /**
+   * Optional data step that needs application code (not just SQL). Runs after
+   * `statements` and before the version is recorded, so a failure leaves the
+   * migration unapplied and it is retried on the next connection. Must be
+   * idempotent.
+   */
+  readonly seed?: (client: Client) => Promise<void>;
+}
+
+/**
+ * Gives every profile that predates passwords the documented default
+ * password so those operators can still log in (and then change it).
+ * Each row gets its own salt.
+ */
+async function seedLegacyPlayerCredentials(client: Client): Promise<void> {
+  const legacyProfiles = await client.execute(
+    `
+      SELECT p.player_name_key, p.player_name
+      FROM player_profiles AS p
+      LEFT JOIN player_credentials AS c ON c.player_name_key = p.player_name_key
+      WHERE c.player_name_key IS NULL
+    `,
+  );
+
+  for (const row of legacyProfiles.rows) {
+    const playerNameKey = typeof row.player_name_key === "string" ? row.player_name_key : null;
+    const playerName = typeof row.player_name === "string" ? row.player_name : null;
+    if (!playerNameKey || !playerName) {
+      continue;
+    }
+
+    const nowMs = Date.now();
+    await client.execute({
+      sql: `
+        INSERT OR IGNORE INTO player_credentials (
+          player_name_key,
+          player_name,
+          password_hash,
+          created_at_ms,
+          updated_at_ms
+        )
+        VALUES (?, ?, ?, ?, ?)
+      `,
+      args: [
+        playerNameKey,
+        playerName,
+        await hashPassword(DEFAULT_LEGACY_PLAYER_PASSWORD),
+        nowMs,
+        nowMs,
+      ],
+    });
+  }
 }
 
 const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
@@ -140,6 +194,41 @@ const SCHEMA_MIGRATIONS: readonly SchemaMigration[] = [
         ON reward_dossiers(updated_at_ms DESC)
       `,
     ],
+  },
+  {
+    version: 3,
+    statements: [
+      // One password per operator. `password_hash` is a self-describing scrypt
+      // string (see ./password-hashing); plaintext is never stored.
+      `
+        CREATE TABLE IF NOT EXISTS player_credentials (
+          player_name_key TEXT PRIMARY KEY,
+          player_name TEXT NOT NULL,
+          password_hash TEXT NOT NULL,
+          created_at_ms INTEGER NOT NULL,
+          updated_at_ms INTEGER NOT NULL
+        )
+      `,
+      // Login sessions behind the HttpOnly cookie. Only a sha256 of the cookie
+      // token is stored, so a leaked table cannot be replayed.
+      `
+        CREATE TABLE IF NOT EXISTS player_sessions (
+          token_hash TEXT PRIMARY KEY,
+          player_name_key TEXT NOT NULL,
+          created_at_ms INTEGER NOT NULL,
+          expires_at_ms INTEGER NOT NULL
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS player_sessions_player_name_key_idx
+        ON player_sessions(player_name_key)
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS player_sessions_expires_at_idx
+        ON player_sessions(expires_at_ms)
+      `,
+    ],
+    seed: seedLegacyPlayerCredentials,
   },
 ];
 
@@ -283,15 +372,18 @@ async function applySchemaMigrations(client: Client, config: DatabaseConfig): Pr
     }
 
     await client.batch(
-      [
-        ...migration.statements.map((sql) => ({ sql, args: [] })),
-        {
-          sql: "INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (?, ?)",
-          args: [migration.version, Date.now()],
-        },
-      ],
+      migration.statements.map((sql) => ({ sql, args: [] })),
       "write",
     );
+
+    if (migration.seed) {
+      await migration.seed(client);
+    }
+
+    await client.execute({
+      sql: "INSERT OR IGNORE INTO schema_migrations (version, applied_at_ms) VALUES (?, ?)",
+      args: [migration.version, Date.now()],
+    });
   }
 }
 

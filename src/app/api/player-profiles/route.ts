@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 
 import { normalizePlayerProfileName } from "@/features/persistence/lib/local-player-profiles";
 import {
+  requirePlayerSessionFor,
+  toPlayerAuthErrorResponse,
+} from "@/features/persistence/lib/player-session";
+import {
   getPlayerProfilesDatabaseLocation,
   readPlayerProfileSnapshotFromSqlite,
   writePlayerProfileSnapshotToSqlite,
@@ -307,17 +311,6 @@ function sanitizePlayerProfileSnapshot(
   };
 }
 
-function toErrorResponse(message: string, status = 400): Response {
-  return NextResponse.json(
-    {
-      error: {
-        message,
-      },
-    },
-    { status },
-  );
-}
-
 function parsePlayerNameFromQuery(request: Request): string {
   const requestUrl = new URL(request.url);
   const rawPlayerName = requestUrl.searchParams.get("playerName");
@@ -357,6 +350,8 @@ function parseWriteRequestBody(body: PlayerProfileWriteRequestBody): {
 export async function GET(request: Request): Promise<Response> {
   try {
     const playerName = parsePlayerNameFromQuery(request);
+    // Profiles are private to the operator who logged in as that name.
+    await requirePlayerSessionFor(request, playerName);
     const profile = await readPlayerProfileSnapshotFromSqlite<unknown>(playerName);
 
     return NextResponse.json(
@@ -369,9 +364,7 @@ export async function GET(request: Request): Promise<Response> {
       { status: 200 },
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to read player profile.";
-    return toErrorResponse(message, 400);
+    return toPlayerAuthErrorResponse(error, "Unable to read player profile.");
   }
 }
 
@@ -379,6 +372,7 @@ export async function PUT(request: Request): Promise<Response> {
   try {
     const body = await parseJsonBody(request);
     const parsedBody = parseWriteRequestBody(body);
+    await requirePlayerSessionFor(request, parsedBody.playerName);
     const profile = await writePlayerProfileSnapshotToSqlite({
       playerName: parsedBody.playerName,
       snapshot: parsedBody.snapshot,
@@ -397,8 +391,6 @@ export async function PUT(request: Request): Promise<Response> {
       { status: 200 },
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unable to write player profile.";
-    return toErrorResponse(message, 400);
+    return toPlayerAuthErrorResponse(error, "Unable to write player profile.");
   }
 }

@@ -56,15 +56,25 @@ async function loadPlayerProfilesRoute({
     databaseFile: "division-challenge.sqlite3",
     databasePath: "/repo/.sqlite/division-challenge.sqlite3",
   }),
+  // By default the request is treated as logged in as whichever player it
+  // names; tests for the auth gate override this.
+  requirePlayerSessionForImpl = async (request, playerName) => ({
+    playerName,
+    playerNameKey: String(playerName).toLowerCase(),
+    token: "test-token",
+    expiresAtMs: Date.now() + 1000,
+  }),
 } = {}) {
   const normalizeCallbackName = `__normalizePlayerName_${Math.random().toString(16).slice(2)}`;
   const readCallbackName = `__readPlayerProfile_${Math.random().toString(16).slice(2)}`;
   const writeCallbackName = `__writePlayerProfile_${Math.random().toString(16).slice(2)}`;
   const locationCallbackName = `__profilesDbLocation_${Math.random().toString(16).slice(2)}`;
+  const sessionCallbackName = `__requirePlayerSessionFor_${Math.random().toString(16).slice(2)}`;
   globalThis[normalizeCallbackName] = normalizePlayerProfileNameImpl;
   globalThis[readCallbackName] = readPlayerProfileSnapshotFromSqliteImpl;
   globalThis[writeCallbackName] = writePlayerProfileSnapshotToSqliteImpl;
   globalThis[locationCallbackName] = getPlayerProfilesDatabaseLocationImpl;
+  globalThis[sessionCallbackName] = requirePlayerSessionForImpl;
 
   const nextServerModuleUrl = toDataUrl(`
     export const NextResponse = {
@@ -97,11 +107,27 @@ async function loadPlayerProfilesRoute({
     }
   `);
 
+  const playerSessionModuleUrl = toDataUrl(`
+    export async function requirePlayerSessionFor(request, playerName) {
+      return await globalThis.${sessionCallbackName}(request, playerName);
+    }
+
+    export function toPlayerAuthErrorResponse(error, fallbackMessage) {
+      const status = typeof error?.status === "number" ? error.status : 400;
+      const message = error instanceof Error ? error.message : fallbackMessage;
+      return new Response(
+        JSON.stringify({ error: { ...(error?.code ? { code: error.code } : {}), message } }),
+        { status, headers: { "content-type": "application/json" } },
+      );
+    }
+  `);
+
   const routeModuleUrl = await transpileTypeScriptToDataUrl(
     "src/app/api/player-profiles/route.ts",
     {
       "next/server": nextServerModuleUrl,
       "@/features/persistence/lib/local-player-profiles": localProfilesModuleUrl,
+      "@/features/persistence/lib/player-session": playerSessionModuleUrl,
       "@/features/persistence/lib/sqlite-player-profiles": sqliteProfilesModuleUrl,
     },
   );
@@ -114,9 +140,80 @@ async function loadPlayerProfilesRoute({
       delete globalThis[readCallbackName];
       delete globalThis[writeCallbackName];
       delete globalThis[locationCallbackName];
+      delete globalThis[sessionCallbackName];
     },
   };
 }
+
+function createAuthGateError(code, status, message) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = status;
+  return error;
+}
+
+test("GET and PUT /api/player-profiles reject requests without a login session", async () => {
+  let readCalls = 0;
+  let writeCalls = 0;
+  const { routeModule, cleanup } = await loadPlayerProfilesRoute({
+    requirePlayerSessionForImpl: async () => {
+      throw createAuthGateError("unauthenticated", 401, "Log in to continue.");
+    },
+    readPlayerProfileSnapshotFromSqliteImpl: async () => {
+      readCalls += 1;
+      return null;
+    },
+    writePlayerProfileSnapshotToSqliteImpl: async () => {
+      writeCalls += 1;
+      throw new Error("should not be reached");
+    },
+  });
+
+  try {
+    const getResponse = await routeModule.GET(
+      new Request("https://example.test/api/player-profiles?playerName=Gus"),
+    );
+    assert.equal(getResponse.status, 401);
+    assert.equal((await getResponse.json()).error.code, "unauthenticated");
+
+    const putResponse = await routeModule.PUT(
+      new Request("https://example.test/api/player-profiles", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ playerName: "Gus", snapshot: {} }),
+      }),
+    );
+    assert.equal(putResponse.status, 401);
+    assert.equal(readCalls, 0, "no profile is read without a session");
+    assert.equal(writeCalls, 0, "no profile is written without a session");
+  } finally {
+    cleanup();
+  }
+});
+
+test("PUT /api/player-profiles refuses to write another operator's profile", async () => {
+  let seenPlayerName;
+  const { routeModule, cleanup } = await loadPlayerProfilesRoute({
+    requirePlayerSessionForImpl: async (request, playerName) => {
+      seenPlayerName = playerName;
+      throw createAuthGateError("forbidden", 403, "You are not logged in as that operator.");
+    },
+  });
+
+  try {
+    const response = await routeModule.PUT(
+      new Request("https://example.test/api/player-profiles", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ playerName: "Someone Else", snapshot: {} }),
+      }),
+    );
+    assert.equal(response.status, 403);
+    assert.equal(seenPlayerName, "Someone Else");
+  } finally {
+    cleanup();
+  }
+});
 
 test("GET /api/player-profiles validates playerName query parameter", async () => {
   const { routeModule, cleanup } = await loadPlayerProfilesRoute();

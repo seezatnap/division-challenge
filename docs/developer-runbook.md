@@ -65,7 +65,27 @@ Reward image record endpoints:
 - `GET /rewards/<slug>.<ext>` streams the current image for a reward from object storage (used
   when no public R2 URL is configured, and for image paths saved before the R2 move)
 
-Player profile endpoint:
+Operator login (all JSON; the session is an HttpOnly `ingen_operator_session` cookie, 30 days):
+
+- `POST /api/auth/login` `{ "playerName": "Gus", "password": "…" }` → `{ data: { player } }` + sets the
+  cookie. `401 invalid-password`, `404 unknown-operator` (the UI then offers registration).
+- `POST /api/auth/register` `{ "playerName", "password" }` → `201` + cookie. `409 operator-exists`
+  when the name already has credentials **or** an existing profile.
+- `POST /api/auth/change-password` `{ "currentPassword", "newPassword" }` — needs the cookie;
+  confirms the current password, stores the new hash, revokes every *other* session.
+- `GET /api/auth/session` → the logged-in player (`401` when logged out);
+  `DELETE /api/auth/session` logs out and clears the cookie.
+
+Passwords are hashed with Node's built-in scrypt (`src/features/persistence/lib/password-hashing.ts`,
+self-describing `scrypt$N$r$p$salt$hash` strings, per-row salt); plaintext is never stored. Policy:
+4–128 characters (`password-policy.ts`). Every profile that existed before passwords were introduced
+was given the password `password` by schema migration 3 (and a profile that somehow still has no
+credentials row — e.g. one copied in by the legacy migration script afterwards — is also accepted
+with `password` on first login, which provisions its hash). Users change it via the
+"Change password" link in the upper-left of the dashboard header.
+
+Player profile endpoint (requires the session cookie, and only for the logged-in operator's own name —
+`401 unauthenticated` / `403 forbidden` otherwise):
 
 - `GET /api/player-profiles?playerName=Gus` (load profile)
 - `PUT /api/player-profiles` with JSON body `{ "playerName": "Gus", "snapshot": { ... }, "updatedAtMs": 123 }`
@@ -149,6 +169,8 @@ Tables:
 | `reward_image_states` | one row per reward slug: generation status (`ready` / `generating` / `missing`) and which `reward_images` row is the current image |
 | `reward_dossiers` | model-written dossier prose per reward (facts are never stored here — see §3) |
 | `player_profiles` | shared player profiles (unchanged schema) |
+| `player_credentials` | one scrypt password hash per operator (`player_name_key` → `password_hash`); backfilled with the default password `password` for pre-existing profiles |
+| `player_sessions` | login sessions: sha256 of the cookie token → `player_name_key`, with expiry |
 
 Reward image binaries live in object storage (`src/features/persistence/lib/object-storage.ts`):
 

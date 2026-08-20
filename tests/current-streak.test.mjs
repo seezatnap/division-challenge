@@ -27,20 +27,6 @@ test("LiveGameSessionState includes a currentStreak field", async () => {
   );
 });
 
-test("toolbar stats use gameSession.currentStreak, not sessionSolvedProblems for streak", async () => {
-  const source = await readRepoFile("src/app/page.tsx");
-
-  // Find the IslaSornaToolbar stats prop and check currentStreak binding
-  assert.ok(
-    source.includes("currentStreak: gameSession.currentStreak"),
-    "Expected currentStreak to be sourced from gameSession.currentStreak",
-  );
-  assert.ok(
-    !source.includes("currentStreak: gameSession.sessionSolvedProblems"),
-    "currentStreak must NOT reuse gameSession.sessionSolvedProblems",
-  );
-});
-
 test("initial game session state sets currentStreak to 0", async () => {
   const source = await readRepoFile("src/app/page.tsx");
 

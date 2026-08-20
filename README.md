@@ -61,6 +61,7 @@ node --test tests/player-journey-smoke.test.mjs
 - Reward image binaries are uploaded to Cloudflare R2 (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`; optional `R2_PUBLIC_BASE_URL` to serve them straight from R2). Without R2 configured they are kept under `.reward-images/` for local development.
 - `npm run db:migrate:rewards` moves images/profiles from the old `public/rewards/` + local sqlite layout into R2/Turso; see `docs/developer-runbook.md` §4.
 - Player profiles (for example, amber balance/progress) are persisted to the shared database via `/api/player-profiles`, so the same player name can load across browsers.
+- Logging in requires a password (`/api/auth/login`; new operators register via `/api/auth/register`). Passwords are stored as scrypt hashes; profiles that predate passwords start with the password `password`, changeable via the "Change password" link in the dashboard header (`/api/auth/change-password`).
 - Browser `localStorage` is still written as a backup/migration source.
 - Save/load prefers File System Access API when available and uses player-named JSON files (for example, `rex-save.json`).
 - If File System Access API is unavailable, save/load falls back to JSON export/import with the same schema validation rules.

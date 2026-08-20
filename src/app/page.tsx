@@ -23,7 +23,6 @@ import {
 } from "@/features/multiplication-engine";
 import { DinoGalleryPanel } from "@/features/gallery/components/dino-gallery-panel";
 import { ScrollIndicators } from "@/features/gallery/components/scroll-indicators";
-import { IslaSornaToolbar } from "./isla-sorna-toolbar";
 import {
   type ActiveInputLane,
   type DivisionProblem,
@@ -67,12 +66,23 @@ import { FractionReductionPanel } from "@/features/workspace-ui/components/fract
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
 import { LiveMultiplicationWorkspacePanel } from "@/features/workspace-ui/components/live-multiplication-workspace-panel";
 import {
+  MIN_PLAYER_PASSWORD_LENGTH,
+  changePlayerPassword,
   fetchPlayerProfileSnapshot,
+  isPlayerAuthApiError,
+  loginPlayer,
   normalizePlayerProfileName,
   readPlayerProfileSnapshot,
+  registerPlayer,
   savePlayerProfileSnapshot,
   writePlayerProfileSnapshot,
 } from "@/features/persistence/lib";
+
+type OperatorAuthMode = "login" | "register";
+
+const ACCOUNT_NOTICE_DURATION_MS = 4000;
+const AUTH_SERVICE_UNREACHABLE_MESSAGE =
+  "Unable to reach the InGen authentication service. Check your connection and try again.";
 
 const APP_BOOT_SPLASH_DURATION_MS = 2000;
 
@@ -1112,6 +1122,17 @@ export default function Home() {
     useState<ActiveRewardRevealState>(initialActiveRewardRevealState);
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
   const [playerNameDraft, setPlayerNameDraft] = useState("");
+  const [passwordDraft, setPasswordDraft] = useState("");
+  const [confirmPasswordDraft, setConfirmPasswordDraft] = useState("");
+  const [authMode, setAuthMode] = useState<OperatorAuthMode>("login");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [currentPasswordDraft, setCurrentPasswordDraft] = useState("");
+  const [newPasswordDraft, setNewPasswordDraft] = useState("");
+  const [confirmNewPasswordDraft, setConfirmNewPasswordDraft] = useState("");
+  const [changePasswordError, setChangePasswordError] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [accountNotice, setAccountNotice] = useState<string | null>(null);
   const [sessionStartError, setSessionStartError] = useState<string | null>(null);
   const [sessionStartStatus, setSessionStartStatus] = useState<string | null>(null);
   const [isSessionStarted, setIsSessionStarted] = useState(false);
@@ -1320,6 +1341,104 @@ export default function Home() {
     };
   }, [isHybridFusionInProgress, isHybridLabOpen, selectedHybridReward]);
 
+  const openChangePasswordModal = useCallback(() => {
+    setCurrentPasswordDraft("");
+    setNewPasswordDraft("");
+    setConfirmNewPasswordDraft("");
+    setChangePasswordError(null);
+    setAccountNotice(null);
+    setIsChangePasswordOpen(true);
+  }, []);
+
+  const closeChangePasswordModal = useCallback(() => {
+    if (isChangingPassword) {
+      return;
+    }
+
+    setIsChangePasswordOpen(false);
+    setChangePasswordError(null);
+  }, [isChangingPassword]);
+
+  const handleChangePassword = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setChangePasswordError(null);
+
+      if (newPasswordDraft.length < MIN_PLAYER_PASSWORD_LENGTH) {
+        setChangePasswordError(
+          `New password must be at least ${MIN_PLAYER_PASSWORD_LENGTH} characters.`,
+        );
+        return;
+      }
+
+      if (newPasswordDraft !== confirmNewPasswordDraft) {
+        setChangePasswordError("New passwords do not match.");
+        return;
+      }
+
+      if (newPasswordDraft === currentPasswordDraft) {
+        setChangePasswordError("New password must be different from the current password.");
+        return;
+      }
+
+      setIsChangingPassword(true);
+      try {
+        await changePlayerPassword({
+          currentPassword: currentPasswordDraft,
+          newPassword: newPasswordDraft,
+        });
+        setIsChangePasswordOpen(false);
+        setCurrentPasswordDraft("");
+        setNewPasswordDraft("");
+        setConfirmNewPasswordDraft("");
+        setAccountNotice("Password updated.");
+      } catch (error) {
+        setChangePasswordError(
+          isPlayerAuthApiError(error) ? error.message : AUTH_SERVICE_UNREACHABLE_MESSAGE,
+        );
+      } finally {
+        setIsChangingPassword(false);
+      }
+    },
+    [confirmNewPasswordDraft, currentPasswordDraft, newPasswordDraft],
+  );
+
+  useEffect(() => {
+    if (!accountNotice) {
+      return;
+    }
+
+    const noticeTimer = window.setTimeout(() => {
+      setAccountNotice(null);
+    }, ACCOUNT_NOTICE_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(noticeTimer);
+    };
+  }, [accountNotice]);
+
+  useEffect(() => {
+    if (!isChangePasswordOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        closeChangePasswordModal();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeChangePasswordModal, isChangePasswordOpen]);
+
   const handleStartSession = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -1328,7 +1447,64 @@ export default function Home() {
       setRewardGenerationNotice(null);
 
       try {
-        const normalizedPlayerName = normalizePlayerProfileName(playerNameDraft);
+        const requestedPlayerName = normalizePlayerProfileName(playerNameDraft);
+        if (passwordDraft.length === 0) {
+          setSessionStartError("Password is required.");
+          return;
+        }
+
+        if (authMode === "register") {
+          if (passwordDraft.length < MIN_PLAYER_PASSWORD_LENGTH) {
+            setSessionStartError(
+              `Password must be at least ${MIN_PLAYER_PASSWORD_LENGTH} characters.`,
+            );
+            return;
+          }
+
+          if (passwordDraft !== confirmPasswordDraft) {
+            setSessionStartError("Passwords do not match.");
+            return;
+          }
+        }
+
+        setIsAuthenticating(true);
+        let authenticatedPlayer: { playerName: string };
+        try {
+          authenticatedPlayer =
+            authMode === "register"
+              ? await registerPlayer({
+                  playerName: requestedPlayerName,
+                  password: passwordDraft,
+                })
+              : await loginPlayer({
+                  playerName: requestedPlayerName,
+                  password: passwordDraft,
+                });
+        } catch (error) {
+          if (!isPlayerAuthApiError(error)) {
+            throw new Error(AUTH_SERVICE_UNREACHABLE_MESSAGE);
+          }
+
+          if (error.code === "unknown-operator" && authMode === "login") {
+            setAuthMode("register");
+            setConfirmPasswordDraft("");
+            setSessionStartStatus(
+              "No operator found with that ID. Confirm your password below to register it as a new operator.",
+            );
+            return;
+          }
+
+          if (error.code === "operator-exists") {
+            setAuthMode("login");
+            setConfirmPasswordDraft("");
+          }
+
+          throw error;
+        }
+
+        const normalizedPlayerName = normalizePlayerProfileName(
+          authenticatedPlayer.playerName,
+        );
         const localPersistedProfile =
           readPlayerProfileSnapshot<PersistedPlayerProfileSnapshot>(
             window.localStorage,
@@ -1465,14 +1641,25 @@ export default function Home() {
         setIsNextProblemReady(false);
         setActivePlayerName(normalizedPlayerName);
         setPlayerNameDraft(normalizedPlayerName);
+        setPasswordDraft("");
+        setConfirmPasswordDraft("");
+        setAuthMode("login");
         setIsSessionStarted(true);
       } catch (error) {
         setSessionStartError(
           error instanceof Error ? error.message : "Unable to start this player profile.",
         );
+      } finally {
+        setIsAuthenticating(false);
       }
     },
-    [isLocalProfileBackupEnabled, playerNameDraft],
+    [
+      authMode,
+      confirmPasswordDraft,
+      isLocalProfileBackupEnabled,
+      passwordDraft,
+      playerNameDraft,
+    ],
   );
 
   useEffect(() => {
@@ -2203,8 +2390,7 @@ export default function Home() {
                 InGen System Login
               </h1>
               <p className="research-center-subtitle">
-                Authenticate operator credentials to access the InGen math sequencers:
-                long division and long multiplication.
+                Authenticate operator credentials to access the InGen math sequencers
               </p>
             </div>
 
@@ -2227,8 +2413,77 @@ export default function Home() {
                 value={playerNameDraft}
               />
 
-              <p className="game-start-helper">
-                Use this Operator ID to log in later and resume your progress on this device.
+              <label className="game-start-label" htmlFor="game-start-password">
+                {authMode === "register" ? "Choose a password" : "Password"}
+              </label>
+              <input
+                autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                className="game-start-input terminal-input"
+                id="game-start-password"
+                minLength={authMode === "register" ? MIN_PLAYER_PASSWORD_LENGTH : undefined}
+                name="password"
+                onChange={(event) => {
+                  setPasswordDraft(event.target.value);
+                  setSessionStartError(null);
+                }}
+                placeholder={
+                  authMode === "register"
+                    ? `At least ${MIN_PLAYER_PASSWORD_LENGTH} characters`
+                    : "Enter your password"
+                }
+                required
+                type="password"
+                value={passwordDraft}
+              />
+
+              {authMode === "register" ? (
+                <>
+                  <label className="game-start-label" htmlFor="game-start-confirm-password">
+                    Confirm password
+                  </label>
+                  <input
+                    autoComplete="new-password"
+                    className="game-start-input terminal-input"
+                    id="game-start-confirm-password"
+                    minLength={MIN_PLAYER_PASSWORD_LENGTH}
+                    name="confirmPassword"
+                    onChange={(event) => {
+                      setConfirmPasswordDraft(event.target.value);
+                      setSessionStartError(null);
+                    }}
+                    placeholder="Re-enter your password"
+                    required
+                    type="password"
+                    value={confirmPasswordDraft}
+                  />
+                </>
+              ) : null}
+
+              {authMode === "register" ? (
+                <p className="game-start-helper">
+                  Use this Operator ID and password to log in later and resume your progress on
+                  any device.
+                </p>
+              ) : null}
+
+              <p className="game-start-helper auth-mode-switch">
+                {authMode === "register" ? "Already have credentials? " : "New operator? "}
+                <button
+                  className="text-link-button"
+                  data-ui-action="toggle-auth-mode"
+                  disabled={isAuthenticating}
+                  onClick={() => {
+                    setAuthMode((previousMode) =>
+                      previousMode === "register" ? "login" : "register",
+                    );
+                    setConfirmPasswordDraft("");
+                    setSessionStartError(null);
+                    setSessionStartStatus(null);
+                  }}
+                  type="button"
+                >
+                  {authMode === "register" ? "Log in instead" : "Register a new operator ID"}
+                </button>
               </p>
 
               {sessionStartError ? (
@@ -2244,15 +2499,22 @@ export default function Home() {
               ) : null}
 
               <div className="save-actions">
-                <button className="jp-button" data-ui-action="start-session" type="submit">
-                  Authenticate Session
+                <button
+                  className="jp-button"
+                  data-ui-action="start-session"
+                  disabled={isAuthenticating}
+                  type="submit"
+                >
+                  {isAuthenticating
+                    ? "Authenticating..."
+                    : authMode === "register"
+                      ? "Register & Authenticate"
+                      : "Authenticate Session"}
                 </button>
               </div>
             </form>
           </section>
         </div>
-
-        <IslaSornaToolbar />
       </main>
     );
   }
@@ -2261,6 +2523,22 @@ export default function Home() {
     <main className="jurassic-shell">
       <div className="jurassic-content">
         <header className="jurassic-panel jurassic-hero motif-canopy">
+          <div className="hero-account-bar" data-ui-surface="account-bar">
+            <button
+              aria-haspopup="dialog"
+              className="text-link-button hero-account-link"
+              data-ui-action="open-change-password"
+              onClick={openChangePasswordModal}
+              type="button"
+            >
+              Change password
+            </button>
+            {accountNotice ? (
+              <span className="hero-account-notice" role="status">
+                {accountNotice}
+              </span>
+            ) : null}
+          </div>
           <p className="eyebrow">Dinosaur Genomic Sequencing Console</p>
           <h1 className="hero-title">
             {gameSession.activeMode === "fractions"
@@ -2804,6 +3082,124 @@ export default function Home() {
           )
         : null}
 
+      {isChangePasswordOpen && modalHost
+        ? createPortal(
+            <div
+              className="jp-modal-backdrop"
+              data-ui-surface="change-password-modal"
+              onClick={closeChangePasswordModal}
+              role="presentation"
+            >
+              <div className="jp-modal-aura">
+                <section
+                  aria-labelledby="change-password-heading"
+                  aria-modal="true"
+                  className="jp-modal change-password-modal"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                  role="dialog"
+                >
+                  <p className="surface-kicker">Operator Credentials</p>
+                  <h3 className="surface-title" id="change-password-heading">
+                    Change Password
+                  </h3>
+                  <p className="hybrid-lab-copy">
+                    Confirm the current password for {activePlayerName}, then choose a new one.
+                    Other devices logged in as this operator will need to log in again.
+                  </p>
+
+                  <form className="game-start-flow" onSubmit={handleChangePassword}>
+                    <label className="game-start-label" htmlFor="change-password-current">
+                      Current password
+                    </label>
+                    <input
+                      autoComplete="current-password"
+                      autoFocus
+                      className="game-start-input terminal-input"
+                      disabled={isChangingPassword}
+                      id="change-password-current"
+                      name="currentPassword"
+                      onChange={(event) => {
+                        setCurrentPasswordDraft(event.target.value);
+                        setChangePasswordError(null);
+                      }}
+                      required
+                      type="password"
+                      value={currentPasswordDraft}
+                    />
+
+                    <label className="game-start-label" htmlFor="change-password-new">
+                      New password
+                    </label>
+                    <input
+                      autoComplete="new-password"
+                      className="game-start-input terminal-input"
+                      disabled={isChangingPassword}
+                      id="change-password-new"
+                      minLength={MIN_PLAYER_PASSWORD_LENGTH}
+                      name="newPassword"
+                      onChange={(event) => {
+                        setNewPasswordDraft(event.target.value);
+                        setChangePasswordError(null);
+                      }}
+                      placeholder={`At least ${MIN_PLAYER_PASSWORD_LENGTH} characters`}
+                      required
+                      type="password"
+                      value={newPasswordDraft}
+                    />
+
+                    <label className="game-start-label" htmlFor="change-password-confirm">
+                      Confirm new password
+                    </label>
+                    <input
+                      autoComplete="new-password"
+                      className="game-start-input terminal-input"
+                      disabled={isChangingPassword}
+                      id="change-password-confirm"
+                      minLength={MIN_PLAYER_PASSWORD_LENGTH}
+                      name="confirmNewPassword"
+                      onChange={(event) => {
+                        setConfirmNewPasswordDraft(event.target.value);
+                        setChangePasswordError(null);
+                      }}
+                      required
+                      type="password"
+                      value={confirmNewPasswordDraft}
+                    />
+
+                    {changePasswordError ? (
+                      <p className="game-start-error" role="alert">
+                        {changePasswordError}
+                      </p>
+                    ) : null}
+
+                    <div className="hybrid-lab-actions">
+                      <button
+                        className="jp-button jp-button-secondary"
+                        disabled={isChangingPassword}
+                        onClick={closeChangePasswordModal}
+                        type="button"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="jp-button"
+                        data-ui-action="submit-change-password"
+                        disabled={isChangingPassword}
+                        type="submit"
+                      >
+                        {isChangingPassword ? "Updating..." : "Update Password"}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+            </div>,
+            modalHost,
+          )
+        : null}
+
       {selectedHybridReward && modalHost
         ? createPortal(
             <div
@@ -2873,14 +3269,6 @@ export default function Home() {
             modalHost,
           )
         : null}
-
-      <IslaSornaToolbar
-        stats={{
-          problemsSolved: gameSession.sessionSolvedProblems,
-          currentStreak: gameSession.currentStreak,
-          difficultyLevel: gameSession.activeProblem.difficultyLevel,
-        }}
-      />
     </main>
   );
 }

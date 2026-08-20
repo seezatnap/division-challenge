@@ -43,9 +43,10 @@ test("home page includes Jurassic surfaces for game, gallery, and player-start U
     false,
     "Expected expedition-file save/load UX copy to be removed",
   );
-  assert.ok(
+  assert.equal(
     source.includes("Use this Operator ID to log in later and resume your progress on this device."),
-    "Expected player-start copy to describe logging in later to resume progress",
+    false,
+    "Expected the login-mode helper copy to be removed",
   );
   assert.ok(
     source.includes('data-ui-action="trade-amber-for-dino"'),
@@ -107,19 +108,6 @@ test("home page includes Research Center title treatment on player-start screen"
   assert.ok(
     source.includes("terminal-input"),
     "Expected terminal-input class on player-name input for field-station styling",
-  );
-});
-
-test("home page includes IslaSornaToolbar component", async () => {
-  const source = await readRepoFile("src/app/page.tsx");
-
-  assert.ok(
-    source.includes("IslaSornaToolbar"),
-    "Expected IslaSornaToolbar component to be rendered",
-  );
-  assert.ok(
-    source.includes('from "./isla-sorna-toolbar"'),
-    "Expected IslaSornaToolbar to be imported from local toolbar module",
   );
 });
 
@@ -190,8 +178,6 @@ test("global stylesheet defines JP3 green panel design tokens", async () => {
     "--jp-panel-bg:",
     "--jp-panel-text:",
     "--jp-panel-border:",
-    "--jp-toolbar:",
-    "--jp-toolbar-text:",
     "--jp-accent-red:",
   ]) {
     assert.ok(source.includes(fragment), `Expected JP3 design token: ${fragment}`);
@@ -211,16 +197,6 @@ test("global stylesheet defines JP3 green panel design tokens", async () => {
   assert.ok(
     source.includes("#145a22"),
     "Expected dark green panel border color #145a22",
-  );
-  // Verify dark metallic toolbar color
-  assert.ok(
-    source.includes("#2a2a2a"),
-    "Expected dark metallic toolbar color #2a2a2a",
-  );
-  // Verify silver toolbar text
-  assert.ok(
-    source.includes("#c0c0c0"),
-    "Expected silver toolbar text color #c0c0c0",
   );
   // Verify accent red
   assert.ok(
@@ -274,27 +250,6 @@ test("global stylesheet defines Jurassic palette, motif overlays, glow animation
     "@media (min-width: 64rem)",
   ]) {
     assert.ok(source.includes(fragment), `Expected styling fragment: ${fragment}`);
-  }
-});
-
-test("global stylesheet defines Isla Sorna toolbar styles", async () => {
-  const source = await readRepoFile("src/app/globals.css");
-
-  for (const fragment of [
-    ".isla-sorna-toolbar",
-    ".toolbar-label",
-    ".toolbar-readouts",
-    ".toolbar-readout",
-    ".toolbar-readout-label",
-    ".toolbar-readout-value",
-    ".toolbar-icons",
-    ".toolbar-icon-btn",
-    ".toolbar-icon-svg",
-    ".toolbar-more-link",
-    ".toolbar-more-text",
-    ".toolbar-more-arrow",
-  ]) {
-    assert.ok(source.includes(fragment), `Expected toolbar styling fragment: ${fragment}`);
   }
 });
 
@@ -357,51 +312,4 @@ test("global stylesheet defines earned reward panel with wood frame and green pa
     source.includes("var(--jp-panel-bg)"),
     "Expected earned reward panel to reference --jp-panel-bg for green background",
   );
-});
-
-test("IslaSornaToolbar component defines surveillance device bar with icon buttons", async () => {
-  const source = await readRepoFile("src/app/isla-sorna-toolbar.tsx");
-
-  assert.ok(
-    source.includes("Isla Sorna Surveillance Device"),
-    "Expected 'Isla Sorna Surveillance Device' label in toolbar",
-  );
-  assert.ok(
-    source.includes('className="isla-sorna-toolbar"'),
-    "Expected isla-sorna-toolbar class on toolbar root element",
-  );
-  assert.ok(
-    source.includes('data-ui-surface="toolbar"'),
-    "Expected data-ui-surface='toolbar' attribute on toolbar",
-  );
-
-  // Verify icon buttons for equipment pictograms
-  for (const iconLabel of ["Footprint", "Fossil", "DNA Helix", "Egg"]) {
-    assert.ok(
-      source.includes(`aria-label="${iconLabel}"`),
-      `Expected toolbar icon button with aria-label "${iconLabel}"`,
-    );
-  }
-
-  // Verify "More" link with red arrow
-  assert.ok(
-    source.includes("toolbar-more-link"),
-    "Expected 'More' link element in toolbar",
-  );
-  assert.ok(
-    source.includes("toolbar-more-arrow"),
-    "Expected red arrow indicator on 'More' link",
-  );
-
-  // Verify session stats readouts
-  assert.ok(
-    source.includes("toolbar-readouts"),
-    "Expected toolbar-readouts container for session stats",
-  );
-  for (const stat of ["problems-solved", "current-streak", "difficulty-level"]) {
-    assert.ok(
-      source.includes(`data-stat="${stat}"`),
-      `Expected toolbar readout for ${stat}`,
-    );
-  }
 });
