@@ -241,10 +241,24 @@ export async function saveRewardDossier(
   };
 }
 
+const RETIRED_DISCLAIMER_PATTERN = /imaginary|not a real animal/i;
+
+/**
+ * Prose stored before hybrids were presented in-universe as real DNA-lab
+ * creations carries the old "imaginary" disclaimer. Rows with that language
+ * are treated as stale so the dossier regenerates under the current prompt.
+ */
+function hasRetiredDisclaimerLanguage(storedDossier: StoredRewardDossier): boolean {
+  return (
+    RETIRED_DISCLAIMER_PATTERN.test(storedDossier.description) ||
+    storedDossier.attributes.some((attribute) => RETIRED_DISCLAIMER_PATTERN.test(attribute))
+  );
+}
+
 /**
  * Combines curated facts with stored prose. The curated dossier supplies every
  * factual field; the stored row may only replace the description (and, for
- * imaginary hybrids, the attribute phrases).
+ * lab-engineered hybrids, the attribute phrases).
  */
 function toResolvedDossier(
   curatedDossier: RewardDinosaurDossier,
@@ -293,7 +307,11 @@ export async function ensureRewardDossier(
   }
 
   const storedDossier = await readStoredRewardDossier(normalizedAssetName);
-  if (storedDossier && isReusableSource(storedDossier.source)) {
+  if (
+    storedDossier &&
+    isReusableSource(storedDossier.source) &&
+    !hasRetiredDisclaimerLanguage(storedDossier)
+  ) {
     const dossier = toResolvedDossier(curatedDossier, storedDossier);
     return {
       dossier,
@@ -368,7 +386,11 @@ export async function getRewardDossier(
 
   const storedDossier = await readStoredRewardDossier(normalizedAssetName);
   const usableStoredDossier =
-    storedDossier && isReusableSource(storedDossier.source) ? storedDossier : null;
+    storedDossier &&
+    isReusableSource(storedDossier.source) &&
+    !hasRetiredDisclaimerLanguage(storedDossier)
+      ? storedDossier
+      : null;
   const dossier = toResolvedDossier(curatedDossier, usableStoredDossier);
 
   return {

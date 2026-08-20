@@ -97,7 +97,7 @@ test("non-dinosaurs and film creations are labelled honestly", async () => {
   const indominus = facts.getDinosaurFactSheet("Indominus Rex");
   assert.equal(indominus.group, "film-creation");
   assert.equal(facts.isRealAnimal(indominus), false);
-  assert.match(facts.formatTimePeriodForDisplay(indominus), /not a real animal/);
+  assert.match(facts.formatTimePeriodForDisplay(indominus), /engineered by InGen/);
   assert.doesNotMatch(facts.formatTimePeriodForDisplay(indominus), /million years ago/);
 });
 
@@ -168,7 +168,7 @@ test("stored dossier content can never override curated facts", async () => {
   assert.deepEqual([...parsed.attributes], ["front legs longer than back legs", "giraffe-like upright neck", "high-canopy browser"]);
 });
 
-test("hybrids are framed as imaginary and average their real parents", async () => {
+test("hybrids are framed as lab creations and average their real parents", async () => {
   const { dossiers } = await modules;
 
   const hybrid = dossiers.buildHybridDinosaurDossier({
@@ -177,7 +177,8 @@ test("hybrids are framed as imaginary and average their real parents", async () 
   });
 
   assert.equal(hybrid.infoCard, null);
-  assert.match(hybrid.description, /imaginary engineered hybrid, not a real animal/);
+  assert.match(hybrid.description, /Engineered in the InGen DNA lab/);
+  assert.doesNotMatch(hybrid.description, /imaginary|not a real animal/i);
   assert.equal(hybrid.lengthMeters, 5.5, "average of 9 m and 2 m");
   assert.equal(hybrid.heightMeters, 1.8, "average of 3 m and 0.5 m");
   assert.deepEqual(

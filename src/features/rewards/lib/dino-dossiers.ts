@@ -217,7 +217,7 @@ function toHybridDescription(input: {
   const [leadTrait = "cross-species adaptation", secondaryTrait = "rapid threat recognition"] =
     input.attributes;
 
-  return `This is an imaginary engineered hybrid, not a real animal: it blends ${input.firstDinosaurName} and ${input.secondDinosaurName}, mixing ${leadTrait} with ${secondaryTrait}. Its listed size is the average of its two real parent species.`;
+  return `Engineered in the InGen DNA lab, this hybrid blends ${input.firstDinosaurName} and ${input.secondDinosaurName}, mixing ${leadTrait} with ${secondaryTrait}. Its listed size is the average of its two parent species.`;
 }
 
 export function buildHybridGenerationAssetName(input: RewardHybridPair): string {
@@ -255,10 +255,9 @@ export function parseHybridGenerationAssetName(assetName: string): RewardHybridP
 }
 
 /**
- * Hybrids are film-style fiction, so their profile is explicitly framed as an
- * engineered blend: dimensions are the plain average of the two real parents
- * (no random jitter), and the info card stays null because there is no real
- * animal to describe.
+ * Hybrids are presented in-universe as real DNA-lab creations: dimensions are
+ * the plain average of the two parent species (no random jitter), and the info
+ * card stays null because a lab-built animal has no curated fact sheet.
  */
 export function buildHybridDinosaurDossier(input: RewardHybridPair): RewardDinosaurDossier {
   const normalizedPair = normalizeHybridPair(input);
@@ -410,7 +409,7 @@ export function formatRewardDossierPromptBlock(dossier: RewardDinosaurDossier): 
 
   lines.push(
     dossier.sourceDinosaurs
-      ? `Source species: ${dossier.sourceDinosaurs[0]} + ${dossier.sourceDinosaurs[1]} (imaginary hybrid).`
+      ? `Source species: ${dossier.sourceDinosaurs[0]} + ${dossier.sourceDinosaurs[1]} (lab-engineered hybrid).`
       : "Source species: primary catalog profile.",
     `Description: ${dossier.description}`,
   );

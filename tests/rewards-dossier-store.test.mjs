@@ -106,7 +106,7 @@ test("hybrids resolve to one canonical row whichever order they are named", asyn
   const first = await store.ensureRewardDossier("Hybrid Velociraptor + Triceratops", {
     generateDossier: async (assetName) => {
       generationCount += 1;
-      return createGeneratedDossier(assetName, "An imaginary blend of two very different animals.", [
+      return createGeneratedDossier(assetName, "A lab-spliced blend of two very different animals.", [
         "spliced trait one",
         "spliced trait two",
         "spliced trait three",
@@ -133,6 +133,49 @@ test("hybrids resolve to one canonical row whichever order they are named", asyn
   });
   assert.equal(generationCount, 1);
   assert.equal(reversed.dossier.description, first.dossier.description);
+});
+
+test("stored prose with the retired imaginary disclaimer is regenerated", async () => {
+  const { store } = await modules;
+  let generationCount = 0;
+
+  const stale = await store.ensureRewardDossier("Hybrid Ankylosaurus + Velociraptor", {
+    generateDossier: async (assetName) => {
+      generationCount += 1;
+      return createGeneratedDossier(
+        assetName,
+        "This is an imaginary engineered hybrid, not a real animal.",
+        ["spliced trait one", "spliced trait two", "imaginary engineered hybrid"],
+      );
+    },
+  });
+  assert.equal(generationCount, 1);
+  assert.match(stale.dossier.description, /imaginary/);
+
+  const regenerated = await store.ensureRewardDossier("Hybrid Ankylosaurus + Velociraptor", {
+    generateDossier: async (assetName) => {
+      generationCount += 1;
+      return createGeneratedDossier(
+        assetName,
+        "A living hybrid engineered in the InGen DNA lab.",
+        ["spliced trait one", "spliced trait two", "lab-engineered hybrid"],
+      );
+    },
+  });
+  assert.equal(generationCount, 2, "old disclaimer prose must not be reused");
+  assert.equal(regenerated.wasRegenerated, true);
+  assert.equal(
+    regenerated.dossier.description,
+    "A living hybrid engineered in the InGen DNA lab.",
+  );
+
+  const reused = await store.ensureRewardDossier("Hybrid Ankylosaurus + Velociraptor", {
+    generateDossier: async () => {
+      throw new Error("clean prose should be reused instead of regenerating");
+    },
+  });
+  assert.equal(generationCount, 2);
+  assert.equal(reused.dossier.description, "A living hybrid engineered in the InGen DNA lab.");
 });
 
 test("getRewardDossier never calls the model and skips amber assets", async () => {

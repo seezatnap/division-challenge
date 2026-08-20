@@ -40,7 +40,8 @@ test("the dossier request pins the model to prose and supplies verified facts", 
   assert.match(prompt, /covered in feathers/);
 
   const hybridPrompt = buildDossierPrompt("Hybrid Tyrannosaurus Rex + Velociraptor");
-  assert.match(hybridPrompt, /imaginary engineered hybrid of Tyrannosaurus Rex and Velociraptor/);
+  assert.match(hybridPrompt, /hybrid engineered in the InGen DNA lab from Tyrannosaurus Rex and Velociraptor/);
+  assert.doesNotMatch(hybridPrompt, /imaginary/);
 });
 
 test("model output supplies prose only; curated facts are kept", async () => {
@@ -59,7 +60,7 @@ test("model output supplies prose only; curated facts are kept", async () => {
               {
                 type: "output_text",
                 text: JSON.stringify({
-                  description: "An imaginary blend of two very different hunters.",
+                  description: "A lab-spliced blend of two very different hunters.",
                   attributes: [
                     "adaptive gait balancing",
                     "cross-species sensory fusion",
@@ -80,7 +81,7 @@ test("model output supplies prose only; curated facts are kept", async () => {
   assert.equal(generated.dossier.kind, "hybrid");
   assert.equal(
     generated.dossier.description,
-    "An imaginary blend of two very different hunters.",
+    "A lab-spliced blend of two very different hunters.",
   );
   // Hybrid dimensions stay the average of the two real parents.
   assert.equal(generated.dossier.heightMeters, 2.1);

@@ -77,7 +77,7 @@ const DOSSIER_INSTRUCTIONS = [
   "You are given a VERIFIED FACTS block. Treat it as the only source of truth.",
   "Never contradict it, and never introduce measurements, weights, dates, locations or classifications that are not in it — the game displays those separately from its own data.",
   "Write a vivid, accurate, family-friendly description of two or three sentences that a curious eight-year-old can follow. Prefer concrete, checkable statements over drama.",
-  "If the subject is an imaginary engineered hybrid, say plainly that it is not a real animal.",
+  "If the subject is an engineered hybrid, present it as a real creature built in the InGen DNA lab from its two source species. Never call it imaginary or fictional, and never say it is not a real animal.",
   "Also return three to six short attribute phrases consistent with the facts.",
   "Respond only with JSON matching the provided schema.",
 ].join(" ");
@@ -110,7 +110,7 @@ export function buildDossierPrompt(assetName: string): string {
   const curatedDossier = resolveRewardAssetDossier(normalizedAssetName);
   const hybridPair = parseHybridGenerationAssetName(normalizedAssetName);
   const subjectLine = hybridPair
-    ? `Write the blurb for "${normalizedAssetName}", an imaginary engineered hybrid of ${hybridPair.firstDinosaurName} and ${hybridPair.secondDinosaurName}.`
+    ? `Write the blurb for "${normalizedAssetName}", a hybrid engineered in the InGen DNA lab from ${hybridPair.firstDinosaurName} and ${hybridPair.secondDinosaurName}.`
     : `Write the blurb for "${normalizedAssetName}".`;
 
   if (!curatedDossier) {

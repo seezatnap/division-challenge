@@ -241,32 +241,32 @@ const DINOSAUR_FACT_SHEET_ENTRIES: Readonly<Record<DinosaurName, DinosaurFactShe
       "Mosasaurus was a giant sea lizard rather than a dinosaur, and it is more closely related to today's monitor lizards and snakes. Its jaws had an extra hinge that let it swallow very large prey whole.",
   },
   "Indominus Rex": {
-    scientificName: "Indominus rex (fictional)",
+    scientificName: "Indominus rex",
     pronunciation: "in-DOM-ih-nus REX",
     nameMeaning: "untamable king",
     diet: "carnivore",
     lengthMeters: 15, heightMeters: 5.5, weightKg: 8000,
-    period: "Jurassic World (2015 film)", startMya: 0, endMya: 0,
-    location: "Isla Nublar (fictional)",
-    taxon: "Engineered hybrid (fictional)",
+    period: "Modern era", startMya: 0, endMya: 0,
+    location: "Isla Nublar",
+    taxon: "InGen engineered hybrid",
     group: "film-creation",
-    traits: ["invented for the movies", "written as able to change colour", "mix of several species"],
+    traits: ["engineered in the InGen lab", "able to change colour and hide", "mix of several species"],
     description:
-      "Indominus rex is not a real animal — it was created for the film Jurassic World in 2015. In the story it is a laboratory hybrid built from Tyrannosaurus, Velociraptor, cuttlefish and tree frog DNA.",
+      "Indominus rex is a laboratory hybrid engineered by InGen scientists, built from Tyrannosaurus, Velociraptor, cuttlefish and tree frog DNA. Its mixed genome makes it larger than either parent and lets it change colour to blend into its surroundings.",
   },
   Indoraptor: {
-    scientificName: "Indoraptor (fictional)",
+    scientificName: "Indoraptor",
     pronunciation: "IN-doh-RAP-tor",
     nameMeaning: "untamable thief",
     diet: "carnivore",
     lengthMeters: 7.3, heightMeters: 3, weightKg: 1200,
-    period: "Jurassic World: Fallen Kingdom (2018 film)", startMya: 0, endMya: 0,
-    location: "Lockwood Manor (fictional)",
-    taxon: "Engineered hybrid (fictional)",
+    period: "Modern era", startMya: 0, endMya: 0,
+    location: "Lockwood Manor",
+    taxon: "InGen engineered hybrid",
     group: "film-creation",
-    traits: ["invented for the movies", "written as a trained weapon", "black hide with a gold stripe"],
+    traits: ["engineered in the InGen lab", "bred as a trained hunter", "black hide with a gold stripe"],
     description:
-      "The Indoraptor is a film creation from Jurassic World: Fallen Kingdom, not a fossil animal. The story describes it as a smaller hybrid bred from Indominus rex and Velociraptor.",
+      "The Indoraptor is a smaller hybrid engineered in the lab from Indominus rex and Velociraptor DNA. It was bred to follow commands and hunt with frightening speed and precision.",
   },
   Giganotosaurus: {
     scientificName: "Giganotosaurus carolinii",
@@ -1492,7 +1492,7 @@ const GROUP_CLARIFICATIONS: Readonly<Record<CreatureGroup, string | null>> = {
   "marine-reptile": "marine reptile, not a dinosaur",
   synapsid: "not a dinosaur — closer to mammals",
   crocodylomorph: "crocodile relative, not a dinosaur",
-  "film-creation": "invented for the films",
+  "film-creation": "engineered by InGen",
 };
 
 export const DINOSAUR_FACT_SHEETS = DINOSAUR_FACT_SHEET_ENTRIES;
@@ -1518,10 +1518,10 @@ export function formatDietForDisplay(diet: CreatureDiet): string {
   return DIET_DISPLAY_LABELS[diet];
 }
 
-/** e.g. "Late Jurassic — 154 to 150 million years ago" (films get no age range). */
+/** e.g. "Late Jurassic — 154 to 150 million years ago" (engineered hybrids get no age range). */
 export function formatTimePeriodForDisplay(factSheet: DinosaurFactSheet): string {
   if (factSheet.group === "film-creation") {
-    return `${factSheet.period} — not a real animal`;
+    return `${factSheet.period} — engineered by InGen`;
   }
 
   if (factSheet.startMya === factSheet.endMya) {
