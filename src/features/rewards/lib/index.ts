@@ -9,6 +9,7 @@ export * from "./reward-image-service";
 export * from "./openai-image-service";
 export * from "./openai-visual-description-service";
 export * from "./prefetch";
+export * from "./provisional-reward-image";
 export * from "./earned-reward-reveal";
 export * from "./dino-dossiers";
 export * from "./dinosaur-facts";

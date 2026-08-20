@@ -7,6 +7,7 @@ export const workspaceUiModule: FeatureModuleDescriptor = {
   rootPath: "src/features/workspace-ui",
 };
 
+export * from "./barbasol-spinner";
 export * from "./bus-stop-long-division-renderer";
 export * from "./fraction-reduction-panel";
 export * from "./live-division-workspace-panel";

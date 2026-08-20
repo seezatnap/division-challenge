@@ -1694,6 +1694,8 @@ body {
   overflow: hidden;
   border: 1px solid rgba(240, 237, 216, 0.2);
   background: rgba(0, 0, 0, 0.15);
+  display: grid;
+  place-items: center;
 }
 
 .amber-bank-image {
@@ -2276,29 +2278,9 @@ body {
   gap: 0.45rem;
 }
 
-.hybrid-fusion-bars {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.3rem;
-}
-
-.hybrid-fusion-bar {
-  height: 0.24rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(240, 237, 216, 0.24), rgba(211, 160, 58, 0.86));
-  animation: hybrid-fusion-pulse 980ms ease-in-out infinite;
-}
-
-.hybrid-fusion-bar:nth-child(2) {
-  animation-delay: 120ms;
-}
-
-.hybrid-fusion-bar:nth-child(3) {
-  animation-delay: 240ms;
-}
-
-.hybrid-fusion-bar:nth-child(4) {
-  animation-delay: 360ms;
+.hybrid-fusion-spinner {
+  justify-self: center;
+  margin-top: 0.2rem;
 }
 
 .hybrid-lab-actions {
@@ -2306,19 +2288,6 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
-}
-
-@keyframes hybrid-fusion-pulse {
-  0%,
-  100% {
-    opacity: 0.34;
-    transform: scaleX(0.9);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scaleX(1.04);
-  }
 }
 
 @keyframes jp-modal-enter {
@@ -2405,7 +2374,7 @@ body {
   gap: 0.75rem;
 }
 
-.reward-egg-loader {
+.reward-can-loader {
   margin-top: 0.75rem;
   display: grid;
   justify-items: center;
@@ -2413,121 +2382,85 @@ body {
   gap: 0.5rem;
 }
 
-.reward-egg-shell {
-  position: relative;
-  width: 3.9rem;
-  height: 4.5rem;
+.barbasol-spinner {
+  display: inline-block;
+  width: 2.2rem;
   filter: drop-shadow(0 0.3rem 0.45rem rgba(45, 36, 25, 0.18));
-  animation: reward-egg-wobble 860ms ease-in-out infinite;
+  animation: barbasol-spin 1.6s linear infinite;
 }
 
-.reward-egg-loader[data-hatch-state="cracking"] .reward-egg-shell {
-  animation: reward-egg-wobble-cracking 520ms ease-in-out infinite;
+.reward-can-loader[data-hatch-state="cracking"] .barbasol-spinner {
+  animation-duration: 0.7s;
 }
 
-.reward-egg-shell-top,
-.reward-egg-shell-bottom {
-  position: absolute;
-  left: 0;
+.barbasol-spinner-svg {
+  display: block;
   width: 100%;
-  border: 1px solid rgba(45, 36, 25, 0.28);
-  background: radial-gradient(circle at 50% 30%, rgba(255, 248, 225, 0.95), rgba(231, 217, 184, 0.92));
+  height: auto;
 }
 
-.reward-egg-shell-top {
-  top: 0;
-  height: 55%;
-  border-radius: 2.2rem 2.2rem 1.3rem 1.3rem;
+@keyframes barbasol-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.reward-egg-shell-bottom {
-  bottom: 0;
-  height: 56%;
-  border-radius: 1.3rem 1.3rem 2.3rem 2.3rem;
+@media (prefers-reduced-motion: reduce) {
+  .barbasol-spinner {
+    animation: none;
+  }
 }
 
-.reward-egg-shell-crack {
-  position: absolute;
-  left: 50%;
-  top: 40%;
+/* Context sizes for the spinning-can loader */
+.amber-bank-spinner {
+  width: 1.15rem;
+}
+
+.gallery-thumb-spinner {
+  width: 2.1rem;
+}
+
+.gallery-detail-loading {
+  display: grid;
+  place-items: center;
+  min-height: 12rem;
+  border-radius: 0.25rem;
+  border: 3px solid var(--jp-panel-border);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+  background: #0d3d15;
+}
+
+.gallery-detail-spinner {
+  width: 3.4rem;
+}
+
+.hybrid-preview-spinner {
   width: 2.4rem;
-  height: 0.16rem;
-  border-radius: 999px;
-  background: rgba(105, 73, 26, 0.75);
-  transform: translateX(-50%);
-  animation: reward-hatch-crack 1.15s ease-in-out infinite;
 }
 
-.reward-egg-loader[data-hatch-state="cracking"] .reward-egg-shell-crack {
-  animation: reward-hatch-crack-widen 460ms ease-in-out infinite;
+.app-boot-splash {
+  min-height: 100dvh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1.1rem;
 }
 
-@keyframes reward-egg-wobble {
-  0%,
-  100% {
-    transform: rotate(0deg) translateY(0);
-  }
-
-  25% {
-    transform: rotate(-5deg) translateY(-1px);
-  }
-
-  50% {
-    transform: rotate(0deg) translateY(0);
-  }
-
-  75% {
-    transform: rotate(5deg) translateY(-1px);
-  }
+.app-boot-spinner {
+  width: 4.6rem;
 }
 
-@keyframes reward-hatch-crack {
-  0%,
-  100% {
-    opacity: 0.3;
-    transform: translateX(-50%) scaleX(0.35);
-  }
-
-  55% {
-    opacity: 0.95;
-    transform: translateX(-50%) scaleX(1);
-  }
-}
-
-@keyframes reward-egg-wobble-cracking {
-  0%,
-  100% {
-    transform: rotate(0deg) translateY(0);
-  }
-
-  20% {
-    transform: rotate(-8deg) translateY(-1px);
-  }
-
-  40% {
-    transform: rotate(6deg) translateY(-1px);
-  }
-
-  60% {
-    transform: rotate(-6deg) translateY(0);
-  }
-
-  80% {
-    transform: rotate(8deg) translateY(-1px);
-  }
-}
-
-@keyframes reward-hatch-crack-widen {
-  0%,
-  100% {
-    opacity: 0.44;
-    transform: translateX(-50%) scaleX(0.55);
-  }
-
-  55% {
-    opacity: 1;
-    transform: translateX(-50%) scaleX(1.28);
-  }
+.app-boot-splash-label {
+  font-family: "Orbitron", var(--font-jurassic-display), "Times New Roman", serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  color: var(--jp-panel-text);
 }
 
 .reward-loader-title {

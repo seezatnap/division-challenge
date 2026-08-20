@@ -22,6 +22,8 @@ import {
   toRewardDossierApiPath,
   type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
+import { isProvisionalRewardImagePath } from "@/features/rewards/lib/provisional-reward-image";
+import { BarbasolSpinner } from "@/features/workspace-ui/components/barbasol-spinner";
 
 const EMPTY_STATE_TITLE = "No dinos unlocked yet.";
 const EMPTY_STATE_COPY =
@@ -184,14 +186,18 @@ export function DinoGalleryPanel({
               type="button"
             >
               <div className="gallery-thumb">
-                <Image
-                  alt={`${reward.dinosaurName} unlocked reward image`}
-                  className="gallery-image"
-                  height={240}
-                  loading="lazy"
-                  src={reward.imagePath}
-                  width={240}
-                />
+                {isProvisionalRewardImagePath(reward.imagePath) ? (
+                  <BarbasolSpinner className="gallery-thumb-spinner" />
+                ) : (
+                  <Image
+                    alt={`${reward.dinosaurName} unlocked reward image`}
+                    className="gallery-image"
+                    height={240}
+                    loading="lazy"
+                    src={reward.imagePath}
+                    width={240}
+                  />
+                )}
               </div>
               <p className="gallery-name">{reward.dinosaurName}</p>
             </button>
@@ -221,14 +227,20 @@ export function DinoGalleryPanel({
               <ScrollIndicators scrollRef={modalScrollRef} />
               <div className="detail-two-panel" data-ui-surface="detail-two-panel">
                 <div className="detail-panel-image">
-                  <Image
-                    alt={`${selectedReward.dinosaurName} unlocked reward image`}
-                    className="gallery-detail-image"
-                    height={540}
-                    loading="lazy"
-                    src={selectedReward.imagePath}
-                    width={960}
-                  />
+                  {isProvisionalRewardImagePath(selectedReward.imagePath) ? (
+                    <div className="gallery-detail-loading">
+                      <BarbasolSpinner className="gallery-detail-spinner" />
+                    </div>
+                  ) : (
+                    <Image
+                      alt={`${selectedReward.dinosaurName} unlocked reward image`}
+                      className="gallery-detail-image"
+                      height={540}
+                      loading="lazy"
+                      src={selectedReward.imagePath}
+                      width={960}
+                    />
+                  )}
                   <p className="gallery-detail-meta">
                     Milestone {selectedReward.milestoneSolvedCount} • Earned{" "}
                     <time dateTime={selectedReward.earnedAt}>

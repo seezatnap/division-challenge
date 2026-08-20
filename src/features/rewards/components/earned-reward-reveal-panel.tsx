@@ -13,6 +13,7 @@ import {
   pollEarnedRewardImageUntilReady,
   type EarnedRewardImageStatus,
 } from "@/features/rewards/lib/earned-reward-reveal";
+import { BarbasolSpinner } from "@/features/workspace-ui/components/barbasol-spinner";
 
 type RewardRevealPhase =
   | "hatching"
@@ -268,12 +269,8 @@ function EarnedRewardRevealPanelContent({
         ) : null}
 
         {isRewardLoaderPhase(phase) ? (
-          <div className="reward-egg-loader" data-hatch-state={phase} role="status">
-            <div className="reward-egg-shell" aria-hidden="true">
-              <span className="reward-egg-shell-top" />
-              <span className="reward-egg-shell-bottom" />
-              <span className="reward-egg-shell-crack" />
-            </div>
+          <div className="reward-can-loader" data-hatch-state={phase} role="status">
+            <BarbasolSpinner />
             {phase === "cracking" ? (
               <>
                 <p className="reward-loader-title">Shell fracture detected...</p>

@@ -11,7 +11,7 @@ async function readRepoFile(relativePath) {
   return readFile(path.join(repoRoot, relativePath), "utf8");
 }
 
-test("earned reward panel uses egg-hatching loading UX and polling helpers", async () => {
+test("earned reward panel uses spinning-can loading UX and polling helpers", async () => {
   const source = await readRepoFile("src/features/rewards/components/earned-reward-reveal-panel.tsx");
 
   for (const fragment of [
@@ -22,7 +22,8 @@ test("earned reward panel uses egg-hatching loading UX and polling helpers", asy
     "setIsRevealModalOpen(true)",
     'data-ui-surface="reward-reveal-modal"',
     "Back To Board",
-    "reward-egg-loader",
+    "reward-can-loader",
+    "<BarbasolSpinner",
     'data-hatch-state={phase}',
     "The reward egg is hatching...",
     "setPhase(\"cracking\")",
@@ -63,20 +64,17 @@ test("home page renders the earned reward reveal surface", async () => {
   }
 });
 
-test("global stylesheet defines egg-hatching and reveal animation styles", async () => {
+test("global stylesheet defines spinning-can loader and reveal animation styles", async () => {
   const source = await readRepoFile("src/app/globals.css");
 
   for (const fragment of [
     ".earned-reward-panel",
     '.earned-reward-panel[data-reward-motion="cracking"]',
-    ".reward-egg-loader",
-    '.reward-egg-loader[data-hatch-state="cracking"] .reward-egg-shell',
-    ".reward-egg-shell",
-    ".reward-egg-shell-crack",
-    "@keyframes reward-egg-wobble",
-    "@keyframes reward-egg-wobble-cracking",
-    "@keyframes reward-hatch-crack",
-    "@keyframes reward-hatch-crack-widen",
+    ".reward-can-loader",
+    '.reward-can-loader[data-hatch-state="cracking"] .barbasol-spinner',
+    ".barbasol-spinner",
+    ".barbasol-spinner-svg",
+    "@keyframes barbasol-spin",
     ".reward-reveal-image",
     '.reward-reveal-figure[data-reveal-state="revealing"] .reward-reveal-image',
     "@keyframes reward-reveal-in",

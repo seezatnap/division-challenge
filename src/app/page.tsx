@@ -52,12 +52,17 @@ import {
   getMilestoneSolvedCountForRewardNumber,
 } from "@/features/rewards/lib/dinosaurs";
 import {
+  PROVISIONAL_REWARD_IMAGE_PATH,
+  isProvisionalRewardImagePath,
+} from "@/features/rewards/lib/provisional-reward-image";
+import {
   buildHybridDinosaurDossier,
   formatMetersAsMetersAndFeet,
   parseRewardDinosaurDossierArtifact,
   toRewardDossierApiPath,
   type RewardDinosaurDossier,
 } from "@/features/rewards/lib/dino-dossiers";
+import { BarbasolSpinner } from "@/features/workspace-ui/components/barbasol-spinner";
 import { FractionReductionPanel } from "@/features/workspace-ui/components/fraction-reduction-panel";
 import { LiveDivisionWorkspacePanel } from "@/features/workspace-ui/components/live-division-workspace-panel";
 import { LiveMultiplicationWorkspacePanel } from "@/features/workspace-ui/components/live-multiplication-workspace-panel";
@@ -69,7 +74,7 @@ import {
   writePlayerProfileSnapshot,
 } from "@/features/persistence/lib";
 
-const PROVISIONAL_REWARD_IMAGE_PATH = "/window.svg";
+const APP_BOOT_SPLASH_DURATION_MS = 2000;
 
 const workspacePreviewProblem: DivisionProblem = {
   id: "workspace-preview-problem",
@@ -1111,6 +1116,7 @@ export default function Home() {
   const [sessionStartStatus, setSessionStartStatus] = useState<string | null>(null);
   const [isSessionStarted, setIsSessionStarted] = useState(false);
   const [isLocalProfileBackupEnabled, setIsLocalProfileBackupEnabled] = useState(true);
+  const [isBootSplashActive, setIsBootSplashActive] = useState(true);
   const [rewardGenerationNotice, setRewardGenerationNotice] =
     useState<string | null>(null);
   const [isNextProblemReady, setIsNextProblemReady] = useState(false);
@@ -1210,6 +1216,16 @@ export default function Home() {
       PROVISIONAL_REWARD_IMAGE_PATH
     : null;
   const modalHost = typeof document !== "undefined" ? document.body : null;
+
+  useEffect(() => {
+    const bootSplashTimeout = setTimeout(() => {
+      setIsBootSplashActive(false);
+    }, APP_BOOT_SPLASH_DURATION_MS);
+
+    return () => {
+      clearTimeout(bootSplashTimeout);
+    };
+  }, []);
 
   useEffect(() => {
     if (
@@ -2158,6 +2174,17 @@ export default function Home() {
       : gameSession.activeMode === "multiplication"
         ? "Multiplication"
         : "Division";
+  if (isBootSplashActive) {
+    return (
+      <main className="jurassic-shell">
+        <div className="app-boot-splash" data-ui-surface="boot-splash" role="status">
+          <BarbasolSpinner className="app-boot-spinner" />
+          <p className="app-boot-splash-label">Loading...</p>
+        </div>
+      </main>
+    );
+  }
+
   if (!isSessionStarted) {
     return (
       <main className="jurassic-shell">
@@ -2372,14 +2399,18 @@ export default function Home() {
 
               <section className="amber-bank" data-ui-surface="amber-bank">
                 <div className="amber-bank-thumb">
-                  <Image
-                    alt="Amber currency crystal"
-                    className="amber-bank-image"
-                    height={120}
-                    loading="lazy"
-                    src={gameSession.amberImagePath ?? PROVISIONAL_REWARD_IMAGE_PATH}
-                    width={120}
-                  />
+                  {isProvisionalRewardImagePath(gameSession.amberImagePath) ? (
+                    <BarbasolSpinner className="amber-bank-spinner" />
+                  ) : (
+                    <Image
+                      alt="Amber currency crystal"
+                      className="amber-bank-image"
+                      height={120}
+                      loading="lazy"
+                      src={gameSession.amberImagePath}
+                      width={120}
+                    />
+                  )}
                 </div>
                 <div className="amber-bank-copy">
                   <p className="amber-bank-balance">Amber: {gameSession.amberBalance}</p>
@@ -2543,14 +2574,18 @@ export default function Home() {
                       <div className="hybrid-preview-row" data-hybrid-preview-state="generating">
                         <article className="hybrid-preview-card" data-hybrid-preview-slot="first">
                           <div className="hybrid-preview-thumb">
-                            <Image
-                              alt={`${pendingHybridFusionReward.firstDinosaurName} preview`}
-                              className="hybrid-preview-image"
-                              height={180}
-                              loading="lazy"
-                              src={pendingHybridFirstPreviewImagePath ?? PROVISIONAL_REWARD_IMAGE_PATH}
-                              width={180}
-                            />
+                            {isProvisionalRewardImagePath(pendingHybridFirstPreviewImagePath) ? (
+                              <BarbasolSpinner className="hybrid-preview-spinner" />
+                            ) : (
+                              <Image
+                                alt={`${pendingHybridFusionReward.firstDinosaurName} preview`}
+                                className="hybrid-preview-image"
+                                height={180}
+                                loading="lazy"
+                                src={pendingHybridFirstPreviewImagePath}
+                                width={180}
+                              />
+                            )}
                           </div>
                           <p className="hybrid-preview-name">
                             {pendingHybridFusionReward.firstDinosaurName}
@@ -2561,14 +2596,18 @@ export default function Home() {
                         </p>
                         <article className="hybrid-preview-card" data-hybrid-preview-slot="second">
                           <div className="hybrid-preview-thumb">
-                            <Image
-                              alt={`${pendingHybridFusionReward.secondDinosaurName} preview`}
-                              className="hybrid-preview-image"
-                              height={180}
-                              loading="lazy"
-                              src={pendingHybridSecondPreviewImagePath ?? PROVISIONAL_REWARD_IMAGE_PATH}
-                              width={180}
-                            />
+                            {isProvisionalRewardImagePath(pendingHybridSecondPreviewImagePath) ? (
+                              <BarbasolSpinner className="hybrid-preview-spinner" />
+                            ) : (
+                              <Image
+                                alt={`${pendingHybridFusionReward.secondDinosaurName} preview`}
+                                className="hybrid-preview-image"
+                                height={180}
+                                loading="lazy"
+                                src={pendingHybridSecondPreviewImagePath}
+                                width={180}
+                              />
+                            )}
                           </div>
                           <p className="hybrid-preview-name">
                             {pendingHybridFusionReward.secondDinosaurName}
@@ -2581,12 +2620,7 @@ export default function Home() {
                           Synthesizing {pendingHybridFusionReward.hybridName}. Opening the hybrid dossier when
                           sequencing completes.
                         </p>
-                        <div className="hybrid-fusion-bars" aria-hidden="true">
-                          <span className="hybrid-fusion-bar" />
-                          <span className="hybrid-fusion-bar" />
-                          <span className="hybrid-fusion-bar" />
-                          <span className="hybrid-fusion-bar" />
-                        </div>
+                        <BarbasolSpinner className="hybrid-fusion-spinner" />
                       </section>
                       <div className="hybrid-lab-actions">
                         <button className="jp-button jp-button-secondary" disabled type="button">
@@ -2672,18 +2706,22 @@ export default function Home() {
                         <article className="hybrid-preview-card" data-hybrid-preview-slot="first">
                           <div className="hybrid-preview-thumb">
                             {firstHybridPreviewImagePath ? (
-                              <Image
-                                alt={
-                                  hybridLabFirstDinosaurName.length > 0
-                                    ? `${hybridLabFirstDinosaurName} preview`
-                                    : "First dinosaur preview placeholder"
-                                }
-                                className="hybrid-preview-image"
-                                height={180}
-                                loading="lazy"
-                                src={firstHybridPreviewImagePath}
-                                width={180}
-                              />
+                              isProvisionalRewardImagePath(firstHybridPreviewImagePath) ? (
+                                <BarbasolSpinner className="hybrid-preview-spinner" />
+                              ) : (
+                                <Image
+                                  alt={
+                                    hybridLabFirstDinosaurName.length > 0
+                                      ? `${hybridLabFirstDinosaurName} preview`
+                                      : "First dinosaur preview placeholder"
+                                  }
+                                  className="hybrid-preview-image"
+                                  height={180}
+                                  loading="lazy"
+                                  src={firstHybridPreviewImagePath}
+                                  width={180}
+                                />
+                              )
                             ) : (
                               <span className="hybrid-preview-placeholder">Awaiting selection</span>
                             )}
@@ -2698,18 +2736,22 @@ export default function Home() {
                         <article className="hybrid-preview-card" data-hybrid-preview-slot="second">
                           <div className="hybrid-preview-thumb">
                             {secondHybridPreviewImagePath ? (
-                              <Image
-                                alt={
-                                  hybridLabSecondDinosaurName.length > 0
-                                    ? `${hybridLabSecondDinosaurName} preview`
-                                    : "Second dinosaur preview placeholder"
-                                }
-                                className="hybrid-preview-image"
-                                height={180}
-                                loading="lazy"
-                                src={secondHybridPreviewImagePath}
-                                width={180}
-                              />
+                              isProvisionalRewardImagePath(secondHybridPreviewImagePath) ? (
+                                <BarbasolSpinner className="hybrid-preview-spinner" />
+                              ) : (
+                                <Image
+                                  alt={
+                                    hybridLabSecondDinosaurName.length > 0
+                                      ? `${hybridLabSecondDinosaurName} preview`
+                                      : "Second dinosaur preview placeholder"
+                                  }
+                                  className="hybrid-preview-image"
+                                  height={180}
+                                  loading="lazy"
+                                  src={secondHybridPreviewImagePath}
+                                  width={180}
+                                />
+                              )
                             ) : (
                               <span className="hybrid-preview-placeholder">Awaiting selection</span>
                             )}
