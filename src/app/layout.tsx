@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Alegreya_Sans, Cinzel, IBM_Plex_Mono } from "next/font/google";
+import { Alegreya_Sans, Cinzel, IBM_Plex_Mono, Orbitron } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
@@ -11,6 +11,12 @@ const jurassicDisplay = Cinzel({
   variable: "--font-jurassic-display",
   subsets: ["latin"],
   weight: ["600", "700"],
+});
+
+// Self-hosted like the other faces; was previously a render-blocking CDN link.
+const jurassicTechy = Orbitron({
+  variable: "--font-orbitron",
+  subsets: ["latin"],
 });
 
 const jurassicBody = Alegreya_Sans({
@@ -37,16 +43,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link href="https://fonts.googleapis.com" rel="preconnect" />
-        <link crossOrigin="" href="https://fonts.gstatic.com" rel="preconnect" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap"
-          rel="stylesheet"
-        />
-      </head>
       <body
-        className={`${jurassicDisplay.variable} ${jurassicBody.variable} ${jurassicMono.variable} antialiased`}
+        className={`${jurassicDisplay.variable} ${jurassicBody.variable} ${jurassicMono.variable} ${jurassicTechy.variable} antialiased`}
       >
         <UiSoundEffects />
         <div className="jp3-frame" data-ui-frame="wood-border">

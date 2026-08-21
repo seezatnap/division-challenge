@@ -29,6 +29,16 @@ type RewardRevealLoaderPhase = "hatching" | "cracking";
 const CRACKING_PHASE_DURATION_MS = 280;
 const REVEALING_PHASE_DURATION_MS = 220;
 
+// Rotating kid-friendly lines for the hatching wait; the poll attempt number
+// stays internal — "Poll attempt 12" reads like a debug log to an 8-year-old.
+const HATCHING_WAIT_LINES = [
+  "Warming up the incubator...",
+  "Listening for little shell taps...",
+  "Counting tiny toeprints in the nest...",
+  "Calibrating the egg scanner...",
+  "Shhh — keep quiet near the nest...",
+] as const;
+
 export interface EarnedRewardRevealPanelProps {
   dinosaurName: string;
   milestoneSolvedCount: number;
@@ -37,6 +47,18 @@ export interface EarnedRewardRevealPanelProps {
   pollIntervalMs?: number;
   maxPollAttempts?: number;
   statusEndpoint?: string;
+  /**
+   * Pop the full-screen reveal modal automatically once the image is ready.
+   * The page turns this off for a reward restored from a saved profile, so a
+   * dino unlocked last week doesn't re-announce itself on every page load.
+   */
+  autoOpenRevealModal?: boolean;
+  /**
+   * "panel" renders the in-page hatching card plus the reveal modal;
+   * "modal-only" keeps the polling and the celebration modal but renders no
+   * in-page card (the gallery tile already shows the generating state).
+   */
+  presentation?: "panel" | "modal-only";
 }
 
 function createRewardRevealResetKey(
@@ -90,6 +112,8 @@ function EarnedRewardRevealPanelContent({
   pollIntervalMs,
   maxPollAttempts,
   statusEndpoint,
+  autoOpenRevealModal = true,
+  presentation = "panel",
 }: EarnedRewardRevealPanelProps) {
   const [phase, setPhase] = useState<RewardRevealPhase>(() =>
     toInitialRevealPhase(initialStatus, initialImagePath),
@@ -197,13 +221,18 @@ function EarnedRewardRevealPanelContent({
   }, [dinosaurName, imagePath, milestoneSolvedCount, phase]);
 
   useEffect(() => {
-    if (phase !== "revealed" || !imagePath || didAutoOpenRevealModalRef.current) {
+    if (
+      !autoOpenRevealModal ||
+      phase !== "revealed" ||
+      !imagePath ||
+      didAutoOpenRevealModalRef.current
+    ) {
       return;
     }
 
     didAutoOpenRevealModalRef.current = true;
     setIsRevealModalOpen(true);
-  }, [imagePath, phase]);
+  }, [autoOpenRevealModal, imagePath, phase]);
 
   useEffect(() => {
     if (!isRevealModalOpen) {
@@ -235,6 +264,7 @@ function EarnedRewardRevealPanelContent({
 
   return (
     <>
+      {presentation === "panel" ? (
       <article
         className="earned-reward-panel"
         data-reward-motion={isRewardTransitionPhase(phase) ? phase : "fallback"}
@@ -258,7 +288,8 @@ function EarnedRewardRevealPanelContent({
               alt={`${dinosaurName} reward image`}
               className="reward-reveal-image"
               height={540}
-              loading="lazy"
+              // Above the fold when a hatch lands, so skip the lazy round-trip.
+              priority
               src={imagePath}
               width={960}
             />
@@ -282,7 +313,8 @@ function EarnedRewardRevealPanelContent({
               <>
                 <p className="reward-loader-title">The reward egg is hatching...</p>
                 <p className="reward-loader-copy">
-                  Checking generation status for {dinosaurName}. Poll attempt {pollAttempt}.
+                  {dinosaurName}:{" "}
+                  {HATCHING_WAIT_LINES[pollAttempt % HATCHING_WAIT_LINES.length]}
                 </p>
               </>
             )}
@@ -307,6 +339,7 @@ function EarnedRewardRevealPanelContent({
           </p>
         ) : null}
       </article>
+      ) : null}
 
       {isRevealModalOpen && imagePath && modalHost
         ? createPortal(

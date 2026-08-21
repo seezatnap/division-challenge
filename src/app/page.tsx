@@ -68,9 +68,11 @@ import { LiveMultiplicationWorkspacePanel } from "@/features/workspace-ui/compon
 import {
   MIN_PLAYER_PASSWORD_LENGTH,
   changePlayerPassword,
+  fetchCurrentPlayerSession,
   fetchPlayerProfileSnapshot,
   isPlayerAuthApiError,
   loginPlayer,
+  logoutPlayer,
   normalizePlayerProfileName,
   readPlayerProfileSnapshot,
   registerPlayer,
@@ -84,7 +86,7 @@ const ACCOUNT_NOTICE_DURATION_MS = 4000;
 const AUTH_SERVICE_UNREACHABLE_MESSAGE =
   "Unable to reach the InGen authentication service. Check your connection and try again.";
 
-const APP_BOOT_SPLASH_DURATION_MS = 2000;
+const APP_BOOT_SPLASH_MINIMUM_DURATION_MS = 480;
 
 const workspacePreviewProblem: DivisionProblem = {
   id: "workspace-preview-problem",
@@ -128,7 +130,6 @@ interface LiveGameSessionState {
   steps: readonly WorkspaceStep[];
   sessionSolvedProblems: number;
   sessionAttemptedProblems: number;
-  currentStreak: number;
   totalProblemsSolved: number;
   totalProblemsAttempted: number;
   solvedByMode: SolvedCountByMode;
@@ -147,10 +148,13 @@ interface ActiveRewardRevealState {
   initialImagePath: string | null;
 }
 
+function toRewardRevealIdentityKey(reveal: ActiveRewardRevealState): string {
+  return `${reveal.dinosaurName}|${reveal.milestoneSolvedCount}`;
+}
+
 interface PersistedPlayerGameSessionSnapshot {
   totalProblemsSolved: number;
   totalProblemsAttempted: number;
-  currentStreak: number;
   solvedByMode: SolvedCountByMode;
   preferredGameMode: GameModeChoice;
   preferredDifficulty: DifficultyChoice;
@@ -169,8 +173,8 @@ const INITIAL_TOTAL_PROBLEMS_SOLVED = 0;
 const INITIAL_TOTAL_PROBLEMS_ATTEMPTED = 0;
 const INITIAL_SESSION_PROBLEMS_SOLVED = 0;
 const INITIAL_SESSION_PROBLEMS_ATTEMPTED = 0;
-const AMBER_COST_PER_DINO_UNLOCK = 10;
-const AMBER_COST_PER_HYBRID_CREATION = 8;
+const AMBER_COST_PER_DINO_UNLOCK = 20;
+const AMBER_COST_PER_HYBRID_CREATION = 16;
 const AMBER_REWARD_ASSET_NAME = "Amber Resonance Crystal";
 const LIVE_PROBLEM_MIN_DIVISOR = 3;
 const LIVE_PROBLEM_MAX_DIVISOR = 12;
@@ -246,10 +250,22 @@ const ENGINE_LEVEL_BY_DIFFICULTY: Record<DifficultyChoice, number> = {
 };
 
 const AMBER_EARNED_BY_DIFFICULTY: Record<DifficultyChoice, number> = {
-  easy: 1,
-  medium: 2,
-  hard: 4,
+  easy: 2,
+  medium: 4,
+  hard: 8,
 };
+
+// Easy division and multiplication are quick wins, so they pay half the
+// easy rate; easy fractions still take real work and keep the full amount.
+const AMBER_EARNED_EASY_ARITHMETIC = 1;
+
+function resolveAmberEarned(mode: GameMode, difficulty: DifficultyChoice): number {
+  if (difficulty === "easy" && (mode === "division" || mode === "multiplication")) {
+    return AMBER_EARNED_EASY_ARITHMETIC;
+  }
+
+  return AMBER_EARNED_BY_DIFFICULTY[difficulty];
+}
 
 const DIFFICULTY_CHOICE_OPTIONS: readonly {
   value: DifficultyChoice;
@@ -561,7 +577,6 @@ function toPersistedPlayerProfileSnapshot(
     totalProblemsSolved,
     toNonNegativeInteger(gameSession.totalProblemsAttempted),
   );
-  const currentStreak = toNonNegativeInteger(gameSession.currentStreak);
   const amberBalance =
     typeof gameSession.amberBalance === "number"
       ? toNonNegativeInteger(gameSession.amberBalance)
@@ -575,7 +590,6 @@ function toPersistedPlayerProfileSnapshot(
     gameSession: {
       totalProblemsSolved,
       totalProblemsAttempted,
-      currentStreak,
       solvedByMode: toSolvedCountByMode(gameSession.solvedByMode, totalProblemsSolved),
       preferredGameMode: toGameModeChoice(gameSession.preferredGameMode),
       preferredDifficulty: toDifficultyChoice(gameSession.preferredDifficulty),
@@ -599,7 +613,6 @@ function toPersistedPlayerGameSessionSnapshot(
     totalProblemsSolved,
     toNonNegativeInteger(gameSession.totalProblemsAttempted),
   );
-  const currentStreak = toNonNegativeInteger(gameSession.currentStreak);
   const amberBalance =
     typeof gameSession.amberBalance === "number"
       ? toNonNegativeInteger(gameSession.amberBalance)
@@ -610,7 +623,6 @@ function toPersistedPlayerGameSessionSnapshot(
   return {
     totalProblemsSolved,
     totalProblemsAttempted,
-    currentStreak,
     solvedByMode: toSolvedCountByMode(gameSession.solvedByMode, totalProblemsSolved),
     preferredGameMode: toGameModeChoice(gameSession.preferredGameMode),
     preferredDifficulty: toDifficultyChoice(gameSession.preferredDifficulty),
@@ -911,7 +923,6 @@ const initialLiveGameSessionState: LiveGameSessionState = {
   steps: workspacePreviewSolution.steps,
   sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
   sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
-  currentStreak: 0,
   totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
   totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
   solvedByMode: { division: 0, multiplication: 0, fractions: 0 },
@@ -936,8 +947,7 @@ function createFreshLiveGameSessionState(): LiveGameSessionState {
     steps: workspacePreviewSolution.steps,
     sessionSolvedProblems: INITIAL_SESSION_PROBLEMS_SOLVED,
     sessionAttemptedProblems: INITIAL_SESSION_PROBLEMS_ATTEMPTED,
-    currentStreak: 0,
-    totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
+      totalProblemsSolved: INITIAL_TOTAL_PROBLEMS_SOLVED,
     totalProblemsAttempted: INITIAL_TOTAL_PROBLEMS_ATTEMPTED,
     solvedByMode: { division: 0, multiplication: 0, fractions: 0 },
     preferredGameMode: "division",
@@ -1029,7 +1039,6 @@ function hydrateLiveGameSessionState(
     ...baselineSession,
     totalProblemsSolved,
     totalProblemsAttempted,
-    currentStreak: toNonNegativeInteger(persistedState.currentStreak),
     solvedByMode: toSolvedCountByMode(persistedState.solvedByMode, totalProblemsSolved),
     preferredGameMode: toGameModeChoice(persistedState.preferredGameMode),
     preferredDifficulty: toDifficultyChoice(persistedState.preferredDifficulty),
@@ -1118,6 +1127,11 @@ export default function Home() {
   const [gameSession, setGameSession] = useState<LiveGameSessionState>(
     initialLiveGameSessionState,
   );
+  // Identity of the reveal that came out of a saved profile (if any). Only a
+  // reward unlocked during this session should auto-pop the reveal modal.
+  const [restoredRewardRevealKey, setRestoredRewardRevealKey] = useState<
+    string | null
+  >(null);
   const [activeRewardReveal, setActiveRewardReveal] =
     useState<ActiveRewardRevealState>(initialActiveRewardRevealState);
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
@@ -1141,6 +1155,10 @@ export default function Home() {
   const [rewardGenerationNotice, setRewardGenerationNotice] =
     useState<string | null>(null);
   const [isNextProblemReady, setIsNextProblemReady] = useState(false);
+  const [amberGain, setAmberGain] = useState<{
+    amount: number;
+    displayKey: number;
+  } | null>(null);
   const [isHybridLabOpen, setIsHybridLabOpen] = useState(false);
   const [hybridLabFirstDinosaurName, setHybridLabFirstDinosaurName] = useState("");
   const [hybridLabSecondDinosaurName, setHybridLabSecondDinosaurName] = useState("");
@@ -1154,17 +1172,43 @@ export default function Home() {
     useState<RewardDinosaurDossier | null>(null);
   const gameSessionRef = useRef<LiveGameSessionState>(gameSession);
   const completedProblemIdRef = useRef<string | null>(null);
-  const hadErrorInCurrentProblemRef = useRef(false);
   const nextProblemButtonRef = useRef<HTMLButtonElement | null>(null);
   const hybridDetailScrollRef = useRef<HTMLElement | null>(null);
+  const hasAttemptedSessionRestoreRef = useRef(false);
+  const amberBalanceRef = useRef(initialLiveGameSessionState.amberBalance);
 
   useEffect(() => {
     gameSessionRef.current = gameSession;
   }, [gameSession]);
 
+  // Celebrate amber earnings at the moment they land instead of silently
+  // bumping a number in the side panel.
+  useEffect(() => {
+    const previousBalance = amberBalanceRef.current;
+    amberBalanceRef.current = gameSession.amberBalance;
+
+    const delta = gameSession.amberBalance - previousBalance;
+    if (delta > 0) {
+      setAmberGain({ amount: delta, displayKey: Date.now() });
+    }
+  }, [gameSession.amberBalance]);
+
+  useEffect(() => {
+    if (!amberGain) {
+      return;
+    }
+
+    const clearGainTimeout = setTimeout(() => {
+      setAmberGain(null);
+    }, 1900);
+
+    return () => {
+      clearTimeout(clearGainTimeout);
+    };
+  }, [amberGain]);
+
   useEffect(() => {
     completedProblemIdRef.current = null;
-    hadErrorInCurrentProblemRef.current = false;
     setIsNextProblemReady(false);
   }, [gameSession.activeProblem.id]);
 
@@ -1238,15 +1282,239 @@ export default function Home() {
     : null;
   const modalHost = typeof document !== "undefined" ? document.body : null;
 
+  // Shared by password login and silent session restore: merges the browser
+  // backup and the shared profile, prefers whichever is further along, then
+  // opens the dashboard.
+  const hydrateProfileForPlayer = useCallback(
+    async (authenticatedPlayerName: string): Promise<void> => {
+      const normalizedPlayerName = normalizePlayerProfileName(authenticatedPlayerName);
+      const localPersistedProfile =
+        readPlayerProfileSnapshot<PersistedPlayerProfileSnapshot>(
+          window.localStorage,
+          normalizedPlayerName,
+        );
+      let remotePersistedProfile:
+        | {
+            schemaVersion: number;
+            playerName: string;
+            snapshot: PersistedPlayerProfileSnapshot;
+            updatedAtMs: number;
+          }
+        | null = null;
+      let remoteProfileReadError: Error | null = null;
+
+      try {
+        remotePersistedProfile =
+          await fetchPlayerProfileSnapshot<PersistedPlayerProfileSnapshot>({
+            playerName: normalizedPlayerName,
+          });
+      } catch (error) {
+        remoteProfileReadError =
+          error instanceof Error
+            ? error
+            : new Error("Unable to load shared player profile.");
+      }
+
+      const localValidSnapshot =
+        localPersistedProfile
+          ? toPersistedPlayerProfileSnapshot(localPersistedProfile.snapshot)
+          : null;
+      const remoteValidSnapshot =
+        remotePersistedProfile
+          ? toPersistedPlayerProfileSnapshot(remotePersistedProfile.snapshot)
+          : null;
+      const shouldPreferLocalOverRemote =
+        !!localValidSnapshot &&
+        !!remoteValidSnapshot &&
+        isLikelyMoreAdvancedProfileSnapshot(localValidSnapshot, remoteValidSnapshot);
+
+      if (remoteValidSnapshot && !shouldPreferLocalOverRemote) {
+        const hydratedSession = hydrateLiveGameSessionState(
+          remoteValidSnapshot.gameSession,
+        );
+        setGameSession(withFreshActiveProblem(hydratedSession));
+        setActiveRewardReveal(remoteValidSnapshot.activeRewardReveal);
+        setRestoredRewardRevealKey(
+          toRewardRevealIdentityKey(remoteValidSnapshot.activeRewardReveal),
+        );
+
+        if (isLocalProfileBackupEnabled) {
+          try {
+            writePlayerProfileSnapshot(
+              window.localStorage,
+              normalizedPlayerName,
+              remoteValidSnapshot,
+            );
+          } catch (error) {
+            if (isStorageQuotaExceededError(error)) {
+              setIsLocalProfileBackupEnabled(false);
+            } else {
+              console.error(
+                "Failed to store local backup after loading shared profile.",
+                error,
+              );
+            }
+          }
+        }
+
+        setSessionStartStatus(
+          `Loaded ${remotePersistedProfile?.playerName ?? normalizedPlayerName}'s shared profile.`,
+        );
+      } else if (localValidSnapshot && localPersistedProfile) {
+        const hydratedSession = hydrateLiveGameSessionState(
+          localValidSnapshot.gameSession,
+        );
+        setGameSession(withFreshActiveProblem(hydratedSession));
+        setActiveRewardReveal(localValidSnapshot.activeRewardReveal);
+        setRestoredRewardRevealKey(
+          toRewardRevealIdentityKey(localValidSnapshot.activeRewardReveal),
+        );
+
+        if (remoteProfileReadError) {
+          setSessionStartStatus(
+            `Loaded ${localPersistedProfile.playerName}'s profile from this browser. Shared sync is currently unavailable.`,
+          );
+        } else {
+          try {
+            await savePlayerProfileSnapshot({
+              playerName: normalizedPlayerName,
+              snapshot: localValidSnapshot,
+              updatedAtMs: Date.now(),
+            });
+            if (remoteValidSnapshot && shouldPreferLocalOverRemote) {
+              setSessionStartStatus(
+                `Loaded ${localPersistedProfile.playerName}'s profile from this browser and synced newer progress to shared storage.`,
+              );
+            } else {
+              setSessionStartStatus(
+                `Loaded ${localPersistedProfile.playerName}'s profile from this browser and synced it to shared storage.`,
+              );
+            }
+          } catch (error) {
+            console.error(
+              "Failed to sync local profile snapshot to shared storage.",
+              error,
+            );
+            setSessionStartStatus(
+              `Loaded ${localPersistedProfile.playerName}'s profile from this browser. Shared sync is currently unavailable.`,
+            );
+          }
+        }
+      } else {
+        const freshSession = createFreshLiveGameSessionState();
+        setGameSession(withFreshActiveProblem(freshSession));
+        setActiveRewardReveal({
+          ...resolveNextRewardTarget(freshSession.unlockedRewards.length),
+          initialStatus: "missing",
+          initialImagePath: null,
+        });
+        setRestoredRewardRevealKey(null);
+
+        if (remoteProfileReadError) {
+          setSessionStartStatus(
+            "Started a new profile for this player. Shared sync is currently unavailable.",
+          );
+        } else {
+          setSessionStartStatus("Started a new profile for this player.");
+        }
+      }
+
+      if (remoteProfileReadError) {
+        console.error(
+          "Failed to load shared player profile; used browser backup/new profile.",
+          remoteProfileReadError,
+        );
+      }
+
+      completedProblemIdRef.current = null;
+      setIsNextProblemReady(false);
+      setActivePlayerName(normalizedPlayerName);
+      setPlayerNameDraft(normalizedPlayerName);
+      setPasswordDraft("");
+      setConfirmPasswordDraft("");
+      setAuthMode("login");
+      setIsSessionStarted(true);
+    },
+    [isLocalProfileBackupEnabled],
+  );
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await logoutPlayer();
+    } catch (error) {
+      console.error("Failed to end the operator session.", error);
+    }
+
+    completedProblemIdRef.current = null;
+    setActivePlayerName(null);
+    setGameSession(initialLiveGameSessionState);
+    setActiveRewardReveal(initialActiveRewardRevealState);
+    setRestoredRewardRevealKey(null);
+    setPasswordDraft("");
+    setConfirmPasswordDraft("");
+    setCurrentPasswordDraft("");
+    setNewPasswordDraft("");
+    setConfirmNewPasswordDraft("");
+    setIsChangePasswordOpen(false);
+    setIsHybridLabOpen(false);
+    setSelectedHybridReward(null);
+    setSelectedHybridDossier(null);
+    setIsHybridFusionInProgress(false);
+    setPendingHybridFusionReward(null);
+    setAccountNotice(null);
+    setSessionStartError(null);
+    setSessionStartStatus(null);
+    setRewardGenerationNotice(null);
+    setIsNextProblemReady(false);
+    setIsSessionStarted(false);
+  }, []);
+
   useEffect(() => {
-    const bootSplashTimeout = setTimeout(() => {
-      setIsBootSplashActive(false);
-    }, APP_BOOT_SPLASH_DURATION_MS);
+    if (hasAttemptedSessionRestoreRef.current) {
+      return;
+    }
+    hasAttemptedSessionRestoreRef.current = true;
+
+    let didCancel = false;
+    const minimumSplashDelay = new Promise((resolve) => {
+      setTimeout(resolve, APP_BOOT_SPLASH_MINIMUM_DURATION_MS);
+    });
+
+    // The httpOnly operator cookie is still valid for up to 30 days, so a
+    // returning player should land straight on their dashboard instead of
+    // re-typing credentials on every visit.
+    void (async () => {
+      try {
+        const sessionPlayer = await fetchCurrentPlayerSession();
+        if (didCancel) {
+          return;
+        }
+
+        if (sessionPlayer) {
+          await hydrateProfileForPlayer(sessionPlayer.playerName);
+          await minimumSplashDelay;
+          if (!didCancel) {
+            setIsBootSplashActive(false);
+          }
+          return;
+        }
+      } catch (error) {
+        console.error(
+          "Session restore failed; falling back to the login panel.",
+          error,
+        );
+      }
+
+      await minimumSplashDelay;
+      if (!didCancel) {
+        setIsBootSplashActive(false);
+      }
+    })();
 
     return () => {
-      clearTimeout(bootSplashTimeout);
+      didCancel = true;
     };
-  }, []);
+  }, [hydrateProfileForPlayer]);
 
   useEffect(() => {
     if (
@@ -1502,149 +1770,7 @@ export default function Home() {
           throw error;
         }
 
-        const normalizedPlayerName = normalizePlayerProfileName(
-          authenticatedPlayer.playerName,
-        );
-        const localPersistedProfile =
-          readPlayerProfileSnapshot<PersistedPlayerProfileSnapshot>(
-            window.localStorage,
-            normalizedPlayerName,
-          );
-        let remotePersistedProfile:
-          | {
-              schemaVersion: number;
-              playerName: string;
-              snapshot: PersistedPlayerProfileSnapshot;
-              updatedAtMs: number;
-            }
-          | null = null;
-        let remoteProfileReadError: Error | null = null;
-
-        try {
-          remotePersistedProfile =
-            await fetchPlayerProfileSnapshot<PersistedPlayerProfileSnapshot>({
-              playerName: normalizedPlayerName,
-            });
-        } catch (error) {
-          remoteProfileReadError =
-            error instanceof Error
-              ? error
-              : new Error("Unable to load shared player profile.");
-        }
-
-        const localValidSnapshot =
-          localPersistedProfile
-            ? toPersistedPlayerProfileSnapshot(localPersistedProfile.snapshot)
-            : null;
-        const remoteValidSnapshot =
-          remotePersistedProfile
-            ? toPersistedPlayerProfileSnapshot(remotePersistedProfile.snapshot)
-            : null;
-        const shouldPreferLocalOverRemote =
-          !!localValidSnapshot &&
-          !!remoteValidSnapshot &&
-          isLikelyMoreAdvancedProfileSnapshot(localValidSnapshot, remoteValidSnapshot);
-
-        if (remoteValidSnapshot && !shouldPreferLocalOverRemote) {
-          const hydratedSession = hydrateLiveGameSessionState(
-            remoteValidSnapshot.gameSession,
-          );
-          setGameSession(withFreshActiveProblem(hydratedSession));
-          setActiveRewardReveal(remoteValidSnapshot.activeRewardReveal);
-
-          if (isLocalProfileBackupEnabled) {
-            try {
-              writePlayerProfileSnapshot(
-                window.localStorage,
-                normalizedPlayerName,
-                remoteValidSnapshot,
-              );
-            } catch (error) {
-              if (isStorageQuotaExceededError(error)) {
-                setIsLocalProfileBackupEnabled(false);
-              } else {
-                console.error(
-                  "Failed to store local backup after loading shared profile.",
-                  error,
-                );
-              }
-            }
-          }
-
-          setSessionStartStatus(
-            `Loaded ${remotePersistedProfile?.playerName ?? normalizedPlayerName}'s shared profile.`,
-          );
-        } else if (localValidSnapshot && localPersistedProfile) {
-          const hydratedSession = hydrateLiveGameSessionState(
-            localValidSnapshot.gameSession,
-          );
-          setGameSession(withFreshActiveProblem(hydratedSession));
-          setActiveRewardReveal(localValidSnapshot.activeRewardReveal);
-
-          if (remoteProfileReadError) {
-            setSessionStartStatus(
-              `Loaded ${localPersistedProfile.playerName}'s profile from this browser. Shared sync is currently unavailable.`,
-            );
-          } else {
-            try {
-              await savePlayerProfileSnapshot({
-                playerName: normalizedPlayerName,
-                snapshot: localValidSnapshot,
-                updatedAtMs: Date.now(),
-              });
-              if (remoteValidSnapshot && shouldPreferLocalOverRemote) {
-                setSessionStartStatus(
-                  `Loaded ${localPersistedProfile.playerName}'s profile from this browser and synced newer progress to shared storage.`,
-                );
-              } else {
-                setSessionStartStatus(
-                  `Loaded ${localPersistedProfile.playerName}'s profile from this browser and synced it to shared storage.`,
-                );
-              }
-            } catch (error) {
-              console.error(
-                "Failed to sync local profile snapshot to shared storage.",
-                error,
-              );
-              setSessionStartStatus(
-                `Loaded ${localPersistedProfile.playerName}'s profile from this browser. Shared sync is currently unavailable.`,
-              );
-            }
-          }
-        } else {
-          const freshSession = createFreshLiveGameSessionState();
-          setGameSession(withFreshActiveProblem(freshSession));
-          setActiveRewardReveal({
-            ...resolveNextRewardTarget(freshSession.unlockedRewards.length),
-            initialStatus: "missing",
-            initialImagePath: null,
-          });
-
-          if (remoteProfileReadError) {
-            setSessionStartStatus(
-              "Started a new profile for this player. Shared sync is currently unavailable.",
-            );
-          } else {
-            setSessionStartStatus("Started a new profile for this player.");
-          }
-        }
-
-        if (remoteProfileReadError) {
-          console.error(
-            "Failed to load shared player profile; used browser backup/new profile.",
-            remoteProfileReadError,
-          );
-        }
-
-        completedProblemIdRef.current = null;
-        hadErrorInCurrentProblemRef.current = false;
-        setIsNextProblemReady(false);
-        setActivePlayerName(normalizedPlayerName);
-        setPlayerNameDraft(normalizedPlayerName);
-        setPasswordDraft("");
-        setConfirmPasswordDraft("");
-        setAuthMode("login");
-        setIsSessionStarted(true);
+        await hydrateProfileForPlayer(authenticatedPlayer.playerName);
       } catch (error) {
         setSessionStartError(
           error instanceof Error ? error.message : "Unable to start this player profile.",
@@ -1656,7 +1782,7 @@ export default function Home() {
     [
       authMode,
       confirmPasswordDraft,
-      isLocalProfileBackupEnabled,
+      hydrateProfileForPlayer,
       passwordDraft,
       playerNameDraft,
     ],
@@ -2118,7 +2244,6 @@ export default function Home() {
 
   const advanceToNextProblem = useCallback(() => {
     const currentState = gameSessionRef.current;
-    const solvedWithoutErrors = !hadErrorInCurrentProblemRef.current;
     const nextSolvedByMode = incrementSolvedByMode(currentState);
     const next = resolveNextProblemAfterSolve(currentState);
 
@@ -2128,9 +2253,6 @@ export default function Home() {
       steps: next.steps,
       sessionSolvedProblems: currentState.sessionSolvedProblems + 1,
       sessionAttemptedProblems: currentState.sessionAttemptedProblems + 1,
-      currentStreak: solvedWithoutErrors
-        ? currentState.currentStreak + 1
-        : 0,
       totalProblemsSolved: currentState.totalProblemsSolved + 1,
       totalProblemsAttempted: currentState.totalProblemsAttempted + 1,
       solvedByMode: nextSolvedByMode,
@@ -2138,7 +2260,7 @@ export default function Home() {
       preferredDifficulty: currentState.preferredDifficulty,
       amberBalance:
         currentState.amberBalance +
-        AMBER_EARNED_BY_DIFFICULTY[currentState.preferredDifficulty],
+        resolveAmberEarned(currentState.activeMode, currentState.preferredDifficulty),
       amberImagePath: currentState.amberImagePath,
       unlockedRewards: currentState.unlockedRewards,
       unlockedHybrids: currentState.unlockedHybrids,
@@ -2308,10 +2430,6 @@ export default function Home() {
 
   const handleWorkspaceStepValidation = useCallback(
     (validation: LongDivisionStepValidationResult) => {
-      if (validation.outcome === "incorrect") {
-        hadErrorInCurrentProblemRef.current = true;
-      }
-
       if (!validation.didAdvance || validation.outcome !== "complete") {
         return;
       }
@@ -2341,10 +2459,6 @@ export default function Home() {
 
     completedProblemIdRef.current = problemId;
     setIsNextProblemReady(true);
-  }, []);
-
-  const handleFractionIncorrectAttempt = useCallback(() => {
-    hadErrorInCurrentProblemRef.current = true;
   }, []);
 
   const activeLaneLabel =
@@ -2523,23 +2637,38 @@ export default function Home() {
     <main className="jurassic-shell">
       <div className="jurassic-content">
         <header className="jurassic-panel jurassic-hero motif-canopy">
-          <div className="hero-account-bar" data-ui-surface="account-bar">
-            <button
-              aria-haspopup="dialog"
-              className="text-link-button hero-account-link"
-              data-ui-action="open-change-password"
-              onClick={openChangePasswordModal}
-              type="button"
-            >
-              Change password
-            </button>
-            {accountNotice ? (
-              <span className="hero-account-notice" role="status">
-                {accountNotice}
-              </span>
-            ) : null}
+          <div className="hero-top-row">
+            <div className="hero-account-bar" data-ui-surface="account-bar">
+              <button
+                aria-haspopup="dialog"
+                className="text-link-button hero-account-link"
+                data-ui-action="open-change-password"
+                onClick={openChangePasswordModal}
+                type="button"
+              >
+                Change password
+              </button>
+              <button
+                className="text-link-button hero-account-link"
+                data-ui-action="logout"
+                onClick={handleLogout}
+                type="button"
+              >
+                Log out
+              </button>
+              {activePlayerName ? (
+                <span className="hero-account-operator" data-ui-surface="operator-badge">
+                  Operator: {activePlayerName}
+                </span>
+              ) : null}
+              {accountNotice ? (
+                <span className="hero-account-notice" role="status">
+                  {accountNotice}
+                </span>
+              ) : null}
+            </div>
+            <p className="eyebrow">Dinosaur Genomic Sequencing Console</p>
           </div>
-          <p className="eyebrow">Dinosaur Genomic Sequencing Console</p>
           <h1 className="hero-title">
             {gameSession.activeMode === "fractions"
               ? "InGen Fraction Dashboard"
@@ -2547,6 +2676,15 @@ export default function Home() {
                 ? "InGen Multiplication Dashboard"
                 : "InGen Division Dashboard"}
           </h1>
+          <div className="hero-stats-row" data-ui-surface="hero-stats">
+            <span className="hero-stat-value">{gameSession.totalProblemsSolved}</span>
+            <span className="hero-stat-label">problems solved</span>
+            <span aria-hidden="true" className="hero-stat-divider">
+              ·
+            </span>
+            <span className="hero-stat-value">{gameSession.sessionSolvedProblems}</span>
+            <span className="hero-stat-label">this session</span>
+          </div>
         </header>
 
         <div className="jurassic-layout">
@@ -2566,7 +2704,9 @@ export default function Home() {
                       : "DNA Division Sequencer"}
                 </h2>
               </div>
-              <p className="status-chip">
+              {/* Screen-reader progress readout; the sighted dashboard shows
+                  this data in the hero stats and amber counter instead. */}
+              <p className="status-chip fraction-announcement">
                 Mode: {activeModeLabel} | Live target: {activeLaneLabel} | Player:{" "}
                 {activePlayerName} | Solved: {gameSession.totalProblemsSolved} | Amber:{" "}
                 {gameSession.amberBalance}
@@ -2609,7 +2749,7 @@ export default function Home() {
                     >
                       {option.label}
                       <span className="mode-toggle-points">
-                        +{AMBER_EARNED_BY_DIFFICULTY[option.value]}
+                        +{resolveAmberEarned(gameSession.activeMode, option.value)}
                       </span>
                     </button>
                   ))}
@@ -2621,7 +2761,6 @@ export default function Home() {
             isFractionProblem(gameSession.activeProblem) ? (
               <FractionReductionPanel
                 key={gameSession.activeProblem.id}
-                onIncorrectAttempt={handleFractionIncorrectAttempt}
                 onProblemSolved={handleFractionProblemSolved}
                 problem={gameSession.activeProblem}
               />
@@ -2648,13 +2787,16 @@ export default function Home() {
             {isNextProblemReady ? (
               <div className="next-problem-action-row">
                 <button
-                  className="jp-button"
+                  className="jp-button jp-button-cta"
                   data-ui-action="next-problem"
                   onClick={advanceToNextProblem}
                   ref={nextProblemButtonRef}
                   type="button"
                 >
-                  NEXT
+                  Next Problem
+                  <span aria-hidden="true" className="jp-button-cta-arrow">
+                    →
+                  </span>
                 </button>
               </div>
             ) : null}
@@ -2684,19 +2826,21 @@ export default function Home() {
                       alt="Amber currency crystal"
                       className="amber-bank-image"
                       height={120}
-                      loading="lazy"
+                      loading="eager"
                       src={gameSession.amberImagePath}
                       width={120}
                     />
                   )}
                 </div>
-                <div className="amber-bank-copy">
-                  <p className="amber-bank-balance">Amber: {gameSession.amberBalance}</p>
-                  <p className="amber-bank-note">
-                    Amber per solve: Easy +{AMBER_EARNED_BY_DIFFICULTY.easy}, Medium +
-                    {AMBER_EARNED_BY_DIFFICULTY.medium}, Hard +{AMBER_EARNED_BY_DIFFICULTY.hard}.
-                  </p>
-                </div>
+                <p className="amber-bank-balance" role="status">
+                  {gameSession.amberBalance}
+                  <span className="amber-bank-currency-word">amber</span>
+                  {amberGain ? (
+                    <span className="amber-gain-pop" key={amberGain.displayKey}>
+                      +{amberGain.amount}
+                    </span>
+                  ) : null}
+                </p>
               </section>
 
               <div className="amber-actions">
@@ -2712,17 +2856,20 @@ export default function Home() {
                 <button
                   className="jp-button jp-button-secondary"
                   data-ui-action="open-hybrid-lab"
-                  disabled={unlockedPrimaryDinosaurNames.length < 2}
+                  disabled={
+                    unlockedPrimaryDinosaurNames.length < 2 || !hasEnoughAmberForHybrid
+                  }
                   onClick={openHybridLab}
                   type="button"
                 >
                   Open Hybrid Lab ({AMBER_COST_PER_HYBRID_CREATION} Amber)
                 </button>
               </div>
-
-              <p className="amber-actions-note">
-                Next unlock: {resolveNextRewardTarget(gameSession.unlockedRewards.length).dinosaurName}
-              </p>
+              {rewardGenerationNotice ? (
+                <p className="amber-actions-notice" role="status">
+                  {rewardGenerationNotice}
+                </p>
+              ) : null}
 
               <DinoGalleryPanel unlockedRewards={gameSession.unlockedRewards} />
             </section>
@@ -2775,16 +2922,6 @@ export default function Home() {
                           />
                         </div>
                         <p className="gallery-name">{hybridReward.hybridName}</p>
-                        <p className="gallery-meta">
-                          Created{" "}
-                          <time dateTime={hybridReward.createdAt}>
-                            {new Intl.DateTimeFormat("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            }).format(new Date(hybridReward.createdAt))}
-                          </time>
-                        </p>
                       </button>
                     </article>
                   ))}
@@ -2792,34 +2929,21 @@ export default function Home() {
               )}
             </section>
 
-            <section
-              aria-labelledby="earned-reward-surface-heading"
-              className="jurassic-panel motif-canopy"
-              data-ui-surface="earned-reward"
-            >
-              <div className="surface-header">
-                <div>
-                  <p className="surface-kicker">Reward Hatch</p>
-                  <h2 className="surface-title" id="earned-reward-surface-heading">
-                    Newly Earned Dino
-                  </h2>
-                </div>
-              </div>
-
-              <EarnedRewardRevealPanel
-                dinosaurName={activeRewardReveal.dinosaurName}
-                initialImagePath={activeRewardReveal.initialImagePath}
-                initialStatus={activeRewardReveal.initialStatus}
-                maxPollAttempts={20}
-                milestoneSolvedCount={activeRewardReveal.milestoneSolvedCount}
-                pollIntervalMs={600}
-              />
-              {rewardGenerationNotice ? (
-                <p className="reward-loader-copy" role="status">
-                  {rewardGenerationNotice}
-                </p>
-              ) : null}
-            </section>
+            {/* Hatching runs headless; the only UI is the unlock celebration modal.
+                The gallery tile's spinner already shows an image still generating. */}
+            <EarnedRewardRevealPanel
+              autoOpenRevealModal={
+                toRewardRevealIdentityKey(activeRewardReveal) !==
+                restoredRewardRevealKey
+              }
+              dinosaurName={activeRewardReveal.dinosaurName}
+              initialImagePath={activeRewardReveal.initialImagePath}
+              initialStatus={activeRewardReveal.initialStatus}
+              maxPollAttempts={20}
+              milestoneSolvedCount={activeRewardReveal.milestoneSolvedCount}
+              pollIntervalMs={600}
+              presentation="modal-only"
+            />
           </div>
         </div>
       </div>
@@ -2861,7 +2985,7 @@ export default function Home() {
                                 height={180}
                                 loading="lazy"
                                 src={pendingHybridFirstPreviewImagePath}
-                                width={180}
+                                width={240}
                               />
                             )}
                           </div>
@@ -2883,7 +3007,7 @@ export default function Home() {
                                 height={180}
                                 loading="lazy"
                                 src={pendingHybridSecondPreviewImagePath}
-                                width={180}
+                                width={240}
                               />
                             )}
                           </div>
@@ -2997,7 +3121,7 @@ export default function Home() {
                                   height={180}
                                   loading="lazy"
                                   src={firstHybridPreviewImagePath}
-                                  width={180}
+                                  width={240}
                                 />
                               )
                             ) : (
@@ -3027,7 +3151,7 @@ export default function Home() {
                                   height={180}
                                   loading="lazy"
                                   src={secondHybridPreviewImagePath}
-                                  width={180}
+                                  width={240}
                                 />
                               )
                             ) : (

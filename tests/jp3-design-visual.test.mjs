@@ -709,7 +709,7 @@ test("gallery visual: pixel sampling of rendered tile centers confirms green fil
   }
 });
 
-test("gallery visual: gallery-card tiles have square aspect ratio", { concurrency: false }, async () => {
+test("gallery visual: gallery-card tiles have a 4:3 landscape aspect ratio", { concurrency: false }, async () => {
   const { context, page } = await createGalleryPage();
 
   try {
@@ -727,8 +727,8 @@ test("gallery visual: gallery-card tiles have square aspect ratio", { concurrenc
       const { width, height } = tileDimensions[i];
       const aspectRatio = width / height;
       assert.ok(
-        Math.abs(aspectRatio - 1) < 0.15,
-        `Expected tile ${i} to be approximately square (aspect ratio ~1). Got width=${width.toFixed(1)}, height=${height.toFixed(1)}, ratio=${aspectRatio.toFixed(2)}.`,
+        Math.abs(aspectRatio - 4 / 3) < 0.15,
+        `Expected tile ${i} to be approximately 4:3 (aspect ratio ~1.33). Got width=${width.toFixed(1)}, height=${height.toFixed(1)}, ratio=${aspectRatio.toFixed(2)}.`,
       );
     }
   } finally {

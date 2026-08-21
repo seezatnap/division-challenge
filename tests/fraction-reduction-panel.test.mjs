@@ -129,10 +129,6 @@ test("the page offers fraction mode and renders the panel for it", async () => {
     source.includes("onProblemSolved={handleFractionProblemSolved}"),
     "Expected the solved callback to be wired",
   );
-  assert.ok(
-    source.includes("onIncorrectAttempt={handleFractionIncorrectAttempt}"),
-    "Expected wrong answers to break the streak like other modes",
-  );
   // Retired mode must not linger in the mode plumbing.
   assert.ok(!source.includes('=== "mixed"'), "Expected the mixed-mode branch to be gone");
 });

@@ -35,7 +35,7 @@ test("gallery panel includes reward image, earned date output, empty-state copy,
 
   for (const fragment of [
     "No dinos unlocked yet.",
-    "Solve your first 5 division problems",
+    "Solve problems to bank amber",
     "<Image",
     "<time dateTime={selectedReward.earnedAt}>",
     'aria-haspopup="dialog"',

@@ -52,11 +52,13 @@ test("earned reward panel resets reveal state when reward identity props change"
   }
 });
 
-test("home page renders the earned reward reveal surface", async () => {
+test("home page mounts the earned reward reveal in modal-only mode", async () => {
   const source = await readRepoFile("src/app/page.tsx");
 
+  // The always-visible "Reward Hatch" card was retired as redundant with the
+  // gallery; the reveal panel still mounts for polling + the unlock modal.
   for (const fragment of [
-    'data-ui-surface="earned-reward"',
+    'presentation="modal-only"',
     "<EarnedRewardRevealPanel",
     "milestoneSolvedCount={activeRewardReveal.milestoneSolvedCount}",
   ]) {

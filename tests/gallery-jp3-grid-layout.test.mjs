@@ -19,8 +19,8 @@ test("gallery grid CSS uses a fixed 3-column layout matching JP3 Research Center
     "Expected gallery-grid to use a fixed 3-column grid (repeat(3, 1fr))",
   );
   assert.ok(
-    source.includes(".gallery-card") && source.includes("aspect-ratio: 1"),
-    "Expected gallery-card tiles to have square aspect-ratio (aspect-ratio: 1)",
+    source.includes(".gallery-card") && source.includes("aspect-ratio: 4 / 3"),
+    "Expected gallery-card tiles to have a 4:3 landscape aspect-ratio (aspect-ratio: 4 / 3)",
   );
 });
 
@@ -37,12 +37,12 @@ test("gallery card tiles have bright green backgrounds matching JP3 green panels
   );
 });
 
-test("gallery thumbnail images use object-fit contain for centering within tiles", async () => {
+test("gallery thumbnail images use object-fit cover to fill tiles edge to edge", async () => {
   const source = await readRepoFile("src/app/globals.css");
 
   assert.ok(
-    source.includes(".gallery-image") && source.includes("object-fit: contain"),
-    "Expected gallery-image to use object-fit: contain for centered dinosaur display",
+    source.includes(".gallery-image") && source.includes("object-fit: cover"),
+    "Expected gallery-image to use object-fit: cover so the dinosaur fills the tile",
   );
 });
 
@@ -59,6 +59,16 @@ test("gallery name labels are uppercase with cream color matching JP3 comp style
   );
 });
 
+test("gallery name sits in a green bar at the bottom of the tile", async () => {
+  const source = await readRepoFile("src/app/globals.css");
+  const nameBlockStart = source.indexOf(".gallery-name {");
+  const nameBlock = source.slice(nameBlockStart, source.indexOf("}", nameBlockStart));
+
+  assert.ok(nameBlockStart >= 0, "Expected a .gallery-name rule");
+  assert.ok(nameBlock.includes("width: 100%"), "Expected gallery-name bar to span the tile width");
+  assert.ok(nameBlock.includes("background: #2d8a2d"), "Expected gallery-name bar to be JP3 green");
+});
+
 test("DinoGalleryPanel renders gallery-name with dinosaur name for each tile", async () => {
   const source = await readRepoFile("src/features/gallery/components/dino-gallery-panel.tsx");
 
@@ -72,12 +82,12 @@ test("DinoGalleryPanel renders gallery-name with dinosaur name for each tile", a
   );
 });
 
-test("DinoGalleryPanel uses square image dimensions for thumbnail tiles", async () => {
+test("DinoGalleryPanel uses 4:3 image dimensions for thumbnail tiles", async () => {
   const source = await readRepoFile("src/features/gallery/components/dino-gallery-panel.tsx");
 
   assert.ok(
-    source.includes("height={240}") && source.includes("width={240}"),
-    "Expected gallery thumbnail images to use square dimensions (240x240)",
+    source.includes("height={240}") && source.includes("width={320}"),
+    "Expected gallery thumbnail images to use 4:3 dimensions (320x240)",
   );
 });
 

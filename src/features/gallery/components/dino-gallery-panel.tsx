@@ -27,7 +27,7 @@ import { BarbasolSpinner } from "@/features/workspace-ui/components/barbasol-spi
 
 const EMPTY_STATE_TITLE = "No dinos unlocked yet.";
 const EMPTY_STATE_COPY =
-  "Solve your first 5 division problems to hatch a dinosaur reward and start your gallery.";
+  "Solve problems to bank amber, then trade it above to unlock your first dinosaur.";
 
 export interface DinoGalleryPanelProps {
   unlockedRewards?: readonly UnlockedReward[];
@@ -46,7 +46,13 @@ export function DinoGalleryPanel({
   const [selectedReward, setSelectedReward] = useState<UnlockedReward | null>(null);
   const [selectedRewardDossier, setSelectedRewardDossier] =
     useState<RewardDinosaurDossier | null>(null);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const modalScrollRef = useRef<HTMLElement | null>(null);
+  const isLightboxOpenRef = useRef(false);
+
+  useEffect(() => {
+    isLightboxOpenRef.current = isLightboxOpen;
+  }, [isLightboxOpen]);
 
   useEffect(() => {
     setGalleryRewards(sortedUnlockedRewards);
@@ -136,9 +142,17 @@ export function DinoGalleryPanel({
     document.body.style.overflow = "hidden";
 
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        setSelectedReward(null);
+      if (event.key !== "Escape") {
+        return;
       }
+
+      // The lightbox stacks on top of the dossier modal, so it closes first.
+      if (isLightboxOpenRef.current) {
+        setIsLightboxOpen(false);
+        return;
+      }
+
+      setSelectedReward(null);
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -153,6 +167,7 @@ export function DinoGalleryPanel({
 
   function closeSelectedReward(): void {
     setSelectedReward(null);
+    setIsLightboxOpen(false);
   }
 
   const modalHost = typeof document !== "undefined" ? document.body : null;
@@ -195,7 +210,7 @@ export function DinoGalleryPanel({
                     height={240}
                     loading="lazy"
                     src={reward.imagePath}
-                    width={240}
+                    width={320}
                   />
                 )}
               </div>
@@ -232,14 +247,41 @@ export function DinoGalleryPanel({
                       <BarbasolSpinner className="gallery-detail-spinner" />
                     </div>
                   ) : (
-                    <Image
-                      alt={`${selectedReward.dinosaurName} unlocked reward image`}
-                      className="gallery-detail-image"
-                      height={540}
-                      loading="lazy"
-                      src={selectedReward.imagePath}
-                      width={960}
-                    />
+                    <div className="detail-image-frame">
+                      <Image
+                        alt={`${selectedReward.dinosaurName} unlocked reward image`}
+                        className="gallery-detail-image"
+                        height={540}
+                        loading="lazy"
+                        src={selectedReward.imagePath}
+                        width={960}
+                      />
+                      <button
+                        aria-haspopup="dialog"
+                        aria-label={`View ${selectedReward.dinosaurName} image full size`}
+                        className="image-zoom-button"
+                        data-ui-action="open-image-lightbox"
+                        onClick={() => {
+                          setIsLightboxOpen(true);
+                        }}
+                        type="button"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          className="image-zoom-icon"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2.2"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle cx="10.5" cy="10.5" r="6.5" />
+                          <path d="M15.5 15.5 21 21" />
+                          <path d="M10.5 7.5v6M7.5 10.5h6" />
+                        </svg>
+                      </button>
+                    </div>
                   )}
                   <p className="gallery-detail-meta">
                     Milestone {selectedReward.milestoneSolvedCount} • Earned{" "}
@@ -307,6 +349,63 @@ export function DinoGalleryPanel({
               </button>
             </section>
           </div>
+        </div>
+          ,
+          modalHost,
+        )
+        : null}
+
+      {isLightboxOpen && selectedReward && modalHost
+        ? createPortal(
+        <div
+          className="jp-lightbox-backdrop"
+          data-ui-surface="gallery-image-lightbox"
+          onClick={() => {
+            setIsLightboxOpen(false);
+          }}
+          role="presentation"
+        >
+          <figure
+            aria-label={`${selectedReward.dinosaurName} full-size image`}
+            aria-modal="true"
+            className="jp-lightbox"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+            role="dialog"
+          >
+            <Image
+              alt={`${selectedReward.dinosaurName} unlocked reward image, full size`}
+              className="jp-lightbox-image"
+              height={1080}
+              priority
+              sizes="100vw"
+              src={selectedReward.imagePath}
+              width={1920}
+            />
+            <figcaption className="jp-lightbox-caption">
+              {selectedReward.dinosaurName}
+            </figcaption>
+            <button
+              aria-label="Close full-size image"
+              className="jp-lightbox-close"
+              onClick={() => {
+                setIsLightboxOpen(false);
+              }}
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2.2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </figure>
         </div>
           ,
           modalHost,
