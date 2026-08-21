@@ -140,6 +140,7 @@ function FractionEntryBlank({
       data-entry-lane="fraction"
       data-entry-state={isFilled ? "locked" : "pending"}
       data-ui-component="fraction-entry"
+      inputMode="numeric"
       onInput={(event) => {
         onChange(sanitizeDigits(event.currentTarget.textContent ?? ""));
       }}

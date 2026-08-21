@@ -52,6 +52,8 @@
 }
 
 body {
+  /* Decorative overlays may extend past the frame; never let them widen the page. */
+  overflow-x: clip;
   min-height: 100vh;
   background: var(--background) url('/jungle-canopy-bg.jpg') center / cover no-repeat fixed;
   color: var(--foreground);
@@ -64,7 +66,7 @@ body {
 .jp3-frame {
   position: relative;
   min-height: 100vh;
-  border: clamp(18px, 2.6vw, 32px) solid var(--jp-frame);
+  border: clamp(12px, 2.6vw, 32px) solid var(--jp-frame);
   background-image: var(--jp-frame-grain);
   background-clip: border-box;
   box-shadow:
@@ -87,10 +89,12 @@ body {
 .jp3-frame::before {
   content: "";
   position: absolute;
-  inset: calc(-1 * clamp(18px, 2.6vw, 32px));
+  /* Must match .jp3-frame's border width exactly, or the overlay pokes past
+     the viewport and the page scrolls sideways on phones. */
+  inset: calc(-1 * clamp(12px, 2.6vw, 32px));
   pointer-events: none;
   z-index: 10;
-  border: clamp(18px, 2.6vw, 32px) solid transparent;
+  border: clamp(12px, 2.6vw, 32px) solid transparent;
   border-image: repeating-linear-gradient(
     92deg,
     rgba(0, 0, 0, 0.06) 0px,
@@ -173,7 +177,8 @@ body {
 
 .jurassic-shell {
   min-height: 100vh;
-  padding: 0.625rem 1.25rem 1.25rem;
+  /* Mobile: 8px gutter between the wood frame and the panels. */
+  padding: 0.5rem;
   position: relative;
   overflow: hidden;
 }
@@ -223,7 +228,7 @@ body {
     inset 2px 2px 0 rgba(255, 255, 255, 0.12),
     inset -2px -2px 0 rgba(0, 0, 0, 0.25),
     0 0.75rem 2rem rgba(0, 0, 0, 0.25);
-  padding: 1rem;
+  padding: 0.75rem;
   overflow: hidden;
   isolation: isolate;
   color: var(--jp-panel-text);
@@ -307,7 +312,7 @@ body {
 }
 
 .jurassic-hero {
-  padding: 1.5rem;
+  padding: 0.8rem 0.9rem 0.9rem;
 }
 
 .eyebrow,
@@ -327,8 +332,8 @@ body {
 }
 
 .hero-title {
-  margin-top: 0.45rem;
-  font-size: clamp(1.8rem, 2.8vw, 2.7rem);
+  margin-top: 0.3rem;
+  font-size: clamp(1.3rem, 5vw, 2.7rem);
 }
 
 .hero-copy {
@@ -360,13 +365,13 @@ body {
    this session's solves, in field-station mono readouts. */
 
 .hero-stats-row {
-  margin-top: 0.85rem;
+  margin-top: 0.55rem;
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
   max-width: 100%;
-  padding: 0.32rem 0.75rem;
+  padding: 0.22rem 0.6rem;
   border-radius: 999px;
   border: 1px solid rgba(240, 237, 216, 0.14);
   background: rgba(0, 0, 0, 0.16);
@@ -377,7 +382,7 @@ body {
 
 .hero-stat-value {
   font-family: var(--font-jurassic-mono), "IBM Plex Mono", "Courier New", monospace;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 500;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -386,9 +391,9 @@ body {
 }
 
 .hero-stat-label {
-  font-size: 0.64rem;
+  font-size: 0.56rem;
   text-transform: uppercase;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   color: color-mix(in srgb, var(--jp-panel-text) 66%, transparent);
 }
 
@@ -405,12 +410,12 @@ body {
 
 .jurassic-layout {
   display: grid;
-  gap: 1rem;
+  gap: 0.6rem;
 }
 
 .side-stack {
   display: grid;
-  gap: 1rem;
+  gap: 0.6rem;
 }
 
 .surface-header {
@@ -436,23 +441,32 @@ body {
 }
 
 .mission-config {
-  margin-top: 0.85rem;
+  margin-top: 0.6rem;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 1rem;
+  gap: 0.45rem;
   border: 1px solid rgba(0, 0, 0, 0.22);
   border-radius: 0.45rem;
   background: rgba(0, 0, 0, 0.12);
-  padding: 0.65rem 0.8rem;
+  padding: 0.45rem 0.5rem;
 }
 
 .mission-config-group {
   display: grid;
   gap: 0.35rem;
+  width: 100%;
 }
 
+/* Mobile: the button labels explain themselves, so the group captions are
+   screen-reader-only until there's room for them (restored at 48rem). */
 .mission-config-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -460,7 +474,8 @@ body {
 }
 
 .mode-toggle {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   border: 1px solid rgba(211, 160, 58, 0.5);
   border-radius: 0.45rem;
   overflow: hidden;
@@ -472,9 +487,11 @@ body {
   background: rgba(0, 0, 0, 0.18);
   color: var(--jp-panel-text);
   font-family: var(--font-jurassic-body), sans-serif;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   letter-spacing: 0.04em;
-  padding: 0.42rem 0.8rem;
+  padding: 0.38rem 0.3rem;
+  flex: 1 1 0;
+  white-space: nowrap;
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
@@ -975,9 +992,14 @@ body {
 
 .mult-notation {
   --mult-column-count: 1;
-  --mult-cell-width: 2.2rem;
-  --mult-cell-gap: 0.45rem;
-  --mult-op-column-width: 1.1rem;
+  /* Phones: narrower cells so a 7-column product still fits the panel. */
+  --mult-cell-width: 1.75rem;
+  --mult-cell-gap: 0.28rem;
+  --mult-op-column-width: 0.95rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.25rem;
+  margin: -0.25rem;
   --mult-grid-width: calc(
     (var(--mult-column-count) * var(--mult-cell-width)) +
       ((var(--mult-column-count) - 1) * var(--mult-cell-gap))
@@ -1958,7 +1980,7 @@ body {
   z-index: 70;
   display: grid;
   place-items: center;
-  padding: 1rem;
+  padding: 0.5rem;
   background: rgba(27, 23, 17, 0.58);
   backdrop-filter: blur(2px);
 }
@@ -1973,6 +1995,8 @@ body {
   position: relative;
   display: grid;
   place-items: center;
+  width: 100%;
+  max-width: 42rem;
 }
 
 .jp-modal-aura::before,
@@ -2026,7 +2050,9 @@ body {
 .jp-modal {
   position: relative;
   z-index: 1;
-  width: min(42rem, 96vw);
+  /* Width comes from the aura (100% of the padded backdrop, capped at 42rem),
+     so the modal stays centered instead of overflowing on narrow screens. */
+  width: 100%;
   max-height: min(90vh, 46rem);
   overflow: auto;
   border: 2px solid var(--jp-panel-border);
@@ -3011,6 +3037,67 @@ body {
     padding: 1.2rem;
   }
 
+  .jurassic-hero {
+    padding: 1.5rem;
+  }
+
+  .hero-title {
+    margin-top: 0.45rem;
+  }
+
+  .hero-top-row {
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+
+  .hero-stats-row {
+    margin-top: 0.85rem;
+    gap: 0.45rem;
+    padding: 0.32rem 0.75rem;
+  }
+
+  .hero-stat-value {
+    font-size: 1.1rem;
+  }
+
+  .hero-stat-label {
+    font-size: 0.64rem;
+    letter-spacing: 0.16em;
+  }
+
+  .jurassic-layout,
+  .side-stack {
+    gap: 1rem;
+  }
+
+  .mission-config {
+    margin-top: 0.85rem;
+    gap: 1rem;
+    padding: 0.65rem 0.8rem;
+  }
+
+  .mission-config-group {
+    width: auto;
+  }
+
+  .mission-config-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+  }
+
+  .mult-notation {
+    --mult-cell-width: 2.2rem;
+    --mult-cell-gap: 0.45rem;
+    --mult-op-column-width: 1.1rem;
+  }
+
+  .jp-modal-backdrop {
+    padding: 1rem;
+  }
+
   .game-grid {
     grid-template-columns: minmax(0, 1.42fr) minmax(0, 0.95fr);
     align-items: start;
@@ -3089,6 +3176,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 0.75rem 1.1rem;
 }
 
@@ -3104,7 +3192,8 @@ body {
   gap: 0.15rem;
   font-family: var(--font-jurassic-mono), "Courier New", monospace;
   font-size: 1.45rem;
-  font-weight: 700;
+  font-weight: 400;
+  letter-spacing: 1px;
   color: var(--jp-panel-text);
   line-height: 1.1;
 }
@@ -3341,44 +3430,105 @@ body {
 
 .hero-top-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.45rem 1.5rem;
+  gap: 0.5rem 1.5rem;
 }
 
 /* DOM keeps the account bar first (tests pin that order); flex order puts
-   the console eyebrow left and the operator controls on the same line, right. */
-.hero-top-row .hero-account-bar {
-  order: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 1.1rem;
-}
-
+   the console eyebrow left and the operator dropdown on the same line, right. */
 .hero-top-row .eyebrow {
   order: 0;
   margin: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+}
+
+.hero-top-row .hero-account-bar {
+  order: 1;
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Operator dropdown trigger reads like the eyebrow; amber when open/hovered. */
+.hero-account-trigger {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0.3rem 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--jp-panel-text) 78%, transparent);
+  font: inherit;
+}
+
+.hero-account-trigger:hover,
+.hero-account-trigger[aria-expanded="true"] {
+  color: var(--jp-amber-bright);
+}
+
+.hero-account-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--jp-amber) 72%, white);
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+
+.hero-account-operator {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.58rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* "Operator:" prefix only earns its space on wider screens. */
+.hero-account-operator-prefix {
+  display: none;
+}
+
+.hero-account-caret {
+  font-size: 0.7rem;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.hero-account-trigger[aria-expanded="true"] .hero-account-caret {
+  transform: rotate(180deg);
+}
+
+.hero-account-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid rgba(211, 160, 58, 0.45);
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--jp-panel-bg) 88%, black);
+  box-shadow: 0 0.6rem 1.4rem rgba(0, 0, 0, 0.45);
 }
 
 .hero-account-link {
   /* Small text, so give it a comfortable hit area. */
-  padding: 0.3rem 0;
+  padding: 0.35rem 0;
+  text-align: left;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
-  font-size: 0.68rem;
-}
-
-/* Operator identity reads as read-only console metadata, not a control:
-   cream like the eyebrow instead of the links' amber. */
-.hero-account-operator {
-  padding: 0.3rem 0;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: color-mix(in srgb, var(--jp-panel-text) 78%, transparent);
+  letter-spacing: 0.14em;
+  font-size: 0.66rem;
+  white-space: nowrap;
 }
 
 .hero-account-notice {
@@ -3387,5 +3537,40 @@ body {
 }
 
 .change-password-modal {
-  width: min(30rem, 96vw);
+  width: min(30rem, 100%);
+}
+
+/* ── Desktop overrides for rules declared late in this file ───────
+   The operator dropdown and mode-toggle base rules above are mobile-first;
+   these must come after them in source order to win at ≥48rem. */
+@media (min-width: 48rem) {
+  .hero-top-row .eyebrow {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+  }
+
+  .hero-account-operator {
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+  }
+
+  .hero-account-operator-prefix {
+    display: inline;
+  }
+
+  .hero-account-link {
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+  }
+
+  .mode-toggle {
+    display: inline-flex;
+    width: auto;
+  }
+
+  .mode-toggle-button {
+    flex: 0 0 auto;
+    font-size: 0.82rem;
+    padding: 0.42rem 0.8rem;
+  }
 }

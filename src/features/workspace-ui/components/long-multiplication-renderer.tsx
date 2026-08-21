@@ -139,6 +139,7 @@ function MultiplicationEntryCell({
       data-glow-cadence={isActive ? stepKind : "none"}
       data-entry-target-id={targetId ?? ""}
       data-entry-digit-index={String(digitIndex)}
+      inputMode="numeric"
       onInput={isEditable ? onInput : undefined}
       onKeyDown={isEditable ? onKeyDown : undefined}
       onPaste={isEditable ? onPaste : undefined}

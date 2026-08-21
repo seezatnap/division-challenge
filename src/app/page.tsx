@@ -1147,6 +1147,34 @@ export default function Home() {
   const [changePasswordError, setChangePasswordError] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [accountNotice, setAccountNotice] = useState<string | null>(null);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Operator dropdown: click-away and Escape close it.
+  useEffect(() => {
+    if (!isAccountMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent): void => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isAccountMenuOpen]);
   const [sessionStartError, setSessionStartError] = useState<string | null>(null);
   const [sessionStartStatus, setSessionStartStatus] = useState<string | null>(null);
   const [isSessionStarted, setIsSessionStarted] = useState(false);
@@ -2638,28 +2666,58 @@ export default function Home() {
       <div className="jurassic-content">
         <header className="jurassic-panel jurassic-hero motif-canopy">
           <div className="hero-top-row">
-            <div className="hero-account-bar" data-ui-surface="account-bar">
+            <div
+              className="hero-account-bar"
+              data-ui-surface="account-bar"
+              ref={accountMenuRef}
+            >
               <button
-                aria-haspopup="dialog"
-                className="text-link-button hero-account-link"
-                data-ui-action="open-change-password"
-                onClick={openChangePasswordModal}
+                aria-controls="hero-account-menu"
+                aria-expanded={isAccountMenuOpen}
+                aria-haspopup="menu"
+                className="hero-account-trigger"
+                data-ui-action="toggle-account-menu"
+                onClick={() => {
+                  setIsAccountMenuOpen((isOpen) => !isOpen);
+                }}
                 type="button"
               >
-                Change password
-              </button>
-              <button
-                className="text-link-button hero-account-link"
-                data-ui-action="logout"
-                onClick={handleLogout}
-                type="button"
-              >
-                Log out
-              </button>
-              {activePlayerName ? (
                 <span className="hero-account-operator" data-ui-surface="operator-badge">
-                  Operator: {activePlayerName}
+                  <span className="hero-account-operator-prefix">Operator: </span>
+                  {activePlayerName ?? "Operator"}
                 </span>
+                <span aria-hidden="true" className="hero-account-caret">
+                  ▾
+                </span>
+              </button>
+              {isAccountMenuOpen ? (
+                <div className="hero-account-menu" id="hero-account-menu" role="menu">
+                  <button
+                    aria-haspopup="dialog"
+                    className="text-link-button hero-account-link"
+                    data-ui-action="open-change-password"
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      openChangePasswordModal();
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    Change password
+                  </button>
+                  <button
+                    className="text-link-button hero-account-link"
+                    data-ui-action="logout"
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      void handleLogout();
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    Log out
+                  </button>
+                </div>
               ) : null}
               {accountNotice ? (
                 <span className="hero-account-notice" role="status">
