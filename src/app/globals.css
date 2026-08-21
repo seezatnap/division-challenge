@@ -996,10 +996,9 @@ body {
   --mult-cell-width: 1.75rem;
   --mult-cell-gap: 0.28rem;
   --mult-op-column-width: 0.95rem;
-  max-width: 100%;
-  overflow-x: auto;
-  padding: 0.25rem;
-  margin: -0.25rem;
+  /* No overflow clipping here: the carry rows are absolutely positioned
+     above the digit tracks (top: -1rem) and any non-visible overflow-x
+     would force overflow-y to clip them (visible on iOS Safari). */
   --mult-grid-width: calc(
     (var(--mult-column-count) * var(--mult-cell-width)) +
       ((var(--mult-column-count) - 1) * var(--mult-cell-gap))
